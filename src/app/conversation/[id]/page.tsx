@@ -7,9 +7,9 @@ import {
   getStoredAnalysis,
   saveAnalysis,
   saveCustomAnalysis,
-  exportToMarkdown,
   type StoredAnalysis,
 } from "@/lib/storage";
+import { exportToObsidian, downloadMarkdown } from "@/lib/obsidian";
 
 interface TranscriptSegment {
   text: string;
@@ -139,16 +139,17 @@ export default function ConversationPage() {
     }
   }, [id, customPrompt]);
 
-  const handleExport = useCallback(() => {
+  const handleExportObsidian = useCallback(() => {
     if (!storedAnalysis) return;
-    const { markdown, filename } = exportToMarkdown(storedAnalysis);
-    const blob = new Blob([markdown], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+    const { uri } = exportToObsidian(storedAnalysis);
+    window.open(uri, "_blank");
+    setExported(true);
+    setTimeout(() => setExported(false), 2000);
+  }, [storedAnalysis]);
+
+  const handleDownload = useCallback(() => {
+    if (!storedAnalysis) return;
+    downloadMarkdown(storedAnalysis);
     setExported(true);
     setTimeout(() => setExported(false), 2000);
   }, [storedAnalysis]);
@@ -228,12 +229,20 @@ export default function ConversationPage() {
                 </h2>
                 <div className="flex items-center gap-2">
                   {storedAnalysis && (
-                    <button
-                      onClick={handleExport}
-                      className="text-xs bg-amber-900/40 hover:bg-amber-800/50 text-amber-300 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
-                    >
-                      {exported ? "✓ Downloaded" : "📓 Export to Obsidian"}
-                    </button>
+                    <>
+                      <button
+                        onClick={handleExportObsidian}
+                        className="text-xs bg-purple-900/40 hover:bg-purple-800/50 text-purple-300 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                      >
+                        {exported ? "✓ Saved" : "📓 Send to Obsidian"}
+                      </button>
+                      <button
+                        onClick={handleDownload}
+                        className="text-xs bg-amber-900/40 hover:bg-amber-800/50 text-amber-300 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                      >
+                        ⬇ Download .md
+                      </button>
+                    </>
                   )}
                   <button
                     onClick={runAnalysis}
