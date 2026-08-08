@@ -22,9 +22,24 @@ export interface StoredAnalysis {
   };
 }
 
-const STORAGE_KEY = "omi-thesis-analyses";
+export interface AnalysisVersion {
+  id: string;
+  timestamp: string;
+  analysis: Omit<StoredAnalysis, "id" | "timestamp" | "conversationId" | "custom">;
+}
 
-export function getStoredAnalyses(): StoredAnalysis[] {
+export interface StoredConversation {
+  conversationId: string;
+  current: StoredAnalysis;
+  versions: AnalysisVersion[];
+}
+
+const STORAGE_KEY = "omi-thesis-analyses";
+const MAX_VERSIONS = 3;
+
+// ── Helpers ──
+
+function getAll(): StoredConversation[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -34,14 +49,61 @@ export function getStoredAnalyses(): StoredAnalysis[] {
   }
 }
 
-export function getStoredAnalysis(conversationId: string): StoredAnalysis | null {
-  const all = getStoredAnalyses();
-  return all.find((a) => a.conversationId === conversationId) || null;
+function saveAll(data: StoredConversation[]): void {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
-export function saveAnalysis(analysis: Omit<StoredAnalysis, "id" | "timestamp">): StoredAnalysis {
-  const all = getStoredAnalyses();
-  const existing = all.findIndex((a) => a.conversationId === analysis.conversationId);
+// ── Age / staleness ──
+
+export function getAnalysisAge(timestamp: string): {
+  label: string;
+  days: number;
+  isStale: boolean;
+} {
+  const now = Date.now();
+  const then = new Date(timestamp).getTime();
+  const ms = now - then;
+  const days = Math.floor(ms / (1000 * 60 * 60 * 24));
+  const hours = Math.floor(ms / (1000 * 60 * 60));
+  const minutes = Math.floor(ms / (1000 * 60));
+
+  let label: string;
+  if (minutes < 1) label = "just now";
+  else if (minutes < 60) label = `${minutes}m ago`;
+  else if (hours < 24) label = `${hours}h ago`;
+  else if (days === 1) label = "yesterday";
+  else if (days < 7) label = `${days} days ago`;
+  else if (days < 30) label = `${Math.floor(days / 7)} weeks ago`;
+  else label = `${Math.floor(days / 30)} months ago`;
+
+  return { label, days, isStale: days >= 7 };
+}
+
+// ── CRUD ──
+
+export function getStoredAnalyses(): StoredAnalysis[] {
+  return getAll().map((c) => c.current);
+}
+
+export function getStoredAnalysis(conversationId: string): StoredAnalysis | null {
+  const all = getAll();
+  const found = all.find((c) => c.conversationId === conversationId);
+  return found?.current || null;
+}
+
+export function getAnalysisVersions(conversationId: string): AnalysisVersion[] {
+  const all = getAll();
+  const found = all.find((c) => c.conversationId === conversationId);
+  return found?.versions || [];
+}
+
+export function saveAnalysis(
+  analysis: Omit<StoredAnalysis, "id" | "timestamp">
+): StoredAnalysis {
+  const all = getAll();
+  const existingIdx = all.findIndex(
+    (c) => c.conversationId === analysis.conversationId
+  );
 
   const stored: StoredAnalysis = {
     ...analysis,
@@ -49,17 +111,52 @@ export function saveAnalysis(analysis: Omit<StoredAnalysis, "id" | "timestamp">)
     timestamp: new Date().toISOString(),
   };
 
-  if (existing >= 0) {
-    if (!stored.custom && all[existing].custom) {
-      stored.custom = all[existing].custom;
+  if (existingIdx >= 0) {
+    const existing = all[existingIdx];
+
+    // Preserve custom analysis from current if new one doesn't have one
+    if (!stored.custom && existing.current.custom) {
+      stored.custom = existing.current.custom;
     }
-    stored.id = all[existing].id;
-    all[existing] = stored;
+
+    // Archive current as a version (keep last MAX_VERSIONS)
+    const prevVersion: AnalysisVersion = {
+      id: existing.current.id,
+      timestamp: existing.current.timestamp,
+      analysis: {
+        title: existing.current.title,
+        category: existing.current.category,
+        date: existing.current.date,
+        rq1_documentary_record: existing.current.rq1_documentary_record,
+        rq2_everyday_practices: existing.current.rq2_everyday_practices,
+        rq3_cskt_intersection: existing.current.rq3_cskt_intersection,
+        rq4_wildness_imaginary: existing.current.rq4_wildness_imaginary,
+        conditions_check: existing.current.conditions_check,
+        rival_hypothesis_test: existing.current.rival_hypothesis_test,
+        refutation_signals: existing.current.refutation_signals,
+        forward_thinking: existing.current.forward_thinking,
+      },
+    };
+
+    const versions = [prevVersion, ...(existing.versions || [])].slice(
+      0,
+      MAX_VERSIONS
+    );
+
+    all[existingIdx] = {
+      conversationId: analysis.conversationId,
+      current: stored,
+      versions,
+    };
   } else {
-    all.unshift(stored);
+    all.unshift({
+      conversationId: analysis.conversationId,
+      current: stored,
+      versions: [],
+    });
   }
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  saveAll(all);
   return stored;
 }
 
@@ -67,94 +164,22 @@ export function saveCustomAnalysis(
   conversationId: string,
   custom: { prompt: string; result: string }
 ): void {
-  const all = getStoredAnalyses();
-  const existing = all.find((a) => a.conversationId === conversationId);
+  const all = getAll();
+  const existing = all.find((c) => c.conversationId === conversationId);
   if (existing) {
-    existing.custom = { ...custom, timestamp: new Date().toISOString() };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+    existing.current.custom = {
+      ...custom,
+      timestamp: new Date().toISOString(),
+    };
+    saveAll(all);
   }
 }
 
 export function deleteAnalysis(conversationId: string): void {
-  const all = getStoredAnalyses().filter((a) => a.conversationId !== conversationId);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  const all = getAll().filter((c) => c.conversationId !== conversationId);
+  saveAll(all);
 }
 
 export function getAnalyzedIds(): Set<string> {
-  return new Set(getStoredAnalyses().map((a) => a.conversationId));
-}
-
-export function exportToMarkdown(analysis: StoredAnalysis): { markdown: string; filename: string } {
-  const date = analysis.date
-    ? new Date(analysis.date).toISOString().split("T")[0]
-    : new Date(analysis.timestamp).toISOString().split("T")[0];
-
-  const safeName = (analysis.title || "Untitled")
-    .replace(/[\/\\:*?"<>|]/g, "-")
-    .substring(0, 80);
-
-  let md = `---
-title: "${analysis.title || "Untitled"}"
-date: ${date}
-analyzed: ${analysis.timestamp}
-category: ${analysis.category || "conversation"}
-source: Omi DK2
-tags:
-  - omi-analysis
-  - fieldwork
----
-
-# ${analysis.title || "Untitled"}
-
-> [!info] Analyzed on ${new Date(analysis.timestamp).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })} from an Omi DK2 conversation recorded ${date}.
-
-## 📜 RQ1 — Documentary Record
-
-${analysis.rq1_documentary_record}
-
-## 🏚️ RQ2 — Everyday Practices
-
-${analysis.rq2_everyday_practices}
-
-## 🪶 RQ3 — CSKT Intersection
-
-${analysis.rq3_cskt_intersection}
-
-## 🐎 RQ4 — Wildness Imaginary
-
-${analysis.rq4_wildness_imaginary}
-
-## 🎯 Orienting Conditions
-
-${analysis.conditions_check}
-
-## ⚖️ Rival Hypothesis Test
-
-${analysis.rival_hypothesis_test}
-
-## ❌ Refutation Signals
-
-${analysis.refutation_signals}
-
-## 🚀 Forward Thinking
-
-${analysis.forward_thinking}
-`;
-
-  if (analysis.custom) {
-    md += `
-## ⚙️ Custom Analysis
-
-> **Prompt:** ${analysis.custom.prompt}
-
-${analysis.custom.result}
-`;
-  }
-
-  md += `
----
-*Generated by [[Omi Thesis Analyzer]] — Pioneer Sovereignty fieldwork analysis.*
-`;
-
-  return { markdown: md, filename: `${date} - ${safeName}.md` };
+  return new Set(getAll().map((c) => c.conversationId));
 }

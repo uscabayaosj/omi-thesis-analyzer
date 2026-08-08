@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useState, useCallback, Suspense } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
   getStoredAnalysis,
+  getAnalysisVersions,
+  getAnalysisAge,
   saveAnalysis,
   saveCustomAnalysis,
   type StoredAnalysis,
+  type AnalysisVersion,
 } from "@/lib/storage";
 import { exportToObsidian, downloadMarkdown } from "@/lib/obsidian";
 
@@ -41,6 +44,8 @@ interface Analysis {
 }
 
 const TRANSCRIPT_PAGE_SIZE = 50;
+
+// ── Components ──
 
 function TranscriptViewer({ segments }: { segments: TranscriptSegment[] }) {
   const [visibleCount, setVisibleCount] = useState(TRANSCRIPT_PAGE_SIZE);
@@ -96,11 +101,124 @@ function AnalysisSection({
   );
 }
 
+function AnalysisAgeBadge({ timestamp }: { timestamp: string }) {
+  const { label, isStale } = getAnalysisAge(timestamp);
+
+  return (
+    <span
+      className={`text-xs px-2 py-0.5 rounded-full font-normal ${
+        isStale
+          ? "bg-amber-900/50 text-amber-300"
+          : "bg-indigo-900/50 text-indigo-200"
+      }`}
+      title={`Analyzed on ${new Date(timestamp).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })}`}
+    >
+      {isStale ? "⚠ " : ""}{label}
+    </span>
+  );
+}
+
+function VersionHistory({
+  versions,
+  onSelect,
+}: {
+  versions: AnalysisVersion[];
+  onSelect: (version: AnalysisVersion) => void;
+}) {
+  if (versions.length === 0) return null;
+
+  return (
+    <details className="card mt-4">
+      <summary className="p-4 cursor-pointer text-sm text-slate-400 hover:text-slate-200 transition-colors min-h-[44px] flex items-center">
+        📋 Previous versions ({versions.length})
+      </summary>
+      <div className="px-4 pb-4 space-y-2">
+        {versions.map((v, i) => (
+          <button
+            key={v.id}
+            onClick={() => onSelect(v)}
+            className="w-full text-left p-3 rounded-lg bg-slate-900 hover:bg-slate-800 transition-colors min-h-[44px]"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-slate-300">
+                Version {versions.length - i}
+              </span>
+              <span className="text-xs text-slate-500">
+                {new Date(v.timestamp).toLocaleDateString("en-GB", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">Click to view this version</p>
+          </button>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+function ConfirmRerunDialog({
+  onConfirm,
+  onCancel,
+  analyzedLabel,
+}: {
+  onConfirm: () => void;
+  onCancel: () => void;
+  analyzedLabel: string;
+}) {
+  return (
+    <div
+      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Confirm re-run analysis"
+    >
+      <div className="card p-6 max-w-md w-full border-amber-500/30">
+        <h3 className="text-lg font-semibold text-white mb-2">
+          ⚠️ Replace existing analysis?
+        </h3>
+        <p className="text-sm text-slate-400 mb-4">
+          This conversation was last analyzed <strong className="text-slate-200">{analyzedLabel}</strong>.
+          Re-running will replace the current analysis. A copy will be saved in version history (last 3 versions kept).
+        </p>
+        <div className="flex gap-3 justify-end">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 min-h-[44px] text-sm text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 min-h-[44px] text-sm text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg transition-colors"
+          >
+            Re-analyze
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Page ──
+
 export default function ConversationPage() {
   const { id } = useParams<{ id: string }>();
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [storedAnalysis, setStoredAnalysis] = useState<StoredAnalysis | null>(null);
+  const [versions, setVersions] = useState<AnalysisVersion[]>([]);
+  const [viewingVersion, setViewingVersion] = useState<AnalysisVersion | null>(null);
   const [customPrompt, setCustomPrompt] = useState("");
   const [showCustom, setShowCustom] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -109,7 +227,9 @@ export default function ConversationPage() {
   const [error, setError] = useState<string | null>(null);
   const [exported, setExported] = useState(false);
   const [customResult, setCustomResult] = useState<string | null>(null);
+  const [showRerunConfirm, setShowRerunConfirm] = useState(false);
 
+  // Load stored analysis
   useEffect(() => {
     const stored = getStoredAnalysis(id);
     if (stored) {
@@ -129,8 +249,10 @@ export default function ConversationPage() {
         setCustomResult(stored.custom.result);
       }
     }
+    setVersions(getAnalysisVersions(id));
   }, [id]);
 
+  // Fetch conversation from API
   useEffect(() => {
     fetch(`/api/conversations/${id}`)
       .then((r) => r.json())
@@ -142,9 +264,10 @@ export default function ConversationPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const runAnalysis = useCallback(async () => {
+  const executeAnalysis = useCallback(async () => {
     setAnalyzing(true);
     setError(null);
+    setViewingVersion(null);
     try {
       const res = await fetch("/api/analyze", {
         method: "POST",
@@ -164,13 +287,23 @@ export default function ConversationPage() {
           ...data.analysis,
         });
         setStoredAnalysis(stored);
+        setVersions(getAnalysisVersions(id));
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Analysis failed");
     } finally {
       setAnalyzing(false);
+      setShowRerunConfirm(false);
     }
   }, [id, conversation]);
+
+  const handleAnalyzeClick = useCallback(() => {
+    if (storedAnalysis) {
+      setShowRerunConfirm(true);
+    } else {
+      executeAnalysis();
+    }
+  }, [storedAnalysis, executeAnalysis]);
 
   const runCustomAnalysis = useCallback(async () => {
     if (!customPrompt.trim()) return;
@@ -212,6 +345,27 @@ export default function ConversationPage() {
     downloadMarkdown(storedAnalysis);
     setExported(true);
     setTimeout(() => setExported(false), 2000);
+  }, [storedAnalysis]);
+
+  const viewVersion = useCallback((version: AnalysisVersion) => {
+    setViewingVersion(version);
+    setAnalysis(version.analysis);
+  }, []);
+
+  const viewCurrent = useCallback(() => {
+    setViewingVersion(null);
+    if (storedAnalysis) {
+      setAnalysis({
+        rq1_documentary_record: storedAnalysis.rq1_documentary_record,
+        rq2_everyday_practices: storedAnalysis.rq2_everyday_practices,
+        rq3_cskt_intersection: storedAnalysis.rq3_cskt_intersection,
+        rq4_wildness_imaginary: storedAnalysis.rq4_wildness_imaginary,
+        conditions_check: storedAnalysis.conditions_check,
+        rival_hypothesis_test: storedAnalysis.rival_hypothesis_test,
+        refutation_signals: storedAnalysis.refutation_signals,
+        forward_thinking: storedAnalysis.forward_thinking,
+      });
+    }
   }, [storedAnalysis]);
 
   const sections = analysis
@@ -275,7 +429,7 @@ export default function ConversationPage() {
           {/* Analyze button */}
           {!analysis && (
             <button
-              onClick={runAnalysis}
+              onClick={handleAnalyzeClick}
               disabled={analyzing}
               aria-label="Run Pioneer Sovereignty analysis on this conversation"
               className="w-full card p-6 text-center hover:border-indigo-500/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mb-8 min-h-[44px]"
@@ -302,12 +456,28 @@ export default function ConversationPage() {
           {sections.length > 0 && (
             <section className="mb-8" aria-label="Pioneer Sovereignty analysis results">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2 flex-wrap">
                   🧠 Pioneer Sovereignty Analysis
-                  <span className="text-xs bg-indigo-900/50 text-indigo-200 px-2 py-0.5 rounded-full font-normal">saved</span>
+                  {storedAnalysis && (
+                    <AnalysisAgeBadge timestamp={storedAnalysis.timestamp} />
+                  )}
+                  {viewingVersion && (
+                    <span className="text-xs bg-rose-900/50 text-rose-300 px-2 py-0.5 rounded-full font-normal">
+                      viewing previous version
+                    </span>
+                  )}
                 </h2>
                 <div className="flex items-center gap-2">
-                  {storedAnalysis && (
+                  {viewingVersion && (
+                    <button
+                      onClick={viewCurrent}
+                      aria-label="Return to current analysis"
+                      className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors"
+                    >
+                      ← Current
+                    </button>
+                  )}
+                  {storedAnalysis && !viewingVersion && (
                     <>
                       <button
                         onClick={handleExportObsidian}
@@ -325,14 +495,16 @@ export default function ConversationPage() {
                       </button>
                     </>
                   )}
-                  <button
-                    onClick={runAnalysis}
-                    disabled={analyzing}
-                    aria-label="Re-run analysis"
-                    className="text-sm text-slate-400 hover:text-indigo-400 transition-colors px-2 py-2 min-h-[44px]"
-                  >
-                    🔄
-                  </button>
+                  {!viewingVersion && (
+                    <button
+                      onClick={handleAnalyzeClick}
+                      disabled={analyzing}
+                      aria-label="Re-run analysis"
+                      className="text-sm text-slate-400 hover:text-indigo-400 transition-colors px-2 py-2 min-h-[44px]"
+                    >
+                      🔄
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="space-y-6">
@@ -340,7 +512,21 @@ export default function ConversationPage() {
                   <AnalysisSection key={section.title} {...section} />
                 ))}
               </div>
+
+              {/* Version history */}
+              {!viewingVersion && (
+                <VersionHistory versions={versions} onSelect={viewVersion} />
+              )}
             </section>
+          )}
+
+          {/* Re-run confirmation dialog */}
+          {showRerunConfirm && storedAnalysis && (
+            <ConfirmRerunDialog
+              onConfirm={executeAnalysis}
+              onCancel={() => setShowRerunConfirm(false)}
+              analyzedLabel={getAnalysisAge(storedAnalysis.timestamp).label}
+            />
           )}
 
           {/* Custom analysis */}
@@ -422,8 +608,8 @@ export default function ConversationPage() {
 
             {customResult && (
               <div className="card mt-2 p-6 border-amber-500/30">
-                <div className="analysis-section" style={{ background: "rgba(245, 158, 11, 0.06)" }}>
-                  <h3 style={{ color: "#fbbf24" }}>
+                <div className="analysis-section" style={{ background: "var(--custom-analysis-bg, rgba(245, 158, 11, 0.06))" }}>
+                  <h3 style={{ color: "var(--custom-analysis-text, #fbbf24)" }}>
                     <span aria-hidden="true">⚙️</span> Custom Analysis
                   </h3>
                   <p className="text-xs text-slate-500 mb-1">Prompt: &ldquo;{customPrompt}&rdquo;</p>

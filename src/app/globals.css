@@ -9,6 +9,8 @@
   --accent-light: #818cf8;
   --muted: #64748b;
   --border: #334155;
+  --custom-analysis-bg: rgba(245, 158, 11, 0.06);
+  --custom-analysis-text: #fbbf24;
 }
 
 body {
