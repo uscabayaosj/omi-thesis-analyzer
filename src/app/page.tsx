@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getAnalyzedIds } from "@/lib/storage";
+import { BookIcon, SquareIcon, XIcon, CheckIcon, SparklesIcon, WarningIcon, MicIcon, FolderIcon } from "@/components/icons";
 
 interface Conversation {
   id: string;
@@ -15,6 +16,21 @@ interface Conversation {
     category?: string;
   };
   folder_name?: string;
+}
+
+function AnalyzedIndicator({ analyzed }: { analyzed: boolean }) {
+  return (
+    <div
+      className={`w-8 h-8 mt-0.5 flex-shrink-0 rounded-full border flex items-center justify-center ${
+        analyzed
+          ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400"
+          : "bg-slate-800/60 border-slate-700 text-slate-600"
+      }`}
+      aria-hidden="true"
+    >
+      {analyzed ? <CheckIcon className="w-4 h-4" /> : <span className="w-1.5 h-1.5 rounded-full bg-current" />}
+    </div>
+  );
 }
 
 export default function Home() {
@@ -80,22 +96,27 @@ export default function Home() {
     <main className="max-w-3xl mx-auto px-4 py-8">
       <header className="mb-10">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-white mb-2">📚 Thesis Analyzer</h1>
+          <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-2">
+            <BookIcon className="w-7 h-7 text-indigo-400 flex-shrink-0" />
+            Thesis Analyzer
+          </h1>
           {!selectMode ? (
             <button
               onClick={() => setSelectMode(true)}
               aria-label="Enable selection mode to analyze multiple conversations as a group"
-              className="text-sm min-h-[44px] bg-indigo-900/40 hover:bg-indigo-800/50 text-indigo-200 px-4 py-2 rounded-lg transition-colors border border-indigo-700/30"
+              className="text-sm min-h-[44px] flex items-center gap-1.5 bg-indigo-900/40 hover:bg-indigo-800/50 text-indigo-200 px-4 py-2 rounded-lg transition-colors border border-indigo-700/30"
             >
-              ☐ Select &amp; Analyze Group
+              <SquareIcon className="w-3.5 h-3.5" />
+              Select &amp; Analyze Group
             </button>
           ) : (
             <button
               onClick={exitSelectMode}
               aria-label="Cancel selection mode"
-              className="text-sm min-h-[44px] bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg transition-colors"
+              className="text-sm min-h-[44px] flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg transition-colors"
             >
-              ✕ Cancel
+              <XIcon className="w-3.5 h-3.5" />
+              Cancel
             </button>
           )}
         </div>
@@ -106,7 +127,10 @@ export default function Home() {
         {/* Onboarding: About this framework */}
         <details className="mt-4 card">
           <summary className="p-4 cursor-pointer text-sm text-slate-400 hover:text-slate-200 transition-colors min-h-[44px] flex items-center justify-between">
-            <span>📖 What is Pioneer Sovereignty?</span>
+            <span className="flex items-center gap-2">
+              <BookIcon className="w-4 h-4 flex-shrink-0" />
+              What is Pioneer Sovereignty?
+            </span>
             <span className="text-xs text-slate-600">For collaborators & first-time users</span>
           </summary>
           <div className="px-4 pb-4 text-sm text-slate-300 space-y-3">
@@ -124,14 +148,28 @@ export default function Home() {
             <div className="pt-2">
               <p className="font-medium text-slate-200 mb-2">The 8 analysis dimensions:</p>
               <ul className="space-y-1.5 text-slate-400">
-                <li>📜 <strong className="text-slate-300">RQ1 — Documentary Record</strong>: Historical-legal acts that constituted authority (patents, water rights)</li>
-                <li>🏚️ <strong className="text-slate-300">RQ2 — Everyday Practices</strong>: Kinship, inheritance, branding, boundary-maintenance, conflict</li>
-                <li>🪶 <strong className="text-slate-300">RQ3 — CSKT Intersection</strong>: How ranching authority intersects with tribal sovereignty</li>
-                <li>🐎 <strong className="text-slate-300">RQ4 — Wildness Imaginary</strong>: Frontier mythology as double erasure of Indigenous + federal authority</li>
-                <li>🎯 <strong className="text-slate-300">Orienting Conditions</strong>: Which of 5 theoretical conditions are evidenced</li>
-                <li>⚖️ <strong className="text-slate-300">Rival Hypothesis Test</strong>: Is frontier framing felt subjectivity or instrumental rhetoric?</li>
-                <li>❌ <strong className="text-slate-300">Refutation Signals</strong>: What would disconfirm the concept</li>
-                <li>🚀 <strong className="text-slate-300">Forward Thinking</strong>: Research directions and next questions</li>
+                {[
+                  { label: "RQ1 — Documentary Record", desc: "Historical-legal acts that constituted authority (patents, water rights)" },
+                  { label: "RQ2 — Everyday Practices", desc: "Kinship, inheritance, branding, boundary-maintenance, conflict" },
+                  { label: "RQ3 — CSKT Intersection", desc: "How ranching authority intersects with tribal sovereignty" },
+                  { label: "RQ4 — Wildness Imaginary", desc: "Frontier mythology as double erasure of Indigenous + federal authority" },
+                  { label: "Orienting Conditions", desc: "Which of 5 theoretical conditions are evidenced" },
+                  { label: "Rival Hypothesis Test", desc: "Is frontier framing felt subjectivity or instrumental rhetoric?" },
+                  { label: "Refutation Signals", desc: "What would disconfirm the concept" },
+                  { label: "Forward Thinking", desc: "Research directions and next questions" },
+                ].map((dim, i) => (
+                  <li key={dim.label} className="flex gap-2">
+                    <span
+                      className="flex-shrink-0 mt-0.5 w-5 h-5 rounded-full bg-slate-800 text-slate-400 text-[10px] font-semibold flex items-center justify-center"
+                      aria-hidden="true"
+                    >
+                      {i + 1}
+                    </span>
+                    <span>
+                      <strong className="text-slate-300">{dim.label}</strong>: {dim.desc}
+                    </span>
+                  </li>
+                ))}
               </ul>
             </div>
             <p className="text-xs text-slate-500 pt-2">
@@ -160,7 +198,7 @@ export default function Home() {
                       : "bg-slate-800 text-slate-300 hover:text-white"
                   }`}
                 >
-                  {f === "all" ? "All" : f === "analyzed" ? "✓ Analyzed" : "○ Unanalyzed"}
+                  {f === "all" ? "All" : f === "analyzed" ? "Analyzed" : "Unanalyzed"}
                 </button>
               ))}
             </div>
@@ -180,7 +218,7 @@ export default function Home() {
                 aria-label={selected.size === filtered.length ? "Deselect all conversations" : "Select all conversations"}
                 className="text-sm min-h-[44px] bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg transition-colors"
               >
-                {selected.size === filtered.length ? "☐ Deselect All" : "☑ Select All"}
+                {selected.size === filtered.length ? "Deselect All" : "Select All"}
               </button>
               <span className="text-sm text-slate-400" aria-live="polite">
                 {selected.size} selected
@@ -190,9 +228,10 @@ export default function Home() {
               onClick={startGroupAnalysis}
               disabled={selected.size < 2}
               aria-label={`Analyze ${selected.size} selected conversations as a group`}
-              className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-white text-white font-medium py-2 px-5 min-h-[44px] rounded-lg text-sm transition-colors"
+              className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-white text-white font-medium py-2 px-5 min-h-[44px] rounded-lg text-sm transition-colors"
             >
-              🧠 Analyze Group ({selected.size})
+              <SparklesIcon className="w-4 h-4" />
+              Analyze Group ({selected.size})
             </button>
           </div>
         )}
@@ -206,14 +245,17 @@ export default function Home() {
 
       {error && (
         <div className="card p-6 border-red-500/50" role="alert">
-          <p className="text-red-400">⚠ {error}</p>
+          <p className="text-red-400 flex items-center gap-2">
+            <WarningIcon className="w-5 h-5 flex-shrink-0" />
+            {error}
+          </p>
           <p className="text-slate-300 text-sm mt-2">Make sure OMI_API_KEY is set in your environment.</p>
         </div>
       )}
 
       {!loading && !error && conversations.length === 0 && (
         <div className="card p-8 text-center">
-          <p className="text-4xl mb-4">🎙️</p>
+          <MicIcon className="w-10 h-10 mx-auto mb-4 text-slate-600" />
           <p className="text-slate-300">No conversations found.</p>
           <p className="text-slate-400 text-sm mt-2">Record a conversation with your Omi device, then come back.</p>
         </div>
@@ -242,7 +284,7 @@ export default function Home() {
                 onClick={() => toggleSelect(convo.id)}
                 role="option"
                 aria-selected={isSelected}
-                aria-label={`${isSelected ? "Deselect" : "Select"} "${convo.structured?.title || "Untitled"}" for group analysis`}
+                aria-label={`${isSelected ? "Deselect" : "Select"} "${convo.structured?.title || "Untitled"}" for group analysis${isAnalyzed ? " (analyzed)" : ""}`}
                 className={`w-full text-left card p-5 transition-colors min-h-[44px] ${
                   isSelected
                     ? "border-indigo-500 bg-indigo-950/30"
@@ -259,21 +301,14 @@ export default function Home() {
                     aria-hidden="true"
                   >
                     {isSelected && (
-                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
+                      <CheckIcon className="w-3 h-3 text-white" />
                     )}
                   </div>
-                  <span className="text-2xl mt-0.5" aria-hidden="true">{convo.structured?.emoji || "💬"}</span>
+                  <AnalyzedIndicator analyzed={isAnalyzed} />
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h2 className="font-semibold text-white truncate">
-                        {convo.structured?.title || "Untitled"}
-                      </h2>
-                      {isAnalyzed && (
-                        <span className="text-emerald-400 text-xs flex-shrink-0" aria-label="Previously analyzed">✓</span>
-                      )}
-                    </div>
+                    <h2 className="font-semibold text-white truncate">
+                      {convo.structured?.title || "Untitled"}
+                    </h2>
                     {convo.structured?.overview && (
                       <p className="text-slate-400 text-sm mt-1 line-clamp-1">{convo.structured.overview}</p>
                     )}
@@ -304,16 +339,11 @@ export default function Home() {
               }`}
             >
               <div className="flex items-start gap-3">
-                <span className="text-2xl mt-0.5" aria-hidden="true">{convo.structured?.emoji || "💬"}</span>
+                <AnalyzedIndicator analyzed={isAnalyzed} />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h2 className="font-semibold text-white truncate">
-                      {convo.structured?.title || "Untitled"}
-                    </h2>
-                    {isAnalyzed && (
-                      <span className="text-emerald-400 text-xs flex-shrink-0" aria-label="Analyzed">✓</span>
-                    )}
-                  </div>
+                  <h2 className="font-semibold text-white truncate">
+                    {convo.structured?.title || "Untitled"}
+                  </h2>
                   {convo.structured?.overview && (
                     <p className="text-slate-400 text-sm mt-1 line-clamp-2">{convo.structured.overview}</p>
                   )}
@@ -328,8 +358,9 @@ export default function Home() {
                       <span className="bg-slate-800 px-2 py-0.5 rounded-full">{convo.structured.category}</span>
                     )}
                     {convo.folder_name && (
-                      <span className="bg-indigo-900/50 text-indigo-300 px-2 py-0.5 rounded-full">
-                        📁 {convo.folder_name}
+                      <span className="flex items-center gap-1 bg-indigo-900/50 text-indigo-300 px-2 py-0.5 rounded-full">
+                        <FolderIcon className="w-3 h-3" />
+                        {convo.folder_name}
                       </span>
                     )}
                   </div>
