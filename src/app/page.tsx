@@ -192,7 +192,7 @@ export default function Home() {
         </div>
       )}
 
-      <div className="space-y-3" role={selectMode ? "listbox" : "list"} aria-label="Conversations" aria-multiselectable={selectMode || undefined}>
+      <div className="space-y-3 conversation-list" role={selectMode ? "listbox" : "list"} aria-label="Conversations" aria-multiselectable={selectMode || undefined}>
         {filtered.map((convo) => {
           const isAnalyzed = analyzedIds.has(convo.id);
           const isSelected = selected.has(convo.id);
