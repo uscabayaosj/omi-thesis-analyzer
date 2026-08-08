@@ -84,14 +84,16 @@ export default function Home() {
           {!selectMode ? (
             <button
               onClick={() => setSelectMode(true)}
-              className="text-xs bg-indigo-900/40 hover:bg-indigo-800/50 text-indigo-300 px-3 py-1.5 rounded-lg transition-colors"
+              aria-label="Enable selection mode to analyze multiple conversations as a group"
+              className="text-sm min-h-[44px] bg-indigo-900/40 hover:bg-indigo-800/50 text-indigo-200 px-4 py-2 rounded-lg transition-colors"
             >
-              ☐ Select & Analyze Group
+              ☐ Select &amp; Analyze Group
             </button>
           ) : (
             <button
               onClick={exitSelectMode}
-              className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg transition-colors"
+              aria-label="Cancel selection mode"
+              className="text-sm min-h-[44px] bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg transition-colors"
             >
               ✕ Cancel
             </button>
@@ -103,18 +105,21 @@ export default function Home() {
 
         {conversations.length > 0 && (
           <div className="flex items-center gap-4 mt-4 text-sm">
-            <span className="text-slate-500">
+            <span className="text-slate-400">
               {analyzedCount}/{conversations.length} analyzed
             </span>
-            <div className="flex gap-1">
+            <div className="flex gap-1" role="radiogroup" aria-label="Filter conversations by analysis status">
               {(["all", "analyzed", "unanalyzed"] as const).map((f) => (
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
-                  className={`px-3 py-1 rounded-full text-xs transition-colors ${
+                  role="radio"
+                  aria-checked={filter === f}
+                  aria-label={`Show ${f} conversations`}
+                  className={`px-4 py-2 min-h-[44px] rounded-full text-sm transition-colors ${
                     filter === f
                       ? "bg-indigo-600 text-white"
-                      : "bg-slate-800 text-slate-400 hover:text-slate-200"
+                      : "bg-slate-800 text-slate-300 hover:text-white"
                   }`}
                 >
                   {f === "all" ? "All" : f === "analyzed" ? "✓ Analyzed" : "○ Unanalyzed"}
@@ -126,22 +131,28 @@ export default function Home() {
 
         {/* Selection mode toolbar */}
         {selectMode && (
-          <div className="mt-4 card p-4 border-indigo-500/30 flex items-center justify-between">
+          <div
+            className="mt-4 card p-4 border-indigo-500/30 flex items-center justify-between"
+            role="toolbar"
+            aria-label="Group analysis toolbar"
+          >
             <div className="flex items-center gap-3">
               <button
                 onClick={selectAll}
-                className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg transition-colors"
+                aria-label={selected.size === filtered.length ? "Deselect all conversations" : "Select all conversations"}
+                className="text-sm min-h-[44px] bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg transition-colors"
               >
                 {selected.size === filtered.length ? "☐ Deselect All" : "☑ Select All"}
               </button>
-              <span className="text-sm text-slate-400">
+              <span className="text-sm text-slate-400" aria-live="polite">
                 {selected.size} selected
               </span>
             </div>
             <button
               onClick={startGroupAnalysis}
               disabled={selected.size < 2}
-              className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium py-2 px-4 rounded-lg text-sm transition-colors"
+              aria-label={`Analyze ${selected.size} selected conversations as a group`}
+              className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-white text-white font-medium py-2 px-5 min-h-[44px] rounded-lg text-sm transition-colors"
             >
               🧠 Analyze Group ({selected.size})
             </button>
@@ -150,15 +161,15 @@ export default function Home() {
       </header>
 
       {loading && (
-        <div className="space-y-4">
+        <div className="space-y-4" aria-label="Loading conversations" role="status">
           {[1, 2, 3].map((i) => <div key={i} className="skeleton h-24 w-full" />)}
         </div>
       )}
 
       {error && (
-        <div className="card p-6 border-red-500/50">
+        <div className="card p-6 border-red-500/50" role="alert">
           <p className="text-red-400">⚠ {error}</p>
-          <p className="text-slate-500 text-sm mt-2">Make sure OMI_API_KEY is set in your environment.</p>
+          <p className="text-slate-300 text-sm mt-2">Make sure OMI_API_KEY is set in your environment.</p>
         </div>
       )}
 
@@ -166,7 +177,7 @@ export default function Home() {
         <div className="card p-8 text-center">
           <p className="text-4xl mb-4">🎙️</p>
           <p className="text-slate-300">No conversations found.</p>
-          <p className="text-slate-500 text-sm mt-2">Record a conversation with your Omi device, then come back.</p>
+          <p className="text-slate-400 text-sm mt-2">Record a conversation with your Omi device, then come back.</p>
         </div>
       )}
 
@@ -175,13 +186,13 @@ export default function Home() {
           <p className="text-slate-400">
             {filter === "analyzed" ? "No analyzed conversations yet." : "All conversations have been analyzed!"}
           </p>
-          <button onClick={() => setFilter("all")} className="text-indigo-400 text-sm mt-2 hover:underline">
+          <button onClick={() => setFilter("all")} className="text-indigo-400 text-sm mt-2 hover:underline min-h-[44px] px-2">
             Show all
           </button>
         </div>
       )}
 
-      <div className="space-y-3">
+      <div className="space-y-3" role={selectMode ? "listbox" : "list"} aria-label="Conversations" aria-multiselectable={selectMode || undefined}>
         {filtered.map((convo) => {
           const isAnalyzed = analyzedIds.has(convo.id);
           const isSelected = selected.has(convo.id);
@@ -191,32 +202,38 @@ export default function Home() {
               <button
                 key={convo.id}
                 onClick={() => toggleSelect(convo.id)}
-                className={`w-full text-left card p-5 transition-colors ${
+                role="option"
+                aria-selected={isSelected}
+                aria-label={`${isSelected ? "Deselect" : "Select"} "${convo.structured?.title || "Untitled"}" for group analysis`}
+                className={`w-full text-left card p-5 transition-colors min-h-[44px] ${
                   isSelected
                     ? "border-indigo-500 bg-indigo-950/30"
                     : "hover:border-slate-600"
                 }`}
               >
                 <div className="flex items-start gap-3">
-                  <div className={`w-5 h-5 mt-1 flex-shrink-0 rounded border-2 flex items-center justify-center transition-colors ${
-                    isSelected
-                      ? "bg-indigo-600 border-indigo-600"
-                      : "border-slate-600"
-                  }`}>
+                  <div
+                    className={`w-5 h-5 mt-1 flex-shrink-0 rounded border-2 flex items-center justify-center transition-colors ${
+                      isSelected
+                        ? "bg-indigo-600 border-indigo-600"
+                        : "border-slate-600"
+                    }`}
+                    aria-hidden="true"
+                  >
                     {isSelected && (
                       <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
                     )}
                   </div>
-                  <span className="text-2xl mt-0.5">{convo.structured?.emoji || "💬"}</span>
+                  <span className="text-2xl mt-0.5" aria-hidden="true">{convo.structured?.emoji || "💬"}</span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <h2 className="font-semibold text-white truncate">
                         {convo.structured?.title || "Untitled"}
                       </h2>
                       {isAnalyzed && (
-                        <span className="text-emerald-400 text-xs flex-shrink-0">✓</span>
+                        <span className="text-emerald-400 text-xs flex-shrink-0" aria-label="Previously analyzed">✓</span>
                       )}
                     </div>
                     {convo.structured?.overview && (
@@ -243,19 +260,20 @@ export default function Home() {
             <Link
               key={convo.id}
               href={`/conversation/${convo.id}`}
-              className={`card p-5 block transition-colors ${
+              aria-label={`${convo.structured?.title || "Untitled conversation"}${isAnalyzed ? " (analyzed)" : ""}`}
+              className={`card p-5 block transition-colors min-h-[44px] ${
                 isAnalyzed ? "hover:border-emerald-500/50" : "hover:border-indigo-500/50"
               }`}
             >
               <div className="flex items-start gap-3">
-                <span className="text-2xl mt-0.5">{convo.structured?.emoji || "💬"}</span>
+                <span className="text-2xl mt-0.5" aria-hidden="true">{convo.structured?.emoji || "💬"}</span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <h2 className="font-semibold text-white truncate">
                       {convo.structured?.title || "Untitled"}
                     </h2>
                     {isAnalyzed && (
-                      <span className="text-emerald-400 text-xs flex-shrink-0">✓</span>
+                      <span className="text-emerald-400 text-xs flex-shrink-0" aria-label="Analyzed">✓</span>
                     )}
                   </div>
                   {convo.structured?.overview && (
@@ -278,7 +296,7 @@ export default function Home() {
                     )}
                   </div>
                 </div>
-                <svg className="w-5 h-5 text-slate-600 mt-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5 text-slate-600 mt-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </div>

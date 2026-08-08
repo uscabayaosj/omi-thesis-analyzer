@@ -99,6 +99,7 @@ tags:
   - omi-analysis
   - fieldwork
   - group-analysis
+  - pioneer-sovereignty
 ---
 
 # Group Analysis
@@ -161,8 +162,8 @@ function GroupAnalysisContent() {
   const [showCustom, setShowCustom] = useState(false);
   const [customAnalyzing, setCustomAnalyzing] = useState(false);
   const [exported, setExported] = useState(false);
+  const [customResult, setCustomResult] = useState<string | null>(null);
 
-  // Check for stored analysis
   useEffect(() => {
     const stored = getStoredGroupAnalyses();
     const key = [...ids].sort().join(",");
@@ -170,7 +171,10 @@ function GroupAnalysisContent() {
     if (existing) {
       setAnalysis(existing.analysis);
       setConversations(existing.conversations);
-      if (existing.custom) setCustomPrompt(existing.custom.prompt);
+      if (existing.custom) {
+        setCustomPrompt(existing.custom.prompt);
+        setCustomResult(existing.custom.result);
+      }
       setLoading(false);
     } else {
       setLoading(false);
@@ -218,6 +222,7 @@ function GroupAnalysisContent() {
       if (data.error) setError(data.error);
       else {
         saveGroupCustom(ids, { prompt: customPrompt, result: data.result });
+        setCustomResult(data.result);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Custom analysis failed");
@@ -250,31 +255,47 @@ function GroupAnalysisContent() {
 
   return (
     <main className="max-w-3xl mx-auto px-4 py-8">
-      <Link href="/" className="text-slate-400 hover:text-white text-sm mb-6 inline-flex items-center gap-1">
+      <Link href="/" className="text-slate-400 hover:text-white text-sm mb-6 inline-flex items-center gap-1 min-h-[44px] py-2">
         ← Back to conversations
       </Link>
 
       <header className="mb-6">
         <h1 className="text-2xl font-bold text-white mb-2">
-          🧠 Group Analysis
+          <span aria-hidden="true">🧠</span> Group Analysis
         </h1>
         <p className="text-slate-400 text-sm">
           {ids.length} conversations selected for cross-conversation analysis
         </p>
         {conversations.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-3">
+          <div className="flex flex-wrap gap-2 mt-3" role="list" aria-label="Conversations in this group">
             {conversations.map((c) => (
-              <span key={c.id} className="text-xs bg-slate-800 text-slate-300 px-2 py-1 rounded-md">
-                {c.emoji} {c.title}
+              <span key={c.id} className="text-sm bg-slate-800 text-slate-300 px-3 py-1.5 rounded-md" role="listitem">
+                <span aria-hidden="true">{c.emoji}</span> {c.title}
               </span>
             ))}
           </div>
         )}
       </header>
 
+      {loading && (
+        <div className="space-y-4" role="status" aria-label="Loading group analysis">
+          <div className="skeleton h-8 w-3/4" />
+          <div className="skeleton h-4 w-1/2" />
+          <div className="skeleton h-32 w-full" />
+          <div className="skeleton h-32 w-full" />
+        </div>
+      )}
+
       {error && (
-        <div className="card p-6 border-red-500/50 mb-6">
+        <div className="card p-6 border-red-500/50 mb-6" role="alert">
           <p className="text-red-400">⚠ {error}</p>
+          <button
+            onClick={() => setError(null)}
+            className="mt-2 text-sm text-slate-400 hover:text-white min-h-[44px] px-2"
+            aria-label="Dismiss error"
+          >
+            Dismiss
+          </button>
         </div>
       )}
 
@@ -283,11 +304,12 @@ function GroupAnalysisContent() {
         <button
           onClick={runAnalysis}
           disabled={analyzing}
-          className="w-full card p-6 text-center hover:border-indigo-500/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mb-8"
+          aria-label={`Run group analysis on ${ids.length} conversations`}
+          className="w-full card p-6 text-center hover:border-indigo-500/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mb-8 min-h-[44px]"
         >
           {analyzing ? (
             <div className="flex items-center justify-center gap-3">
-              <span className="pulse-dot text-2xl">⏳</span>
+              <span className="pulse-dot text-2xl" aria-hidden="true">⏳</span>
               <div>
                 <p className="font-semibold text-white">Analyzing {ids.length} conversations...</p>
                 <p className="text-slate-400 text-sm mt-1">Running cross-conversation analysis</p>
@@ -295,7 +317,7 @@ function GroupAnalysisContent() {
             </div>
           ) : (
             <div>
-              <p className="text-2xl mb-2">🧠</p>
+              <p className="text-2xl mb-2" aria-hidden="true">🧠</p>
               <p className="font-semibold text-white">Run Group Analysis</p>
               <p className="text-slate-400 text-sm mt-1">Find patterns across {ids.length} conversations</p>
             </div>
@@ -305,25 +327,27 @@ function GroupAnalysisContent() {
 
       {/* Analysis results */}
       {sections.length > 0 && (
-        <div className="mb-8">
+        <section className="mb-8" aria-label="Cross-conversation analysis results">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-white flex items-center gap-2">
               🧠 Cross-Conversation Analysis
-              <span className="text-xs bg-indigo-900/50 text-indigo-300 px-2 py-0.5 rounded-full font-normal">saved</span>
+              <span className="text-xs bg-indigo-900/50 text-indigo-200 px-2 py-0.5 rounded-full font-normal">saved</span>
             </h2>
             <div className="flex items-center gap-2">
               <button
                 onClick={handleExportObsidian}
-                className="text-xs bg-purple-900/40 hover:bg-purple-800/50 text-purple-300 px-3 py-1.5 rounded-lg transition-colors"
+                aria-label="Export group analysis to Obsidian vault"
+                className="text-sm bg-purple-900/40 hover:bg-purple-800/50 text-purple-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors"
               >
                 {exported ? "✓ Saved" : "📓 Send to Obsidian"}
               </button>
               <button
                 onClick={runAnalysis}
                 disabled={analyzing}
-                className="text-xs text-slate-500 hover:text-indigo-400 transition-colors px-2 py-1.5"
+                aria-label="Re-run group analysis"
+                className="text-sm text-slate-400 hover:text-indigo-400 transition-colors px-2 py-2 min-h-[44px]"
               >
-                🔄 Re-analyze
+                🔄
               </button>
             </div>
           </div>
@@ -331,51 +355,62 @@ function GroupAnalysisContent() {
             {sections.map((section) => (
               <div key={section.title} className="card p-6">
                 <div className="analysis-section">
-                  <h3>{section.icon} {section.title}</h3>
+                  <h3><span aria-hidden="true">{section.icon}</span> {section.title}</h3>
                   <p className="text-xs text-slate-500 mb-3">{section.subtitle}</p>
                   <div className="whitespace-pre-wrap text-sm leading-relaxed">{section.content}</div>
                 </div>
               </div>
             ))}
           </div>
-        </div>
+        </section>
       )}
 
       {/* Custom group analysis */}
-      <div className="mb-8">
+      <section className="mb-8" aria-label="Custom group analysis">
         <button
           onClick={() => setShowCustom(!showCustom)}
-          className="w-full card p-5 text-left hover:border-amber-500/50 transition-colors cursor-pointer flex items-center justify-between"
+          aria-expanded={showCustom}
+          aria-controls="custom-group-panel"
+          className="w-full card p-5 text-left hover:border-amber-500/50 transition-colors cursor-pointer flex items-center justify-between min-h-[44px]"
         >
           <div className="flex items-center gap-3">
-            <span className="text-xl">⚙️</span>
+            <span className="text-xl" aria-hidden="true">⚙️</span>
             <div>
               <p className="font-semibold text-white">Custom Group Analysis</p>
               <p className="text-slate-500 text-sm">Ask a question across all selected conversations</p>
             </div>
           </div>
-          <svg className={`w-5 h-5 text-slate-500 transition-transform ${showCustom ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className={`w-5 h-5 text-slate-500 transition-transform ${showCustom ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </button>
 
         {showCustom && (
-          <div className="card mt-2 p-6 border-amber-500/30">
-            <textarea
-              value={customPrompt}
-              onChange={(e) => setCustomPrompt(e.target.value)}
-              placeholder="e.g., How do different speakers frame land ownership? What shared assumptions about 'the good life' emerge across these conversations?"
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-600 focus:border-amber-500 focus:outline-none resize-none mb-3"
-              rows={3}
-            />
-            <div className="flex flex-wrap gap-2 mb-3">
+          <div id="custom-group-panel" className="card mt-2 p-6 border-amber-500/30">
+            <label className="block mb-3">
+              <span className="text-sm font-medium text-slate-300 mb-2 block">What do you want to explore across these conversations?</span>
+              <textarea
+                value={customPrompt}
+                onChange={(e) => setCustomPrompt(e.target.value)}
+                placeholder="e.g., How do different speakers frame land ownership? What shared assumptions about 'the good life' emerge?"
+                aria-label="Custom group analysis question"
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-600 focus:border-amber-500 focus:outline-none resize-none"
+                rows={3}
+              />
+            </label>
+            <div className="flex flex-wrap gap-2 mb-3" role="group" aria-label="Quick prompt suggestions">
               {[
                 "How do speakers frame land ownership differently?",
                 "What shared assumptions about 'the good life' emerge?",
                 "Where does resistance to outside authority appear?",
                 "What role does family legacy play across conversations?",
               ].map((p) => (
-                <button key={p} onClick={() => setCustomPrompt(p)} className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 px-2 py-1 rounded-md transition-colors">
+                <button
+                  key={p}
+                  onClick={() => setCustomPrompt(p)}
+                  aria-label={`Use prompt: ${p}`}
+                  className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-3 py-2 min-h-[44px] rounded-md transition-colors"
+                >
                   {p}
                 </button>
               ))}
@@ -383,20 +418,43 @@ function GroupAnalysisContent() {
             <button
               onClick={runCustom}
               disabled={customAnalyzing || !customPrompt.trim()}
-              className="bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium py-2 px-4 rounded-lg text-sm transition-colors"
+              aria-label="Run custom group analysis"
+              className="bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-white text-white font-medium py-2 px-5 min-h-[44px] rounded-lg text-sm transition-colors"
             >
               {customAnalyzing ? "⏳ Analyzing..." : "Run Custom Group Analysis"}
             </button>
           </div>
         )}
-      </div>
+
+        {customResult && (
+          <div className="card mt-2 p-6 border-amber-500/30">
+            <div className="analysis-section" style={{ background: "rgba(245, 158, 11, 0.06)" }}>
+              <h3 style={{ color: "#fbbf24" }}>
+                <span aria-hidden="true">⚙️</span> Custom Group Analysis
+              </h3>
+              <p className="text-xs text-slate-500 mb-1">Prompt: &ldquo;{customPrompt}&rdquo;</p>
+              <div className="whitespace-pre-wrap text-sm leading-relaxed mt-3">{customResult}</div>
+            </div>
+          </div>
+        )}
+      </section>
     </main>
   );
 }
 
 export default function GroupAnalysisPage() {
   return (
-    <Suspense fallback={<div className="max-w-3xl mx-auto px-4 py-8"><div className="skeleton h-64 w-full" /></div>}>
+    <Suspense
+      fallback={
+        <div className="max-w-3xl mx-auto px-4 py-8" role="status" aria-label="Loading">
+          <div className="space-y-4">
+            <div className="skeleton h-8 w-3/4" />
+            <div className="skeleton h-4 w-1/2" />
+            <div className="skeleton h-32 w-full" />
+          </div>
+        </div>
+      }
+    >
       <GroupAnalysisContent />
     </Suspense>
   );
