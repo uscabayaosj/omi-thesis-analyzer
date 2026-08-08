@@ -463,8 +463,8 @@ function GroupAnalysisContent() {
 
         {customResult && (
           <div className="card mt-2 p-6 border-amber-500/30">
-            <div className="analysis-section" style={{ background: "rgba(245, 158, 11, 0.06)" }}>
-              <h3 style={{ color: "#fbbf24" }}>
+            <div className="analysis-section" style={{ background: "var(--custom-analysis-bg, rgba(245, 158, 11, 0.06))" }}>
+              <h3 style={{ color: "var(--custom-analysis-text, #fbbf24)" }}>
                 <span aria-hidden="true">⚙️</span> Custom Group Analysis
               </h3>
               <p className="text-xs text-slate-500 mb-1">Prompt: &ldquo;{customPrompt}&rdquo;</p>

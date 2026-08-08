@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import ServiceWorkerRegistration from "@/components/sw-register";
 
 export const metadata: Metadata = {
   title: "Omi Thesis Analyzer",
@@ -30,6 +31,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icon-192.png" />
       </head>
       <body className="bg-slate-950 text-slate-100 antialiased min-h-screen">
+        <ServiceWorkerRegistration />
         {children}
       </body>
     </html>

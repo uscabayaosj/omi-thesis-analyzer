@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // PWA headers for offline support
   async headers() {
     return [
       {
