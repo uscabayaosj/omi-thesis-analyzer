@@ -3,8 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getAnalyzedIds } from "@/lib/storage";
-import { BookIcon, SquareIcon, XIcon, CheckIcon, SparklesIcon, WarningIcon, MicIcon, FolderIcon } from "@/components/icons";
+import { getAnalyzedIds, getAnalysisAge } from "@/lib/storage";
+import { BookIcon, SquareIcon, XIcon, CheckIcon, SparklesIcon, WarningIcon, MicIcon, FolderIcon, RefreshIcon } from "@/components/icons";
 
 interface Conversation {
   id: string;
@@ -38,23 +38,38 @@ export default function Home() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [analyzedIds, setAnalyzedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "analyzed" | "unanalyzed">("all");
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
+  const loadConversations = useCallback(async (mode: "initial" | "refresh") => {
+    if (mode === "initial") setLoading(true);
+    else setRefreshing(true);
+    try {
+      const res = await fetch("/api/conversations", { cache: "no-store" });
+      const data = await res.json();
+      if (data.error) {
+        setError(data.error);
+      } else {
+        setConversations(data);
+        setError(null);
+        setLastSynced(new Date().toISOString());
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to reach Omi");
+    } finally {
+      if (mode === "initial") setLoading(false);
+      else setRefreshing(false);
+    }
+  }, []);
+
   useEffect(() => {
     setAnalyzedIds(getAnalyzedIds());
-
-    fetch("/api/conversations")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.error) setError(data.error);
-        else setConversations(data);
-      })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, []);
+    loadConversations("initial");
+  }, [loadConversations]);
 
   const analyzedCount = conversations.filter((c) => analyzedIds.has(c.id)).length;
 
@@ -123,6 +138,28 @@ export default function Home() {
         <p className="text-slate-400">
           AI-powered analysis of your Omi conversations through the lens of Pioneer Sovereignty
         </p>
+
+        {/* Sync status + refresh */}
+        <div className="flex items-center justify-between gap-3 mt-4">
+          <span className="text-sm text-slate-400" aria-live="polite">
+            {refreshing
+              ? "Refreshing from Omi…"
+              : loading
+              ? "Loading…"
+              : lastSynced
+              ? `Synced ${getAnalysisAge(lastSynced).label}`
+              : ""}
+          </span>
+          <button
+            onClick={() => loadConversations("refresh")}
+            disabled={loading || refreshing}
+            aria-label="Refresh conversations from Omi"
+            className="flex items-center gap-1.5 text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+          >
+            <RefreshIcon className={`w-4 h-4 flex-shrink-0 ${refreshing ? "animate-spin" : ""}`} />
+            {refreshing ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
 
         {/* Onboarding: About this framework */}
         <details className="mt-4 card">
