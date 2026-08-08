@@ -103,6 +103,44 @@ export default function Home() {
           AI-powered analysis of your Omi conversations through the lens of Pioneer Sovereignty
         </p>
 
+        {/* Onboarding: About this framework */}
+        <details className="mt-4 card">
+          <summary className="p-4 cursor-pointer text-sm text-slate-400 hover:text-slate-200 transition-colors min-h-[44px] flex items-center justify-between">
+            <span>📖 What is Pioneer Sovereignty?</span>
+            <span className="text-xs text-slate-600">For collaborators & first-time users</span>
+          </summary>
+          <div className="px-4 pb-4 text-sm text-slate-300 space-y-3">
+            <p>
+              <strong className="text-white">Pioneer Sovereignty</strong> is a concept from a PhD anthropology thesis
+              by Ulysses S. Cabayao, SJ (UCL). It examines how ranching families in Montana&apos;s Flathead Valley
+              produce, assert, and contest authority over land and herd through everyday social practices.
+            </p>
+            <p>
+              The thesis argues that these families received their land, water, and grazing rights through
+              federal instruments (homestead patents, water adjudications) — yet experience that authority
+              as self-made and prior to the state that granted it. At the same time, they deny the prior
+              and ongoing sovereignty of the Confederated Salish and Kootenai Tribes whose territory they occupy.
+            </p>
+            <div className="pt-2">
+              <p className="font-medium text-slate-200 mb-2">The 8 analysis dimensions:</p>
+              <ul className="space-y-1.5 text-slate-400">
+                <li>📜 <strong className="text-slate-300">RQ1 — Documentary Record</strong>: Historical-legal acts that constituted authority (patents, water rights)</li>
+                <li>🏚️ <strong className="text-slate-300">RQ2 — Everyday Practices</strong>: Kinship, inheritance, branding, boundary-maintenance, conflict</li>
+                <li>🪶 <strong className="text-slate-300">RQ3 — CSKT Intersection</strong>: How ranching authority intersects with tribal sovereignty</li>
+                <li>🐎 <strong className="text-slate-300">RQ4 — Wildness Imaginary</strong>: Frontier mythology as double erasure of Indigenous + federal authority</li>
+                <li>🎯 <strong className="text-slate-300">Orienting Conditions</strong>: Which of 5 theoretical conditions are evidenced</li>
+                <li>⚖️ <strong className="text-slate-300">Rival Hypothesis Test</strong>: Is frontier framing felt subjectivity or instrumental rhetoric?</li>
+                <li>❌ <strong className="text-slate-300">Refutation Signals</strong>: What would disconfirm the concept</li>
+                <li>🚀 <strong className="text-slate-300">Forward Thinking</strong>: Research directions and next questions</li>
+              </ul>
+            </div>
+            <p className="text-xs text-slate-500 pt-2">
+              This tool analyzes conversations captured by the Omi DK2 wearable device
+              and runs them through an AI model grounded in the thesis&apos;s full theoretical framework.
+            </p>
+          </div>
+        </details>
+
         {conversations.length > 0 && (
           <div className="flex items-center gap-4 mt-4 text-sm">
             <span className="text-slate-400">
