@@ -5,37 +5,6 @@ interface ObsidianExport {
   filename: string;
 }
 
-export function exportToObsidian(analysis: StoredAnalysis): ObsidianExport {
-  const date = analysis.date
-    ? new Date(analysis.date).toISOString().split("T")[0]
-    : new Date(analysis.timestamp).toISOString().split("T")[0];
-
-  const safeName = (analysis.title || "Untitled")
-    .replace(/[\/\\:*?"<>|]/g, "-")
-    .substring(0, 80);
-
-  const filename = `${date} - ${safeName}`;
-
-  const content = buildNoteContent(analysis, date);
-
-  // Obsidian URI scheme — opens Obsidian and creates the note
-  // https://docs.obsidian.md/Advanced+URIs
-  const params = new URLSearchParams({
-    vault: "PhDVault",
-    name: `Fieldwork/Omi Analysis/${filename}`,
-    content,
-    append: "false",
-  });
-
-  const uri = `obsidian://advanced-uri?${params.toString()}`;
-
-  return { uri, filename };
-}
-
-export function exportAllToObsidian(analyses: StoredAnalysis[]): string[] {
-  return analyses.map((a) => exportToObsidian(a).uri);
-}
-
 function buildNoteContent(analysis: StoredAnalysis, date: string): string {
   let md = `---
 title: "${(analysis.title || "Untitled").replace(/"/g, '\\"')}"
@@ -46,23 +15,40 @@ source: Omi DK2
 tags:
   - omi-analysis
   - fieldwork
+  - pioneer-sovereignty
 ---
 
 # ${analysis.title || "Untitled"}
 
 > [!info] Analyzed on ${new Date(analysis.timestamp).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })} from an Omi DK2 conversation recorded ${date}.
 
-## 🎯 Thesis Relevance
+## 📜 RQ1 — Documentary Record
 
-${analysis.thesis_relevance}
+${analysis.rq1_documentary_record}
 
-## 🔍 Derived Meanings
+## 🏚️ RQ2 — Everyday Practices
 
-${analysis.meanings}
+${analysis.rq2_everyday_practices}
 
-## 📝 Summary
+## 🪶 RQ3 — CSKT Intersection
 
-${analysis.summary}
+${analysis.rq3_cskt_intersection}
+
+## 🐎 RQ4 — Wildness Imaginary
+
+${analysis.rq4_wildness_imaginary}
+
+## 🎯 Orienting Conditions
+
+${analysis.conditions_check}
+
+## ⚖️ Rival Hypothesis Test
+
+${analysis.rival_hypothesis_test}
+
+## ❌ Refutation Signals
+
+${analysis.refutation_signals}
 
 ## 🚀 Forward Thinking
 
@@ -85,6 +71,29 @@ ${analysis.custom.result}
 `;
 
   return md;
+}
+
+export function exportToObsidian(analysis: StoredAnalysis): ObsidianExport {
+  const date = analysis.date
+    ? new Date(analysis.date).toISOString().split("T")[0]
+    : new Date(analysis.timestamp).toISOString().split("T")[0];
+
+  const safeName = (analysis.title || "Untitled")
+    .replace(/[\/\\:*?"<>|]/g, "-")
+    .substring(0, 80);
+
+  const filename = `${date} - ${safeName}`;
+  const content = buildNoteContent(analysis, date);
+
+  const params = new URLSearchParams({
+    vault: "PhDVault",
+    name: `Fieldwork/Omi Analysis/${filename}`,
+    content,
+    append: "false",
+  });
+
+  const uri = `obsidian://advanced-uri?${params.toString()}`;
+  return { uri, filename };
 }
 
 export function downloadMarkdown(analysis: StoredAnalysis): void {

@@ -1,4 +1,4 @@
-import { type Analysis } from "./omi-api";
+import type { Analysis } from "./omi-api";
 
 interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -70,7 +70,6 @@ function buildRequestBody(config: ProviderConfig, messages: ChatMessage[], jsonM
   const provider = process.env.AI_PROVIDER || "openai";
 
   if (provider === "anthropic") {
-    // Anthropic Messages API format
     const systemMsg = messages.find((m) => m.role === "system");
     const userMsgs = messages.filter((m) => m.role !== "system");
     return {
@@ -82,7 +81,6 @@ function buildRequestBody(config: ProviderConfig, messages: ChatMessage[], jsonM
   }
 
   if (provider === "google") {
-    // Google Generative AI format
     const systemMsg = messages.find((m) => m.role === "system");
     const userMsgs = messages.filter((m) => m.role !== "system");
     return {
@@ -99,7 +97,6 @@ function buildRequestBody(config: ProviderConfig, messages: ChatMessage[], jsonM
     };
   }
 
-  // OpenAI / OpenRouter format (compatible)
   return {
     model: config.model,
     messages,
@@ -120,7 +117,6 @@ function extractContent(data: Record<string, unknown>, provider: string): string
     return candidates?.[0]?.content?.parts?.[0]?.text || "";
   }
 
-  // OpenAI / OpenRouter
   const choices = data.choices as Array<{ message: { content: string } }>;
   return choices?.[0]?.message?.content || "";
 }
@@ -134,7 +130,6 @@ export async function chatCompletion(messages: ChatMessage[], jsonMode = false):
   const provider = process.env.AI_PROVIDER || "openai";
   let url = config.baseUrl;
 
-  // Google needs API key as query param
   if (provider === "google") {
     url += `?key=${config.apiKey}`;
   }
@@ -156,37 +151,98 @@ export async function chatCompletion(messages: ChatMessage[], jsonMode = false):
   return extractContent(data, provider);
 }
 
-const SYSTEM_PROMPT = `You are an academic research assistant helping a PhD anthropology student analyze fieldwork conversations.
+// ─────────────────────────────────────────────────────────────────
+// Analysis prompts — grounded in the Pioneer Sovereignty proposal
+// ─────────────────────────────────────────────────────────────────
 
-The student's thesis is titled "Pioneer Sovereignty" — it examines sovereignty through ranch sociality in Montana. The research explores how people on Montana ranches enact, negotiate, and experience sovereignty through everyday social practices, land use, community relations, and political engagement.
+const SYSTEM_PROMPT = `You are an academic research assistant for a PhD anthropology thesis titled "Ranch Sociality and the Making of Authority in the Flathead Valley, Montana: An Ethnography of Pioneer Sovereignty" by Ulysses S. Cabayao, SJ (UCL).
 
-When analyzing conversations, consider:
-- How themes of land, territory, belonging, and governance appear
-- Social dynamics around community, family, labor, and place
-- Power relations, autonomy, and self-determination
-- Connections to broader political and economic structures
-- The lived experience of people in rural/frontier contexts
+## The thesis argument
+
+The thesis argues for a concept called **pioneer sovereignty**: the sovereign formation produced when state-constituted settler agents redeploy the ideological and material resources of their own constitution against the regulatory authority of the state that empowered them, while denying the prior and ongoing sovereignty of the Confederated Salish and Kootenai Tribes (CSKT) whose territory they occupy.
+
+The Flathead Valley concentrates three sovereignty formations on one ground:
+1. **CSKT sovereignty** — held under the 1855 Hellgate Treaty, with time-immemorial water priority
+2. **Federal/state regulatory authority** — BLM grazing, Clean Water Act, ESA, CSKT Water Compact
+3. **Ranching families' authority** — presented as prior to federal regulation while depending on it
+
+A single federal process (the 1904 Allotment Act) produced two of these formations: it allotted the reservation and opened surplus to homestead entry, assembling the settler land base out of Indigenous dispossession.
+
+## The five orienting conditions
+
+These direct ethnographic attention to where the formation should be observable:
+
+**Condition 1: State delegation through friendly aspects of sovereignty.** The federal state extended land, water, and grazing authority to settlers through homestead patents, water rights, and grazing permits. Families may know their land began with a homestead patent and still narrate authority as self-made. The candid family is the expected case, not a counterexample.
+
+**Condition 2: The eliminatory structure of settler colonialism.** Ranching authority is exercised on dispossessed ground. In the Flathead, dispossession and grant were executed under the same statute (1904 Act) within the same decade.
+
+**Condition 3: The regulatory contradiction and refrontierisation.** Post-1970s federal regulation constrains authority the state itself constituted. Ranching communities experience this as betrayal, triggering refrontierisation — present conflict is narrated as repetition of the original frontier struggle, with the federal government now occupying the position the wild landscape held in the founding story.
+
+**Condition 4: The wildness imaginary as a double-erasure instrument.** One apparatus produces two erasures through the same resources:
+- **4A:** Erasure of Indigenous prior sovereignty — the frontier mythos presents pre-settlement landscape as empty
+- **4B:** Erasure of federal regulatory authority — the same binary presents regulation as intrusion into a naturally self-governing space
+The two erasures co-vary: where disavowal of federal authority intensifies, disavowal of CSKT sovereignty intensifies with it.
+
+**Condition 5: The affective constitution of sovereign subjectivity.** Sovereignty is felt and performed rather than legally held — a form of sovereign agency, "often more aspiration than realization" (Bryant and Reeves 2021), directed at regaining the felt capacity to govern land, herd, and community without external interference.
+
+## The rival hypothesis
+
+The strongest alternative is that pioneer sovereignty is organized interest-group politics deploying frontier mythology instrumentally — a rhetorical resource in regulatory contexts, not a felt sovereign subjectivity. The accounts diverge on one observable axis: the interest-group account predicts frontier framing concentrates in strategic, audience-bearing settings and thins in intimate ones (private inheritance disputes, kinship talk, ordinary ranch work). Pioneer sovereignty predicts the same framing saturates both registers.
+
+## What would refute the concept
+
+1. Frontier framing appeared only in strategic-public settings, substantially absent from intimate ones
+2. Families' acknowledgment of federal origins dissolved rather than coexisted with the claim to autonomy
+3. The two erasures did not co-vary (e.g., families who contest federal authority while readily affirming CSKT priority)
+4. Authority claims tracked economic stakes irrespective of heritage narrative
+
+## Four research questions
+
+**RQ1 (contextual):** Which historical and legal acts constituted pioneer and settler authority (homestead patents, allotment law, grazing permits, water-rights adjudications, federal irrigation projects) and how are they documented, preserved, and remembered?
+
+**RQ2 (primary):** Through which everyday social practices (kinship, inheritance, land use, animal husbandry, boundary-maintenance, and conflict) do ranching families produce, assert, and contest authority over land and herd?
+- How is ranch property transmitted across generations (legal instrument, family negotiation, informal expectation)?
+- How are cattle ownership, branding, and herd management used to assert status and territorial claim?
+- How are boundary disputes handled (kin obligation, informal arbitration, legal recourse, threat of force)?
+
+**RQ3 (secondary):** How do ranching families' practices of authority intersect with, depend on, and become contested by CSKT sovereignty over the same territory?
+
+**RQ4 (secondary):** How is the frontier wildness imaginary enacted through observable practice (rodeo, branding, hunting, oral storytelling) and what work does that enactment do in legitimating authority claims against both Indigenous prior sovereignty and federal regulatory authority?
 
 You MUST respond with valid JSON matching this exact schema:
 {
-  "thesis_relevance": "...",
-  "meanings": "...",
-  "summary": "...",
+  "rq1_documentary_record": "...",
+  "rq2_everyday_practices": "...",
+  "rq3_cskt_intersection": "...",
+  "rq4_wildness_imaginary": "...",
+  "conditions_check": "...",
+  "rival_hypothesis_test": "...",
+  "refutation_signals": "...",
   "forward_thinking": "..."
 }
 
-Each field should be 2-4 paragraphs of thoughtful analysis. Be specific — quote or reference actual content from the conversation.`;
+Each field should be 2-3 paragraphs. Be specific — quote or reference actual content from the conversation. If a conversation does not provide evidence for a dimension, say so explicitly rather than speculating.`;
 
 function buildUserPrompt(transcript: string, title: string): string {
-  return `Analyze this conversation titled "${title}" across four dimensions:
+  return `Analyze this conversation titled "${title}" against the thesis on Pioneer Sovereignty.
 
-1. **Thesis Relevance**: How is this conversation relevant to the thesis on "Pioneer Sovereignty" — sovereignty through ranch sociality in Montana? Identify specific themes, concepts, or data points that connect.
+For each dimension, ground your analysis in what the transcript actually contains. If a dimension has no evidence in this conversation, say so.
 
-2. **Derived Meanings**: What deeper meanings, patterns, or insights can be extracted from this conversation? Consider social dynamics, power relations, cultural patterns, and implicit knowledge.
+1. **RQ1 — Documentary Record**: What evidence exists of the historical-legal constitution of authority? References to land titles, water rights, homestead patents, grazing permits, federal agencies (BLM, Forest Service, Fish & Wildlife), the CSKT Water Compact, or the 1904 Allotment Act? How are these documented, preserved, or remembered in the conversation?
 
-3. **Comprehensive Summary**: Provide a thorough summary that captures the key points, participants, context, and significance of this conversation.
+2. **RQ2 — Everyday Practices**: What social practices of authority production are observable? Look for: kinship obligations, inheritance talk, land transmission, cattle branding, herd management as status claim, boundary disputes, labor exchange, conflict resolution (kin obligation vs. legal recourse vs. threat of force).
 
-4. **Forward Thinking**: Based on this conversation, what questions should the researcher explore next? What connections can be drawn to other data? What hypotheses emerge? How can the researcher think several steps ahead from this material?
+3. **RQ3 — CSKT Intersection**: How does CSKT sovereignty appear in this conversation? Direct references to the Tribes, the Water Compact, the reservation, the Bison Range? Silences where you would expect reference? How do participants frame the relationship between their authority and tribal sovereignty?
+
+4. **RQ4 — Wildness Imaginary**: Is the frontier wildness imaginary enacted? Look for: the pre-settlement landscape described as empty or wild, settlement described as "opening" or "taming," regulation described as intrusion, the pioneer generation referenced as self-made. Which erasure does it perform — of Indigenous prior sovereignty (4A), of federal regulatory authority (4B), or both?
+
+5. **Conditions Check**: Which of the five orienting conditions are evidenced in this conversation? Cite specific moments.
+
+6. **Rival Hypothesis Test**: Is frontier framing appearing in an audience-bearing (public/strategic) setting or an intimate one (private, kinship, ordinary work)? What does the register tell us about whether this is felt subjectivity or instrumental rhetoric?
+
+7. **Refutation Signals**: Does anything in this conversation challenge or complicate the pioneer sovereignty concept? Any acknowledgment of federal origins that coexists with autonomy claims? Any moments where the two erasures do NOT co-vary?
+
+8. **Forward Thinking**: What research directions does this conversation suggest? What questions should the researcher pursue next? What connections to other data or theoretical literatures emerge?
 
 Conversation transcript:
 ${transcript}`;
@@ -212,7 +268,9 @@ export async function analyzeCustom(
   title: string,
   customPrompt: string
 ): Promise<string> {
-  const systemPrompt = `You are an academic research assistant helping a PhD anthropology student analyze fieldwork conversations. The student's thesis is "Pioneer Sovereignty" — sovereignty through ranch sociality in Montana.
+  const systemPrompt = `You are an academic research assistant for a PhD anthropology thesis on "Pioneer Sovereignty" — the sovereign formation produced when state-constituted settler ranching families in Montana's Flathead Valley redeploy the resources of their own federal constitution against the regulatory state, while denying CSKT sovereignty.
+
+Key concepts: friendly aspects of sovereignty (Miller), refrontierisation (Haug), the wildness imaginary, settler common sense (Rifkin), possessive logics (Moreton-Robinson), the double erasure (of Indigenous sovereignty + federal origin), defrontierisation (Acciaioli).
 
 You will be given a conversation transcript and a specific analysis question. Provide a thoughtful, detailed analysis (2-4 paragraphs). Be specific — quote or reference actual content from the conversation.`;
 

@@ -30,9 +30,13 @@ interface Conversation {
 }
 
 interface Analysis {
-  thesis_relevance: string;
-  meanings: string;
-  summary: string;
+  rq1_documentary_record: string;
+  rq2_everyday_practices: string;
+  rq3_cskt_intersection: string;
+  rq4_wildness_imaginary: string;
+  conditions_check: string;
+  rival_hypothesis_test: string;
+  refutation_signals: string;
   forward_thinking: string;
 }
 
@@ -49,24 +53,24 @@ export default function ConversationPage() {
   const [error, setError] = useState<string | null>(null);
   const [exported, setExported] = useState(false);
 
-  // Load stored analysis on mount
   useEffect(() => {
     const stored = getStoredAnalysis(id);
     if (stored) {
       setStoredAnalysis(stored);
       setAnalysis({
-        thesis_relevance: stored.thesis_relevance,
-        meanings: stored.meanings,
-        summary: stored.summary,
+        rq1_documentary_record: stored.rq1_documentary_record,
+        rq2_everyday_practices: stored.rq2_everyday_practices,
+        rq3_cskt_intersection: stored.rq3_cskt_intersection,
+        rq4_wildness_imaginary: stored.rq4_wildness_imaginary,
+        conditions_check: stored.conditions_check,
+        rival_hypothesis_test: stored.rival_hypothesis_test,
+        refutation_signals: stored.refutation_signals,
         forward_thinking: stored.forward_thinking,
       });
-      if (stored.custom) {
-        setCustomPrompt(stored.custom.prompt);
-      }
+      if (stored.custom) setCustomPrompt(stored.custom.prompt);
     }
   }, [id]);
 
-  // Fetch conversation
   useEffect(() => {
     fetch(`/api/conversations/${id}`)
       .then((r) => r.json())
@@ -92,17 +96,12 @@ export default function ConversationPage() {
       else {
         setAnalysis(data.analysis);
         if (data.conversation) setConversation(data.conversation);
-
-        // Persist to localStorage
         const stored = saveAnalysis({
           conversationId: id,
           title: data.conversation?.structured?.title || conversation?.structured?.title || "Untitled",
           category: data.conversation?.structured?.category,
           date: data.conversation?.created_at,
-          thesis_relevance: data.analysis.thesis_relevance,
-          meanings: data.analysis.meanings,
-          summary: data.analysis.summary,
-          forward_thinking: data.analysis.forward_thinking,
+          ...data.analysis,
         });
         setStoredAnalysis(stored);
       }
@@ -156,10 +155,14 @@ export default function ConversationPage() {
 
   const sections = analysis
     ? [
-        { icon: "🎯", title: "Thesis Relevance", subtitle: 'Connection to "Pioneer Sovereignty"', content: analysis.thesis_relevance },
-        { icon: "🔍", title: "Derived Meanings", subtitle: "Deeper patterns and insights", content: analysis.meanings },
-        { icon: "📝", title: "Summary", subtitle: "Comprehensive overview", content: analysis.summary },
-        { icon: "🚀", title: "Forward Thinking", subtitle: "Next steps and research directions", content: analysis.forward_thinking },
+        { icon: "📜", title: "RQ1 — Documentary Record", subtitle: "Historical-legal constitution of authority: patents, water rights, allotments, grazing permits", content: analysis.rq1_documentary_record },
+        { icon: "🏚️", title: "RQ2 — Everyday Practices", subtitle: "Kinship, inheritance, branding, boundary-maintenance, conflict — how authority is produced daily", content: analysis.rq2_everyday_practices },
+        { icon: "🪶", title: "RQ3 — CSKT Intersection", subtitle: "How ranching authority intersects with, depends on, and is contested by CSKT sovereignty", content: analysis.rq3_cskt_intersection },
+        { icon: "🐎", title: "RQ4 — Wildness Imaginary", subtitle: "Frontier mythology as double-erasure instrument (4A: Indigenous erasure, 4B: federal erasure)", content: analysis.rq4_wildness_imaginary },
+        { icon: "🎯", title: "Orienting Conditions", subtitle: "Which of the five conditions are evidenced in this conversation?", content: analysis.conditions_check },
+        { icon: "⚖️", title: "Rival Hypothesis Test", subtitle: "Is frontier framing public/strategic or intimate? Does it indicate felt subjectivity or instrumental rhetoric?", content: analysis.rival_hypothesis_test },
+        { icon: "❌", title: "Refutation Signals", subtitle: "Does anything challenge or complicate the pioneer sovereignty concept?", content: analysis.refutation_signals },
+        { icon: "🚀", title: "Forward Thinking", subtitle: "Research directions, questions to pursue, connections to other data", content: analysis.forward_thinking },
       ]
     : [];
 
@@ -194,7 +197,6 @@ export default function ConversationPage() {
             </p>
           </header>
 
-          {/* Analyze button — only shown if no stored analysis */}
           {!analysis && (
             <button
               onClick={runAnalysis}
@@ -206,50 +208,39 @@ export default function ConversationPage() {
                   <span className="pulse-dot text-2xl">⏳</span>
                   <div>
                     <p className="font-semibold text-white">Analyzing conversation...</p>
-                    <p className="text-slate-400 text-sm mt-1">Running 4-dimension analysis</p>
+                    <p className="text-slate-400 text-sm mt-1">Running 8-dimension Pioneer Sovereignty analysis</p>
                   </div>
                 </div>
               ) : (
                 <div>
                   <p className="text-2xl mb-2">🧠</p>
-                  <p className="font-semibold text-white">Run Thesis Analysis</p>
-                  <p className="text-slate-400 text-sm mt-1">Analyze through the lens of Pioneer Sovereignty</p>
+                  <p className="font-semibold text-white">Run Pioneer Sovereignty Analysis</p>
+                  <p className="text-slate-400 text-sm mt-1">4 research questions + conditions + rival hypothesis + refutation</p>
                 </div>
               )}
             </button>
           )}
 
-          {/* Analysis results */}
           {sections.length > 0 && (
             <div className="mb-8">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  🧠 Analysis
+                  🧠 Pioneer Sovereignty Analysis
                   <span className="text-xs bg-indigo-900/50 text-indigo-300 px-2 py-0.5 rounded-full font-normal">saved</span>
                 </h2>
                 <div className="flex items-center gap-2">
                   {storedAnalysis && (
                     <>
-                      <button
-                        onClick={handleExportObsidian}
-                        className="text-xs bg-purple-900/40 hover:bg-purple-800/50 text-purple-300 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
-                      >
+                      <button onClick={handleExportObsidian} className="text-xs bg-purple-900/40 hover:bg-purple-800/50 text-purple-300 px-3 py-1.5 rounded-lg transition-colors">
                         {exported ? "✓ Saved" : "📓 Send to Obsidian"}
                       </button>
-                      <button
-                        onClick={handleDownload}
-                        className="text-xs bg-amber-900/40 hover:bg-amber-800/50 text-amber-300 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
-                      >
-                        ⬇ Download .md
+                      <button onClick={handleDownload} className="text-xs bg-amber-900/40 hover:bg-amber-800/50 text-amber-300 px-3 py-1.5 rounded-lg transition-colors">
+                        ⬇ .md
                       </button>
                     </>
                   )}
-                  <button
-                    onClick={runAnalysis}
-                    disabled={analyzing}
-                    className="text-xs text-slate-500 hover:text-indigo-400 transition-colors px-2 py-1.5"
-                  >
-                    🔄 Re-analyze
+                  <button onClick={runAnalysis} disabled={analyzing} className="text-xs text-slate-500 hover:text-indigo-400 transition-colors px-2 py-1.5">
+                    🔄
                   </button>
                 </div>
               </div>
@@ -267,7 +258,7 @@ export default function ConversationPage() {
             </div>
           )}
 
-          {/* Fifth: Custom Analysis (toggle) */}
+          {/* Custom analysis */}
           <div className="mb-8">
             <button
               onClick={() => setShowCustom(!showCustom)}
@@ -280,18 +271,13 @@ export default function ConversationPage() {
                   <p className="text-slate-500 text-sm">
                     {storedAnalysis?.custom
                       ? `Last: "${storedAnalysis.custom.prompt.substring(0, 50)}..."`
-                      : "Write your own analysis prompt for ad-hoc needs"}
+                      : "Ask any question about this conversation through the lens of Pioneer Sovereignty"}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {storedAnalysis?.custom && (
-                  <span className="text-xs bg-amber-900/40 text-amber-300 px-2 py-0.5 rounded-full">saved</span>
-                )}
-                <svg
-                  className={`w-5 h-5 text-slate-500 transition-transform ${showCustom ? "rotate-180" : ""}`}
-                  fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                >
+                {storedAnalysis?.custom && <span className="text-xs bg-amber-900/40 text-amber-300 px-2 py-0.5 rounded-full">saved</span>}
+                <svg className={`w-5 h-5 text-slate-500 transition-transform ${showCustom ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </div>
@@ -299,64 +285,43 @@ export default function ConversationPage() {
 
             {showCustom && (
               <div className="card mt-2 p-6 border-amber-500/30">
-                <label className="block mb-3">
-                  <span className="text-sm font-medium text-slate-300 mb-2 block">What do you want to explore?</span>
-                  <textarea
-                    value={customPrompt}
-                    onChange={(e) => setCustomPrompt(e.target.value)}
-                    placeholder="e.g., What power dynamics are at play? How does this relate to land sovereignty? What would James Scott say?"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-600 focus:border-amber-500 focus:outline-none resize-none"
-                    rows={4}
-                  />
-                </label>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={runCustomAnalysis}
-                    disabled={customAnalyzing || !customPrompt.trim()}
-                    className="bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium py-2 px-4 rounded-lg text-sm transition-colors"
-                  >
-                    {customAnalyzing ? (
-                      <span className="flex items-center gap-2"><span className="pulse-dot">⏳</span> Analyzing...</span>
-                    ) : (
-                      "Run Custom Analysis"
-                    )}
-                  </button>
+                <textarea
+                  value={customPrompt}
+                  onChange={(e) => setCustomPrompt(e.target.value)}
+                  placeholder="e.g., Does this conversation show the double erasure at work? Is the frontier framing public or intimate register? What does this reveal about Condition 5 (affective sovereignty)?"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-600 focus:border-amber-500 focus:outline-none resize-none mb-3"
+                  rows={3}
+                />
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {[
+                    "Does the double erasure appear here?",
+                    "Is this public or intimate register?",
+                    "What would Rifkin's 'settler common sense' say about this?",
+                    "How does the wildness imaginary operate in this scene?",
+                    "Is there evidence of refrontierisation?",
+                    "What would disconfirm pioneer sovereignty here?",
+                  ].map((preset) => (
+                    <button key={preset} onClick={() => setCustomPrompt(preset)} className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 px-2 py-1 rounded-md transition-colors">
+                      {preset}
+                    </button>
+                  ))}
                 </div>
-
-                {/* Preset prompts */}
-                <div className="mt-4 pt-4 border-t border-slate-800">
-                  <p className="text-xs text-slate-500 mb-2">Quick prompts:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      "What power dynamics are at play?",
-                      "How does this relate to land sovereignty?",
-                      "What would James Scott say about this?",
-                      "Identify implicit knowledge and local epistemologies",
-                      "What are the economic undercurrents?",
-                      "How does place shape this conversation?",
-                    ].map((preset) => (
-                      <button
-                        key={preset}
-                        onClick={() => setCustomPrompt(preset)}
-                        className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 px-2 py-1 rounded-md transition-colors"
-                      >
-                        {preset}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                <button
+                  onClick={runCustomAnalysis}
+                  disabled={customAnalyzing || !customPrompt.trim()}
+                  className="bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium py-2 px-4 rounded-lg text-sm transition-colors"
+                >
+                  {customAnalyzing ? "⏳ Analyzing..." : "Run Custom Analysis"}
+                </button>
               </div>
             )}
 
-            {/* Custom analysis result */}
             {storedAnalysis?.custom && (
               <div className="card mt-2 p-6 border-amber-500/30">
                 <div className="analysis-section" style={{ borderLeftColor: "#f59e0b" }}>
                   <h3 style={{ color: "#fbbf24" }}>⚙️ Custom Analysis</h3>
                   <p className="text-xs text-slate-500 mb-1">Prompt: &ldquo;{storedAnalysis.custom.prompt}&rdquo;</p>
-                  <div className="whitespace-pre-wrap text-sm leading-relaxed mt-3">
-                    {storedAnalysis.custom.result}
-                  </div>
+                  <div className="whitespace-pre-wrap text-sm leading-relaxed mt-3">{storedAnalysis.custom.result}</div>
                 </div>
               </div>
             )}

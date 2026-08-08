@@ -7,9 +7,13 @@ export interface StoredAnalysis {
   title: string;
   category?: string;
   date?: string;
-  thesis_relevance: string;
-  meanings: string;
-  summary: string;
+  rq1_documentary_record: string;
+  rq2_everyday_practices: string;
+  rq3_cskt_intersection: string;
+  rq4_wildness_imaginary: string;
+  conditions_check: string;
+  rival_hypothesis_test: string;
+  refutation_signals: string;
   forward_thinking: string;
   custom?: {
     prompt: string;
@@ -104,17 +108,33 @@ tags:
 
 > [!info] Analyzed on ${new Date(analysis.timestamp).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })} from an Omi DK2 conversation recorded ${date}.
 
-## 🎯 Thesis Relevance
+## 📜 RQ1 — Documentary Record
 
-${analysis.thesis_relevance}
+${analysis.rq1_documentary_record}
 
-## 🔍 Derived Meanings
+## 🏚️ RQ2 — Everyday Practices
 
-${analysis.meanings}
+${analysis.rq2_everyday_practices}
 
-## 📝 Summary
+## 🪶 RQ3 — CSKT Intersection
 
-${analysis.summary}
+${analysis.rq3_cskt_intersection}
+
+## 🐎 RQ4 — Wildness Imaginary
+
+${analysis.rq4_wildness_imaginary}
+
+## 🎯 Orienting Conditions
+
+${analysis.conditions_check}
+
+## ⚖️ Rival Hypothesis Test
+
+${analysis.rival_hypothesis_test}
+
+## ❌ Refutation Signals
+
+${analysis.refutation_signals}
 
 ## 🚀 Forward Thinking
 

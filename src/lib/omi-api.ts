@@ -39,9 +39,13 @@ export interface Conversation {
 }
 
 export interface Analysis {
-  thesis_relevance: string;
-  meanings: string;
-  summary: string;
+  rq1_documentary_record: string;
+  rq2_everyday_practices: string;
+  rq3_cskt_intersection: string;
+  rq4_wildness_imaginary: string;
+  conditions_check: string;
+  rival_hypothesis_test: string;
+  refutation_signals: string;
   forward_thinking: string;
 }
 
