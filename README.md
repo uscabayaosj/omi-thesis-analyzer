@@ -1,36 +1,30 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Omi Thesis Analyzer
 
-## Getting Started
+AI-powered conversation analysis for PhD research on Pioneer Sovereignty. Pulls conversations from the Omi Developer API and runs 5-dimension analysis through GPT-4o.
 
-First, run the development server:
+## Setup
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. Copy `.env.example` to `.env.local`
+2. Add your Omi Developer API key (from Omi app → Developer → API Keys)
+3. Add your OpenAI API key
+4. `npm run dev` or deploy to Vercel
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Analysis Dimensions
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. **Thesis Relevance** — How the conversation connects to "Pioneer Sovereignty" (sovereignty through ranch sociality in Montana)
+2. **Derived Meanings** — Deeper patterns, social dynamics, power relations
+3. **Summary** — Comprehensive overview of the conversation
+4. **Forward Thinking** — Research directions, hypotheses, next steps
+5. **Custom** (toggle) — User-defined analysis prompt for ad-hoc needs
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Deploy to Vercel
 
-## Learn More
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/uscabayaosj/omi-thesis-analyzer&env=OMI_API_KEY,OPENAI_API_KEY)
 
-To learn more about Next.js, take a look at the following resources:
+## Tech Stack
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Next.js 15 (App Router)
+- Tailwind CSS
+- OpenAI GPT-4o
+- Omi Developer API
+- PWA (installable on mobile)
