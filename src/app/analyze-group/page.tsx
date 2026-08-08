@@ -429,9 +429,11 @@ function GroupAnalysisContent() {
                 onChange={(e) => setCustomPrompt(e.target.value)}
                 placeholder="e.g., How do different speakers frame land ownership? What shared assumptions about 'the good life' emerge?"
                 aria-label="Custom group analysis question"
+                maxLength={2000}
                 className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-600 focus:border-amber-500 focus:outline-none resize-none"
                 rows={3}
               />
+              <div className="text-xs text-slate-600 text-right mt-1">{customPrompt.length}/2000</div>
             </label>
             <div className="flex flex-wrap gap-2 mb-3" role="group" aria-label="Quick prompt suggestions">
               {[

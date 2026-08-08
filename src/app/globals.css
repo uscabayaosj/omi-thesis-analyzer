@@ -83,6 +83,8 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
   line-height: 1.7;
   color: var(--foreground);
   opacity: 0.9;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .pulse-dot {

@@ -50,7 +50,19 @@ function getAll(): StoredConversation[] {
 }
 
 function saveAll(data: StoredConversation[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "QuotaExceededError") {
+      // Prune oldest versions to free space
+      const pruned = data.map((c) => ({ ...c, versions: c.versions.slice(0, 1) }));
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(pruned));
+      } catch {
+        console.error("localStorage quota exceeded even after pruning");
+      }
+    }
+  }
 }
 
 // ── Age / staleness ──
