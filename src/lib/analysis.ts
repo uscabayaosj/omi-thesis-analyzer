@@ -125,7 +125,7 @@ function extractContent(data: Record<string, unknown>, provider: string): string
   return choices?.[0]?.message?.content || "";
 }
 
-async function chatCompletion(messages: ChatMessage[], jsonMode = false): Promise<string> {
+export async function chatCompletion(messages: ChatMessage[], jsonMode = false): Promise<string> {
   const config = getProviderConfig();
   if (!config.apiKey) {
     throw new Error(`API key not set for provider '${process.env.AI_PROVIDER || "openai"}'. Check your .env.local.`);
