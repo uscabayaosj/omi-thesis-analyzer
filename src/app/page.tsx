@@ -4,7 +4,10 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getAnalyzedIds } from "@/lib/storage";
-import { BookIcon, SquareIcon, XIcon, CheckIcon, SparklesIcon, WarningIcon, MicIcon, FolderIcon } from "@/components/icons";
+import { cacheGet, cacheSet } from "@/lib/cache";
+import { BookIcon, SquareIcon, XIcon, CheckIcon, SparklesIcon, WarningIcon, MicIcon, FolderIcon, RefreshIcon } from "@/components/icons";
+
+const CONVERSATIONS_CACHE_KEY = "conversations";
 
 interface Conversation {
   id: string;
@@ -38,23 +41,48 @@ export default function Home() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [analyzedIds, setAnalyzedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "analyzed" | "unanalyzed">("all");
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
+  // Revalidate the list over the network and refresh the cache. Keeps any
+  // cached list on screen if the network fails, so a hiccup never blanks the UI.
+  const loadConversations = useCallback(async (force = false) => {
+    if (force) setRefreshing(true);
+    try {
+      const res = await fetch("/api/conversations", force ? { cache: "no-store" } : undefined);
+      const data = await res.json();
+      if (data.error) {
+        setError(data.error);
+      } else {
+        setConversations(data);
+        setError(null);
+        cacheSet(CONVERSATIONS_CACHE_KEY, data);
+      }
+    } catch (e) {
+      // Only surface a network error if we have nothing cached to show.
+      if (!cacheGet(CONVERSATIONS_CACHE_KEY)) {
+        setError(e instanceof Error ? e.message : "Failed to load conversations");
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
   useEffect(() => {
     setAnalyzedIds(getAnalyzedIds());
 
-    fetch("/api/conversations")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.error) setError(data.error);
-        else setConversations(data);
-      })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, []);
+    // Instant paint from cache (stale-while-revalidate), then refresh.
+    const cached = cacheGet<Conversation[]>(CONVERSATIONS_CACHE_KEY);
+    if (cached) {
+      setConversations(cached.data);
+      setLoading(false);
+    }
+    loadConversations(false);
+  }, [loadConversations]);
 
   const analyzedCount = conversations.filter((c) => analyzedIds.has(c.id)).length;
 
@@ -101,14 +129,25 @@ export default function Home() {
             Thesis Analyzer
           </h1>
           {!selectMode ? (
-            <button
-              onClick={() => setSelectMode(true)}
-              aria-label="Enable selection mode to analyze multiple conversations as a group"
-              className="text-sm min-h-[44px] flex items-center gap-1.5 bg-indigo-900/40 hover:bg-indigo-800/50 text-indigo-200 px-4 py-2 rounded-lg transition-colors border border-indigo-700/30"
-            >
-              <SquareIcon className="w-3.5 h-3.5" />
-              Select &amp; Analyze Group
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => loadConversations(true)}
+                disabled={refreshing || loading}
+                aria-label="Refresh conversations from Omi"
+                title="Refresh conversations from Omi"
+                className="text-sm min-h-[44px] flex items-center justify-center bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 p-2.5 rounded-lg transition-colors"
+              >
+                <RefreshIcon className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+              </button>
+              <button
+                onClick={() => setSelectMode(true)}
+                aria-label="Enable selection mode to analyze multiple conversations as a group"
+                className="text-sm min-h-[44px] flex items-center gap-1.5 bg-indigo-900/40 hover:bg-indigo-800/50 text-indigo-200 px-4 py-2 rounded-lg transition-colors border border-indigo-700/30"
+              >
+                <SquareIcon className="w-3.5 h-3.5" />
+                Select &amp; Analyze Group
+              </button>
+            </div>
           ) : (
             <button
               onClick={exitSelectMode}

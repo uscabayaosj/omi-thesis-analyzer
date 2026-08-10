@@ -13,6 +13,7 @@ import {
   type AnalysisVersion,
 } from "@/lib/storage";
 import { exportToObsidian, downloadMarkdown } from "@/lib/obsidian";
+import { cacheGet, cacheSet } from "@/lib/cache";
 
 interface TranscriptSegment {
   text: string;
@@ -252,13 +253,24 @@ export default function ConversationPage() {
     setVersions(getAnalysisVersions(id));
   }, [id]);
 
-  // Fetch conversation from API
+  // Fetch conversation from API. A finished conversation's transcript is
+  // immutable, so a cached copy is served without touching the network.
   useEffect(() => {
+    const cacheKey = `conversation:${id}`;
+    const cached = cacheGet<Conversation>(cacheKey);
+    if (cached) {
+      setConversation(cached.data);
+      setLoading(false);
+      return;
+    }
     fetch(`/api/conversations/${id}`)
       .then((r) => r.json())
       .then((data) => {
         if (data.error) setError(data.error);
-        else setConversation(data);
+        else {
+          setConversation(data);
+          if (data.transcript_segments?.length) cacheSet(cacheKey, data);
+        }
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -278,7 +290,12 @@ export default function ConversationPage() {
       if (data.error) setError(data.error);
       else {
         setAnalysis(data.analysis);
-        if (data.conversation) setConversation(data.conversation);
+        if (data.conversation) {
+          setConversation(data.conversation);
+          if (data.conversation.transcript_segments?.length) {
+            cacheSet(`conversation:${id}`, data.conversation);
+          }
+        }
         const stored = saveAnalysis({
           conversationId: id,
           title: data.conversation?.structured?.title || conversation?.structured?.title || "Untitled",
