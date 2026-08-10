@@ -4,7 +4,10 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getAnalyzedIds, getAnalysisAge } from "@/lib/storage";
+import { cacheGet, cacheSet } from "@/lib/cache";
 import { BookIcon, SquareIcon, XIcon, CheckIcon, SparklesIcon, WarningIcon, MicIcon, FolderIcon, RefreshIcon } from "@/components/icons";
+
+const CONVERSATIONS_CACHE_KEY = "conversations";
 
 interface Conversation {
   id: string;
@@ -45,11 +48,14 @@ export default function Home() {
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
+  // Revalidate the list over the network and refresh the cache. A refresh
+  // forces a fresh pull from Omi; the initial load can reuse the HTTP cache.
+  // Cached data stays on screen if an initial load fails, so a network hiccup
+  // never blanks the UI.
   const loadConversations = useCallback(async (mode: "initial" | "refresh") => {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
+    if (mode === "refresh") setRefreshing(true);
     try {
-      const res = await fetch("/api/conversations", { cache: "no-store" });
+      const res = await fetch("/api/conversations", mode === "refresh" ? { cache: "no-store" } : undefined);
       const data = await res.json();
       if (data.error) {
         setError(data.error);
@@ -57,17 +63,29 @@ export default function Home() {
         setConversations(data);
         setError(null);
         setLastSynced(new Date().toISOString());
+        cacheSet(CONVERSATIONS_CACHE_KEY, data);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to reach Omi");
+      // On an explicit refresh, always report. On the initial load, only surface
+      // an error if there was no cached list to fall back on.
+      if (mode === "refresh" || !cacheGet(CONVERSATIONS_CACHE_KEY)) {
+        setError(e instanceof Error ? e.message : "Failed to reach Omi");
+      }
     } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
+      setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
     setAnalyzedIds(getAnalyzedIds());
+
+    // Instant paint from cache (stale-while-revalidate), then revalidate.
+    const cached = cacheGet<Conversation[]>(CONVERSATIONS_CACHE_KEY);
+    if (cached) {
+      setConversations(cached.data);
+      setLoading(false);
+    }
     loadConversations("initial");
   }, [loadConversations]);
 

@@ -75,7 +75,12 @@ function buildRequestBody(config: ProviderConfig, messages: ChatMessage[], jsonM
     return {
       model: config.model,
       max_tokens: 4096,
-      system: systemMsg?.content || "",
+      // Mark the large, stable system prompt for prompt caching. The thesis
+      // framework (~1.8k tokens) is identical on every call, so Anthropic
+      // serves it from cache (~90% cheaper, lower latency) after the first hit.
+      system: systemMsg?.content
+        ? [{ type: "text", text: systemMsg.content, cache_control: { type: "ephemeral" } }]
+        : undefined,
       messages: userMsgs,
     };
   }
@@ -97,6 +102,9 @@ function buildRequestBody(config: ProviderConfig, messages: ChatMessage[], jsonM
     };
   }
 
+  // OpenAI (and OpenRouter's OpenAI-compatible path) cache stable prompt
+  // prefixes >1024 tokens automatically. Keeping the system prompt first and
+  // unchanged (as it is here) is what makes that caching kick in.
   return {
     model: config.model,
     messages,

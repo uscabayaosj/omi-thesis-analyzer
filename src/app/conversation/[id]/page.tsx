@@ -13,6 +13,7 @@ import {
   type AnalysisVersion,
 } from "@/lib/storage";
 import { exportToObsidian, downloadMarkdown } from "@/lib/obsidian";
+import { cacheGet, cacheSet } from "@/lib/cache";
 import { RefreshIcon } from "@/components/icons";
 
 interface TranscriptSegment {
@@ -255,12 +256,31 @@ export default function ConversationPage() {
     setVersions(getAnalysisVersions(id));
   }, [id]);
 
-  // Fetch conversation (with transcript) from Omi
+  // Load a conversation (with transcript) from Omi.
+  //   • initial: a finished transcript is immutable, so serve the cached copy
+  //     instantly and skip the network; only fetch on a cache miss.
+  //   • refresh: force a fresh pull from Omi and write it through to the cache.
   const loadConversation = useCallback(async (mode: "initial" | "refresh") => {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
+    const cacheKey = `conversation:${id}`;
+
+    if (mode === "initial") {
+      const cached = cacheGet<Conversation>(cacheKey);
+      if (cached) {
+        setConversation(cached.data);
+        setLastSynced(new Date(Date.now() - cached.ageMs).toISOString());
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+    } else {
+      setRefreshing(true);
+    }
+
     try {
-      const res = await fetch(`/api/conversations/${id}`, { cache: "no-store" });
+      const res = await fetch(
+        `/api/conversations/${id}`,
+        mode === "refresh" ? { cache: "no-store" } : undefined
+      );
       const data = await res.json();
       if (data.error) {
         setError(data.error);
@@ -268,6 +288,7 @@ export default function ConversationPage() {
         setConversation(data);
         setError(null);
         setLastSynced(new Date().toISOString());
+        if (data.transcript_segments?.length) cacheSet(cacheKey, data);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to reach Omi");
@@ -295,7 +316,12 @@ export default function ConversationPage() {
       if (data.error) setError(data.error);
       else {
         setAnalysis(data.analysis);
-        if (data.conversation) setConversation(data.conversation);
+        if (data.conversation) {
+          setConversation(data.conversation);
+          if (data.conversation.transcript_segments?.length) {
+            cacheSet(`conversation:${id}`, data.conversation);
+          }
+        }
         const stored = saveAnalysis({
           conversationId: id,
           title: data.conversation?.structured?.title || conversation?.structured?.title || "Untitled",
