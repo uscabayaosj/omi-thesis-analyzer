@@ -45,36 +45,24 @@ interface Analysis {
   forward_thinking: string;
 }
 
-const TRANSCRIPT_PAGE_SIZE = 50;
-
 // ── Components ──
 
+// Renders the full transcript. Long text wraps (min-w-0 + break-words) instead
+// of overflowing horizontally, and there is no inner scroll box — the whole
+// transcript flows in the page so it scrolls naturally (never frozen on touch).
 function TranscriptViewer({ segments }: { segments: TranscriptSegment[] }) {
-  const [visibleCount, setVisibleCount] = useState(TRANSCRIPT_PAGE_SIZE);
-  const visible = segments.slice(0, visibleCount);
-  const hasMore = visibleCount < segments.length;
-
   return (
-    <div>
-      <div className="space-y-2">
-        {visible.map((seg, i) => (
-          <div key={i} className="flex gap-3 text-sm">
-            <span className="text-slate-500 font-mono w-20 flex-shrink-0 text-right">
-              {seg.speaker_name || `S${seg.speaker_id ?? 0}`}
-            </span>
-            <span className="text-slate-300">{seg.text}</span>
-          </div>
-        ))}
-      </div>
-      {hasMore && (
-        <button
-          onClick={() => setVisibleCount((c) => c + TRANSCRIPT_PAGE_SIZE)}
-          className="mt-4 w-full text-sm text-slate-400 hover:text-indigo-400 transition-colors min-h-[44px] py-2"
-          aria-label={`Show ${Math.min(TRANSCRIPT_PAGE_SIZE, segments.length - visibleCount)} more transcript segments`}
-        >
-          Show more ({segments.length - visibleCount} remaining)
-        </button>
-      )}
+    <div className="space-y-2">
+      {segments.map((seg, i) => (
+        <div key={i} className="flex gap-3 text-sm">
+          <span className="text-slate-500 font-mono w-20 flex-shrink-0 text-right">
+            {seg.speaker_name || `S${seg.speaker_id ?? 0}`}
+          </span>
+          <span className="flex-1 min-w-0 break-words whitespace-pre-wrap text-slate-300">
+            {seg.text}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -223,6 +211,7 @@ export default function ConversationPage() {
   const [viewingVersion, setViewingVersion] = useState<AnalysisVersion | null>(null);
   const [customPrompt, setCustomPrompt] = useState("");
   const [showCustom, setShowCustom] = useState(false);
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastSynced, setLastSynced] = useState<string | null>(null);
@@ -331,6 +320,9 @@ export default function ConversationPage() {
         });
         setStoredAnalysis(stored);
         setVersions(getAnalysisVersions(id));
+        // Tuck the verification/custom cards away now that results are up.
+        setTranscriptOpen(false);
+        setShowCustom(false);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Analysis failed");
@@ -588,7 +580,8 @@ export default function ConversationPage() {
             />
           )}
 
-          {/* Custom analysis */}
+          {/* Custom analysis — collapsed by default; auto-collapses after an
+              analysis runs so it tucks away without disappearing. */}
           <section className="mb-8" aria-label="Custom analysis">
             <button
               onClick={() => setShowCustom(!showCustom)}
@@ -680,13 +673,18 @@ export default function ConversationPage() {
             )}
           </section>
 
-          {/* Transcript */}
+          {/* Transcript — collapsed by default; auto-collapses after an
+              analysis runs. Expands to the full, page-scrollable transcript. */}
           {conversation.transcript_segments && conversation.transcript_segments.length > 0 && (
-            <details className="card">
+            <details
+              className="card"
+              open={transcriptOpen}
+              onToggle={(e) => setTranscriptOpen(e.currentTarget.open)}
+            >
               <summary className="p-5 cursor-pointer font-semibold text-white hover:text-indigo-300 transition-colors min-h-[44px] flex items-center">
                 📄 Transcript ({conversation.transcript_segments.length} segments)
               </summary>
-              <div className="px-5 pb-5 max-h-96 overflow-y-auto">
+              <div className="px-5 pb-5">
                 <TranscriptViewer segments={conversation.transcript_segments} />
               </div>
             </details>
