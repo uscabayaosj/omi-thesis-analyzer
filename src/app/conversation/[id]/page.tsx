@@ -14,6 +14,7 @@ import {
 } from "@/lib/storage";
 import { exportToObsidian, downloadMarkdown } from "@/lib/obsidian";
 import { cacheGet, cacheSet } from "@/lib/cache";
+import { RefreshIcon } from "@/components/icons";
 
 interface TranscriptSegment {
   text: string;
@@ -223,6 +224,8 @@ export default function ConversationPage() {
   const [customPrompt, setCustomPrompt] = useState("");
   const [showCustom, setShowCustom] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [customAnalyzing, setCustomAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -253,28 +256,51 @@ export default function ConversationPage() {
     setVersions(getAnalysisVersions(id));
   }, [id]);
 
-  // Fetch conversation from API. A finished conversation's transcript is
-  // immutable, so a cached copy is served without touching the network.
-  useEffect(() => {
+  // Load a conversation (with transcript) from Omi.
+  //   • initial: a finished transcript is immutable, so serve the cached copy
+  //     instantly and skip the network; only fetch on a cache miss.
+  //   • refresh: force a fresh pull from Omi and write it through to the cache.
+  const loadConversation = useCallback(async (mode: "initial" | "refresh") => {
     const cacheKey = `conversation:${id}`;
-    const cached = cacheGet<Conversation>(cacheKey);
-    if (cached) {
-      setConversation(cached.data);
-      setLoading(false);
-      return;
+
+    if (mode === "initial") {
+      const cached = cacheGet<Conversation>(cacheKey);
+      if (cached) {
+        setConversation(cached.data);
+        setLastSynced(new Date(Date.now() - cached.ageMs).toISOString());
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+    } else {
+      setRefreshing(true);
     }
-    fetch(`/api/conversations/${id}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.error) setError(data.error);
-        else {
-          setConversation(data);
-          if (data.transcript_segments?.length) cacheSet(cacheKey, data);
-        }
-      })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+
+    try {
+      const res = await fetch(
+        `/api/conversations/${id}`,
+        mode === "refresh" ? { cache: "no-store" } : undefined
+      );
+      const data = await res.json();
+      if (data.error) {
+        setError(data.error);
+      } else {
+        setConversation(data);
+        setError(null);
+        setLastSynced(new Date().toISOString());
+        if (data.transcript_segments?.length) cacheSet(cacheKey, data);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to reach Omi");
+    } finally {
+      if (mode === "initial") setLoading(false);
+      else setRefreshing(false);
+    }
   }, [id]);
+
+  useEffect(() => {
+    loadConversation("initial");
+  }, [loadConversation]);
 
   const executeAnalysis = useCallback(async () => {
     setAnalyzing(true);
@@ -400,9 +426,25 @@ export default function ConversationPage() {
 
   return (
     <main className="max-w-3xl mx-auto px-4 py-8">
-      <Link href="/" className="text-slate-400 hover:text-white text-sm mb-6 inline-flex items-center gap-1 min-h-[44px] py-2">
-        ← Back to conversations
-      </Link>
+      <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
+        <Link href="/" className="text-slate-400 hover:text-white text-sm inline-flex items-center gap-1 min-h-[44px] py-2">
+          ← Back to conversations
+        </Link>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-slate-400" aria-live="polite">
+            {refreshing ? "Refreshing…" : lastSynced ? `Synced ${getAnalysisAge(lastSynced).label}` : ""}
+          </span>
+          <button
+            onClick={() => loadConversation("refresh")}
+            disabled={loading || refreshing}
+            aria-label="Refresh this conversation and transcript from Omi"
+            className="flex items-center gap-1.5 text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+          >
+            <RefreshIcon className={`w-4 h-4 flex-shrink-0 ${refreshing ? "animate-spin" : ""}`} />
+            {refreshing ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
+      </div>
 
       {loading && (
         <div className="space-y-4" role="status" aria-label="Loading conversation">

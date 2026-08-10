@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getAnalyzedIds } from "@/lib/storage";
+import { getAnalyzedIds, getAnalysisAge } from "@/lib/storage";
 import { cacheGet, cacheSet } from "@/lib/cache";
 import { BookIcon, SquareIcon, XIcon, CheckIcon, SparklesIcon, WarningIcon, MicIcon, FolderIcon, RefreshIcon } from "@/components/icons";
 
@@ -42,29 +42,34 @@ export default function Home() {
   const [analyzedIds, setAnalyzedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "analyzed" | "unanalyzed">("all");
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  // Revalidate the list over the network and refresh the cache. Keeps any
-  // cached list on screen if the network fails, so a hiccup never blanks the UI.
-  const loadConversations = useCallback(async (force = false) => {
-    if (force) setRefreshing(true);
+  // Revalidate the list over the network and refresh the cache. A refresh
+  // forces a fresh pull from Omi; the initial load can reuse the HTTP cache.
+  // Cached data stays on screen if an initial load fails, so a network hiccup
+  // never blanks the UI.
+  const loadConversations = useCallback(async (mode: "initial" | "refresh") => {
+    if (mode === "refresh") setRefreshing(true);
     try {
-      const res = await fetch("/api/conversations", force ? { cache: "no-store" } : undefined);
+      const res = await fetch("/api/conversations", mode === "refresh" ? { cache: "no-store" } : undefined);
       const data = await res.json();
       if (data.error) {
         setError(data.error);
       } else {
         setConversations(data);
         setError(null);
+        setLastSynced(new Date().toISOString());
         cacheSet(CONVERSATIONS_CACHE_KEY, data);
       }
     } catch (e) {
-      // Only surface a network error if we have nothing cached to show.
-      if (!cacheGet(CONVERSATIONS_CACHE_KEY)) {
-        setError(e instanceof Error ? e.message : "Failed to load conversations");
+      // On an explicit refresh, always report. On the initial load, only surface
+      // an error if there was no cached list to fall back on.
+      if (mode === "refresh" || !cacheGet(CONVERSATIONS_CACHE_KEY)) {
+        setError(e instanceof Error ? e.message : "Failed to reach Omi");
       }
     } finally {
       setLoading(false);
@@ -75,13 +80,13 @@ export default function Home() {
   useEffect(() => {
     setAnalyzedIds(getAnalyzedIds());
 
-    // Instant paint from cache (stale-while-revalidate), then refresh.
+    // Instant paint from cache (stale-while-revalidate), then revalidate.
     const cached = cacheGet<Conversation[]>(CONVERSATIONS_CACHE_KEY);
     if (cached) {
       setConversations(cached.data);
       setLoading(false);
     }
-    loadConversations(false);
+    loadConversations("initial");
   }, [loadConversations]);
 
   const analyzedCount = conversations.filter((c) => analyzedIds.has(c.id)).length;
@@ -129,25 +134,14 @@ export default function Home() {
             Thesis Analyzer
           </h1>
           {!selectMode ? (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => loadConversations(true)}
-                disabled={refreshing || loading}
-                aria-label="Refresh conversations from Omi"
-                title="Refresh conversations from Omi"
-                className="text-sm min-h-[44px] flex items-center justify-center bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 p-2.5 rounded-lg transition-colors"
-              >
-                <RefreshIcon className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
-              </button>
-              <button
-                onClick={() => setSelectMode(true)}
-                aria-label="Enable selection mode to analyze multiple conversations as a group"
-                className="text-sm min-h-[44px] flex items-center gap-1.5 bg-indigo-900/40 hover:bg-indigo-800/50 text-indigo-200 px-4 py-2 rounded-lg transition-colors border border-indigo-700/30"
-              >
-                <SquareIcon className="w-3.5 h-3.5" />
-                Select &amp; Analyze Group
-              </button>
-            </div>
+            <button
+              onClick={() => setSelectMode(true)}
+              aria-label="Enable selection mode to analyze multiple conversations as a group"
+              className="text-sm min-h-[44px] flex items-center gap-1.5 bg-indigo-900/40 hover:bg-indigo-800/50 text-indigo-200 px-4 py-2 rounded-lg transition-colors border border-indigo-700/30"
+            >
+              <SquareIcon className="w-3.5 h-3.5" />
+              Select &amp; Analyze Group
+            </button>
           ) : (
             <button
               onClick={exitSelectMode}
@@ -162,6 +156,28 @@ export default function Home() {
         <p className="text-slate-400">
           AI-powered analysis of your Omi conversations through the lens of Pioneer Sovereignty
         </p>
+
+        {/* Sync status + refresh */}
+        <div className="flex items-center justify-between gap-3 mt-4">
+          <span className="text-sm text-slate-400" aria-live="polite">
+            {refreshing
+              ? "Refreshing from Omi…"
+              : loading
+              ? "Loading…"
+              : lastSynced
+              ? `Synced ${getAnalysisAge(lastSynced).label}`
+              : ""}
+          </span>
+          <button
+            onClick={() => loadConversations("refresh")}
+            disabled={loading || refreshing}
+            aria-label="Refresh conversations from Omi"
+            className="flex items-center gap-1.5 text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+          >
+            <RefreshIcon className={`w-4 h-4 flex-shrink-0 ${refreshing ? "animate-spin" : ""}`} />
+            {refreshing ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
 
         {/* Onboarding: About this framework */}
         <details className="mt-4 card">

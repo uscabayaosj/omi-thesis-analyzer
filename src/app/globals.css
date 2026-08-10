@@ -121,6 +121,9 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
   .card {
     transition: none;
   }
+  .animate-spin {
+    animation: none;
+  }
 }
 
 /* Mobile PWA bottom safe area */
