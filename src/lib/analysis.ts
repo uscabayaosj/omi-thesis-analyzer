@@ -74,7 +74,7 @@ function buildRequestBody(config: ProviderConfig, messages: ChatMessage[], jsonM
     const userMsgs = messages.filter((m) => m.role !== "system");
     return {
       model: config.model,
-      max_tokens: 4096,
+      max_tokens: 8192,
       // Mark the large, stable system prompt for prompt caching. The thesis
       // framework (~1.8k tokens) is identical on every call, so Anthropic
       // serves it from cache (~90% cheaper, lower latency) after the first hit.
@@ -96,7 +96,7 @@ function buildRequestBody(config: ProviderConfig, messages: ChatMessage[], jsonM
       systemInstruction: systemMsg ? { parts: [{ text: systemMsg.content }] } : undefined,
       generationConfig: {
         temperature: 0.7,
-        maxOutputTokens: 4096,
+        maxOutputTokens: 8192,
         responseMimeType: jsonMode ? "application/json" : "text/plain",
       },
     };
@@ -109,7 +109,7 @@ function buildRequestBody(config: ProviderConfig, messages: ChatMessage[], jsonM
     model: config.model,
     messages,
     temperature: 0.7,
-    max_tokens: 4096,
+    max_tokens: 8192,
     ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
   };
 }
@@ -144,19 +144,88 @@ export async function chatCompletion(messages: ChatMessage[], jsonMode = false):
 
   const body = buildRequestBody(config, messages, jsonMode);
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: config.headers,
-    body: JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: config.headers,
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(AI_TIMEOUT_MS),
+    });
+  } catch (e) {
+    if (e instanceof DOMException && (e.name === "TimeoutError" || e.name === "AbortError")) {
+      throw new Error(`${provider} API request timed out after ${AI_TIMEOUT_MS / 1000}s`);
+    }
+    throw e;
+  }
 
   if (!res.ok) {
-    const errorBody = await res.text();
+    const errorBody = (await res.text()).slice(0, 500);
     throw new Error(`${provider} API ${res.status}: ${errorBody}`);
   }
 
   const data = await res.json();
   return extractContent(data, provider);
+}
+
+const AI_TIMEOUT_MS = 120_000;
+
+// Rough character budget for transcripts sent to the AI (~50k tokens),
+// so a marathon recording degrades to a truncated analysis instead of a
+// context-window error from the provider.
+export const MAX_TRANSCRIPT_CHARS = 200_000;
+
+export function clampTranscript(transcript: string, maxChars = MAX_TRANSCRIPT_CHARS): string {
+  if (transcript.length <= maxChars) return transcript;
+  return `${transcript.slice(0, maxChars)}\n\n[Transcript truncated for analysis — the recording exceeds the size limit. The analysis covers the portion above.]`;
+}
+
+// Providers (Anthropic especially, which has no JSON mode) often wrap JSON
+// in markdown fences or prose. Extract the object rather than failing.
+export function extractJsonObject(content: string): Record<string, unknown> {
+  const attempts = [content.trim()];
+
+  const fenced = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenced) attempts.push(fenced[1].trim());
+
+  const first = content.indexOf("{");
+  const last = content.lastIndexOf("}");
+  if (first !== -1 && last > first) attempts.push(content.slice(first, last + 1));
+
+  for (const attempt of attempts) {
+    try {
+      const parsed = JSON.parse(attempt);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      // try the next candidate
+    }
+  }
+  throw new Error("AI response did not return valid JSON");
+}
+
+const ANALYSIS_FIELDS: (keyof Analysis)[] = [
+  "rq1_documentary_record",
+  "rq2_everyday_practices",
+  "rq3_cskt_intersection",
+  "rq4_wildness_imaginary",
+  "conditions_check",
+  "rival_hypothesis_test",
+  "refutation_signals",
+  "forward_thinking",
+];
+
+function toAnalysis(raw: Record<string, unknown>): Analysis {
+  const result = {} as Record<keyof Analysis, string>;
+  for (const field of ANALYSIS_FIELDS) {
+    const value = raw[field];
+    result[field] =
+      typeof value === "string" && value.trim()
+        ? value
+        : "The AI did not return this dimension. Re-run the analysis to fill it in.";
+  }
+  return result;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -263,12 +332,12 @@ export async function analyzeConversation(
   const content = await chatCompletion(
     [
       { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: buildUserPrompt(transcript, title) },
+      { role: "user", content: buildUserPrompt(clampTranscript(transcript), title) },
     ],
     true
   );
 
-  return JSON.parse(content) as Analysis;
+  return toAnalysis(extractJsonObject(content));
 }
 
 export async function analyzeCustom(
@@ -285,7 +354,7 @@ You will be given a conversation transcript and a specific analysis question. Pr
   const userPrompt = `Conversation: "${title}"
 
 Transcript:
-${transcript}
+${clampTranscript(transcript)}
 
 Analysis question: ${customPrompt}`;
 

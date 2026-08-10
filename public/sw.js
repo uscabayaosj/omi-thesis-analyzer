@@ -1,4 +1,4 @@
-const CACHE_NAME = "thesis-analyzer-v1";
+const CACHE_NAME = "thesis-analyzer-v2";
 const STATIC_ASSETS = ["/", "/manifest.json", "/icon-192.png", "/icon-512.png"];
 
 // Install — cache static shell
@@ -42,16 +42,48 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Page navigations — network first so the app shell never goes stale,
+  // falling back to the cached shell only when offline
+  if (request.mode === "navigate") {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        })
+        .catch(() =>
+          caches.match(request).then(
+            (cached) =>
+              cached ||
+              caches.match("/").then(
+                (shell) =>
+                  shell ||
+                  new Response("You are offline and this page is not cached.", {
+                    status: 503,
+                    headers: { "Content-Type": "text/plain" },
+                  })
+              )
+          )
+        )
+    );
+    return;
+  }
+
   // Static assets — cache first
   event.respondWith(
     caches.match(request).then((cached) => {
-      const fetched = fetch(request).then((response) => {
-        if (response.ok) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-        }
-        return response;
-      });
+      const fetched = fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        })
+        .catch(() => cached || Response.error());
       return cached || fetched;
     })
   );

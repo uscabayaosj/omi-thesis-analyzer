@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getConversation, segmentsToText } from "@/lib/omi-api";
 import { analyzeCustom } from "@/lib/analysis";
+import { friendlyError } from "@/lib/api-error";
 
 export async function POST(req: NextRequest) {
   try {
     const { conversationId, prompt } = await req.json();
 
-    if (!conversationId || !prompt) {
+    if (!conversationId || typeof conversationId !== "string" || !prompt || typeof prompt !== "string") {
       return NextResponse.json(
         { error: "Please select a conversation and enter a question." },
         { status: 400 }
@@ -36,24 +37,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ result });
   } catch (err) {
-    const raw = err instanceof Error ? err.message : String(err);
-
-    if (raw.includes("API key") || raw.includes("401") || raw.includes("403")) {
-      return NextResponse.json(
-        { error: "AI service authentication failed. Check your API key." },
-        { status: 502 }
-      );
-    }
-    if (raw.includes("429") || raw.includes("rate")) {
-      return NextResponse.json(
-        { error: "AI service is busy. Please wait a moment and try again." },
-        { status: 429 }
-      );
-    }
-
-    return NextResponse.json(
-      { error: "Something went wrong during analysis. Please try again." },
-      { status: 500 }
-    );
+    console.error("custom analysis failed:", err);
+    const { error, status } = friendlyError(err);
+    return NextResponse.json({ error }, { status });
   }
 }

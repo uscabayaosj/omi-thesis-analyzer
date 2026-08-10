@@ -1,8 +1,24 @@
 "use client";
 
-import { useEffect, useState, useCallback, Suspense } from "react";
+import { useEffect, useState, useCallback, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { fetchJson } from "@/lib/fetch-json";
+import {
+  ArrowLeftIcon,
+  CompassIcon,
+  WarningIcon,
+  CheckIcon,
+  ExternalLinkIcon,
+  DownloadIcon,
+  RefreshIcon,
+  LoaderIcon,
+  LinkIcon,
+  ZapIcon,
+  TrendingUpIcon,
+  PuzzleIcon,
+  CogIcon,
+} from "@/components/icons";
 
 interface ConvoRef {
   id: string;
@@ -34,16 +50,42 @@ function getStoredGroupAnalyses(): StoredGroupAnalysis[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (a): a is StoredGroupAnalysis =>
+        a && typeof a === "object" && Array.isArray(a.conversationIds) && !!a.analysis
+    );
   } catch {
     return [];
   }
 }
 
+function groupKey(ids: string[]): string {
+  return [...ids].sort().join(",");
+}
+
+function persistGroups(all: StoredGroupAnalysis[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "QuotaExceededError") {
+      // Keep only the 5 most recent groups and retry once
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(all.slice(0, 5)));
+        return;
+      } catch {
+        // fall through
+      }
+    }
+    console.error("Failed to save group analysis to localStorage:", e);
+  }
+}
+
 function saveGroupAnalysis(data: Omit<StoredGroupAnalysis, "id" | "timestamp">): StoredGroupAnalysis {
   const all = getStoredGroupAnalyses();
-  const id = data.conversationIds.sort().join(",");
-  const existing = all.findIndex((a) => a.conversationIds.sort().join(",") === id);
+  const key = groupKey(data.conversationIds);
+  const existing = all.findIndex((a) => groupKey(a.conversationIds) === key);
 
   const stored: StoredGroupAnalysis = {
     ...data,
@@ -59,7 +101,7 @@ function saveGroupAnalysis(data: Omit<StoredGroupAnalysis, "id" | "timestamp">):
     all.unshift(stored);
   }
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  persistGroups(all);
   return stored;
 }
 
@@ -68,24 +110,29 @@ function saveGroupCustom(
   custom: { prompt: string; result: string }
 ) {
   const all = getStoredGroupAnalyses();
-  const key = conversationIds.sort().join(",");
-  const existing = all.find((a) => a.conversationIds.sort().join(",") === key);
+  const key = groupKey(conversationIds);
+  const existing = all.find((a) => groupKey(a.conversationIds) === key);
   if (existing) {
     existing.custom = { ...custom, timestamp: new Date().toISOString() };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+    persistGroups(all);
   }
 }
 
+function safeDay(date: string | undefined): string {
+  return typeof date === "string" && date.length >= 10 ? date.split("T")[0] : "unknown-date";
+}
+
 function buildGroupMarkdown(stored: StoredGroupAnalysis): { markdown: string; filename: string } {
-  const dates = stored.conversations.map((c) => c.date.split("T")[0]);
-  const dateRange = dates.length > 1 ? `${dates[0]} to ${dates[dates.length - 1]}` : dates[0];
-  const titles = stored.conversations.map((c) => c.title).join(", ");
-  const safeName = titles.replace(/[\/\\:*?"<>|]/g, "-").substring(0, 80);
+  const dates = stored.conversations.map((c) => safeDay(c.date));
+  const dateRange =
+    dates.length > 1 ? `${dates[0]} to ${dates[dates.length - 1]}` : dates[0] ?? "unknown-date";
+  const titles = stored.conversations.map((c) => c.title || "Untitled").join(", ");
+  const safeName = (titles || "Untitled group").replace(/[\/\\:*?"<>|]/g, "-").substring(0, 80);
 
   const convoLinks = stored.conversations
     .map((c) => {
-      const d = c.date.split("T")[0];
-      return `- [[${d} - ${c.title.replace(/[\/\\:*?"<>|]/g, "-")}]]`;
+      const d = safeDay(c.date);
+      return `- [[${d} - ${(c.title || "Untitled").replace(/[\/\\:*?"<>|]/g, "-")}]]`;
     })
     .join("\n");
 
@@ -168,7 +215,13 @@ function downloadGroupMarkdown(stored: StoredGroupAnalysis): void {
 
 function GroupAnalysisContent() {
   const searchParams = useSearchParams();
-  const ids = searchParams.get("ids")?.split(",") || [];
+  const idsParam = searchParams.get("ids") ?? "";
+  // Memoize on the raw string — a fresh array every render would re-trigger
+  // every effect and callback that depends on it.
+  const ids = useMemo(
+    () => Array.from(new Set(idsParam.split(",").map((s) => s.trim()).filter(Boolean))),
+    [idsParam]
+  );
 
   const [analysis, setAnalysis] = useState<GroupAnalysis | null>(null);
   const [conversations, setConversations] = useState<ConvoRef[]>([]);
@@ -180,11 +233,12 @@ function GroupAnalysisContent() {
   const [customAnalyzing, setCustomAnalyzing] = useState(false);
   const [exported, setExported] = useState(false);
   const [customResult, setCustomResult] = useState<string | null>(null);
+  const [skipped, setSkipped] = useState(0);
 
   useEffect(() => {
     const stored = getStoredGroupAnalyses();
-    const key = [...ids].sort().join(",");
-    const existing = stored.find((a) => [...a.conversationIds].sort().join(",") === key);
+    const key = groupKey(ids);
+    const existing = stored.find((a) => groupKey(a.conversationIds) === key);
     if (existing) {
       setAnalysis(existing.analysis);
       setConversations(existing.conversations);
@@ -192,32 +246,31 @@ function GroupAnalysisContent() {
         setCustomPrompt(existing.custom.prompt);
         setCustomResult(existing.custom.result);
       }
-      setLoading(false);
-    } else {
-      setLoading(false);
     }
+    setLoading(false);
   }, [ids]);
 
   const runAnalysis = useCallback(async () => {
     setAnalyzing(true);
     setError(null);
     try {
-      const res = await fetch("/api/analyze-group", {
+      const data = await fetchJson<{
+        analysis: GroupAnalysis;
+        conversations: ConvoRef[];
+        skipped?: number;
+      }>("/api/analyze-group", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conversationIds: ids }),
       });
-      const data = await res.json();
-      if (data.error) setError(data.error);
-      else {
-        setAnalysis(data.analysis);
-        setConversations(data.conversations);
-        saveGroupAnalysis({
-          conversationIds: ids,
-          conversations: data.conversations,
-          analysis: data.analysis,
-        });
-      }
+      setAnalysis(data.analysis);
+      setConversations(data.conversations);
+      setSkipped(data.skipped ?? 0);
+      saveGroupAnalysis({
+        conversationIds: ids,
+        conversations: data.conversations,
+        analysis: data.analysis,
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Analysis failed");
     } finally {
@@ -230,17 +283,13 @@ function GroupAnalysisContent() {
     setCustomAnalyzing(true);
     setError(null);
     try {
-      const res = await fetch("/api/analyze-group/custom", {
+      const data = await fetchJson<{ result: string }>("/api/analyze-group/custom", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conversationIds: ids, prompt: customPrompt }),
       });
-      const data = await res.json();
-      if (data.error) setError(data.error);
-      else {
-        saveGroupCustom(ids, { prompt: customPrompt, result: data.result });
-        setCustomResult(data.result);
-      }
+      saveGroupCustom(ids, { prompt: customPrompt, result: data.result });
+      setCustomResult(data.result);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Custom analysis failed");
     } finally {
@@ -248,22 +297,29 @@ function GroupAnalysisContent() {
     }
   }, [ids, customPrompt]);
 
-  const handleExportObsidian = () => {
+  const findStoredGroup = useCallback(() => {
     const stored = getStoredGroupAnalyses();
-    const key = [...ids].sort().join(",");
-    const existing = stored.find((a) => [...a.conversationIds].sort().join(",") === key);
+    const key = groupKey(ids);
+    return stored.find((a) => groupKey(a.conversationIds) === key);
+  }, [ids]);
+
+  const handleExportObsidian = () => {
+    const existing = findStoredGroup();
     if (existing) {
       const uri = exportGroupToObsidian(existing);
-      window.open(uri, "_blank");
+      if (uri.length > 30_000) {
+        // Very long custom-scheme URIs get silently dropped on some platforms
+        downloadGroupMarkdown(existing);
+      } else {
+        window.open(uri, "_blank");
+      }
       setExported(true);
       setTimeout(() => setExported(false), 2000);
     }
   };
 
   const handleDownloadGroup = () => {
-    const stored = getStoredGroupAnalyses();
-    const key = [...ids].sort().join(",");
-    const existing = stored.find((a) => [...a.conversationIds].sort().join(",") === key);
+    const existing = findStoredGroup();
     if (existing) {
       downloadGroupMarkdown(existing);
       setExported(true);
@@ -273,27 +329,58 @@ function GroupAnalysisContent() {
 
   const sections = analysis
     ? [
-        { icon: "🔗", title: "Cross-Conversation Themes", subtitle: "Recurring ideas and shared concerns", content: analysis.cross_conversation_themes },
-        { icon: "⚡", title: "Contradictions & Tensions", subtitle: "Where conversations diverge or conflict", content: analysis.contradictions_and_tensions },
-        { icon: "📈", title: "Evolution & Patterns", subtitle: "How ideas change over time", content: analysis.evolution_and_patterns },
-        { icon: "🧩", title: "Synthesis", subtitle: "The bigger picture across all conversations", content: analysis.synthesis },
-        { icon: "🚀", title: "Forward Thinking", subtitle: "Research directions from cross-conversation patterns", content: analysis.forward_thinking },
+        { icon: LinkIcon, title: "Cross-Conversation Themes", subtitle: "Recurring ideas and shared concerns", content: analysis.cross_conversation_themes },
+        { icon: ZapIcon, title: "Contradictions & Tensions", subtitle: "Where conversations diverge or conflict", content: analysis.contradictions_and_tensions },
+        { icon: TrendingUpIcon, title: "Evolution & Patterns", subtitle: "How ideas change over time", content: analysis.evolution_and_patterns },
+        { icon: PuzzleIcon, title: "Synthesis", subtitle: "The bigger picture across all conversations", content: analysis.synthesis },
+        { icon: CompassIcon, title: "Forward Thinking", subtitle: "Research directions from cross-conversation patterns", content: analysis.forward_thinking },
       ]
     : [];
 
+  if (ids.length < 2) {
+    return (
+      <main className="max-w-3xl mx-auto px-4 py-8">
+        <Link href="/" className="text-slate-400 hover:text-white text-sm mb-6 inline-flex items-center gap-1.5 min-h-[44px] py-2">
+          <ArrowLeftIcon className="w-4 h-4" />
+          Back to conversations
+        </Link>
+        <div className="card p-8 text-center">
+          <CompassIcon className="w-8 h-8 mx-auto mb-3 text-slate-500" />
+          <h1 className="text-xl font-bold text-white mb-2">Group analysis needs at least 2 conversations</h1>
+          <p className="text-slate-400 text-sm mb-6">
+            Use &ldquo;Select &amp; Analyze Group&rdquo; on the conversations list to pick two or more, then come back here.
+          </p>
+          <Link
+            href="/"
+            className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 px-5 min-h-[44px] rounded-lg text-sm transition-colors inline-flex items-center"
+          >
+            Choose conversations
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="max-w-3xl mx-auto px-4 py-8">
-      <Link href="/" className="text-slate-400 hover:text-white text-sm mb-6 inline-flex items-center gap-1 min-h-[44px] py-2">
-        ← Back to conversations
+      <Link href="/" className="text-slate-400 hover:text-white text-sm mb-6 inline-flex items-center gap-1.5 min-h-[44px] py-2">
+        <ArrowLeftIcon className="w-4 h-4" />
+        Back to conversations
       </Link>
 
       <header className="mb-6">
-        <h1 className="text-2xl font-bold text-white mb-2">
-          <span aria-hidden="true">🧠</span> Group Analysis
+        <h1 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
+          <CompassIcon className="w-6 h-6 text-indigo-400 flex-shrink-0" />
+          Group Analysis
         </h1>
         <p className="text-slate-400 text-sm">
           {ids.length} conversations selected for cross-conversation analysis
         </p>
+        {skipped > 0 && (
+          <p className="text-amber-300/90 text-sm mt-1" role="status">
+            {skipped} conversation{skipped === 1 ? "" : "s"} could not be loaded from Omi and {skipped === 1 ? "was" : "were"} left out of this analysis.
+          </p>
+        )}
         {conversations.length > 0 && (
           <div className="flex flex-wrap gap-2 mt-3" role="list" aria-label="Conversations in this group">
             {conversations.map((c) => (
@@ -316,7 +403,10 @@ function GroupAnalysisContent() {
 
       {error && (
         <div className="card p-6 border-red-500/50 mb-6" role="alert">
-          <p className="text-red-400">⚠ {error}</p>
+          <p className="text-red-400 flex items-center gap-2">
+            <WarningIcon className="w-5 h-5 flex-shrink-0" />
+            <span className="min-w-0 break-words">{error}</span>
+          </p>
           <button
             onClick={() => setError(null)}
             className="mt-2 text-sm text-slate-400 hover:text-white min-h-[44px] px-2"
@@ -337,7 +427,7 @@ function GroupAnalysisContent() {
         >
           {analyzing ? (
             <div className="flex items-center justify-center gap-3">
-              <span className="pulse-dot text-2xl" aria-hidden="true">⏳</span>
+              <LoaderIcon className="w-6 h-6 text-indigo-400 animate-spin flex-shrink-0" />
               <div>
                 <p className="font-semibold text-white">Analyzing {ids.length} conversations...</p>
                 <p className="text-slate-400 text-sm mt-1">Running cross-conversation analysis</p>
@@ -345,7 +435,7 @@ function GroupAnalysisContent() {
             </div>
           ) : (
             <div>
-              <p className="text-2xl mb-2" aria-hidden="true">🧠</p>
+              <CompassIcon className="w-7 h-7 mx-auto mb-2 text-indigo-400" />
               <p className="font-semibold text-white">Run Group Analysis</p>
               <p className="text-slate-400 text-sm mt-1">Find patterns across {ids.length} conversations</p>
             </div>
@@ -358,31 +448,43 @@ function GroupAnalysisContent() {
         <section className="mb-8" aria-label="Cross-conversation analysis results">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              🧠 Cross-Conversation Analysis
+              <CompassIcon className="w-5 h-5 text-indigo-400 flex-shrink-0" />
+              Cross-Conversation Analysis
               <span className="text-xs bg-indigo-900/50 text-indigo-200 px-2 py-0.5 rounded-full font-normal">saved</span>
             </h2>
             <div className="flex items-center gap-2">
               <button
                 onClick={handleExportObsidian}
                 aria-label="Export group analysis to Obsidian vault"
-                className="text-sm bg-purple-900/40 hover:bg-purple-800/50 text-purple-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors"
+                className="text-sm bg-purple-900/40 hover:bg-purple-800/50 text-purple-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5"
               >
-                {exported ? "✓ Saved" : "📓 Send to Obsidian"}
+                {exported ? (
+                  <>
+                    <CheckIcon className="w-3.5 h-3.5" />
+                    Saved
+                  </>
+                ) : (
+                  <>
+                    <ExternalLinkIcon className="w-3.5 h-3.5" />
+                    Send to Obsidian
+                  </>
+                )}
               </button>
               <button
                 onClick={handleDownloadGroup}
                 aria-label="Download group analysis as markdown file"
-                className="text-sm bg-amber-900/40 hover:bg-amber-800/50 text-amber-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors"
+                className="text-sm bg-amber-900/40 hover:bg-amber-800/50 text-amber-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5"
               >
-                ⬇ Download .md
+                <DownloadIcon className="w-3.5 h-3.5" />
+                Download .md
               </button>
               <button
                 onClick={runAnalysis}
                 disabled={analyzing}
                 aria-label="Re-run group analysis"
-                className="text-sm text-slate-400 hover:text-indigo-400 transition-colors px-2 py-2 min-h-[44px]"
+                className="text-slate-400 hover:text-indigo-400 disabled:opacity-50 transition-colors p-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
               >
-                🔄
+                <RefreshIcon className={`w-4 h-4 ${analyzing ? "animate-spin" : ""}`} />
               </button>
             </div>
           </div>
@@ -390,7 +492,10 @@ function GroupAnalysisContent() {
             {sections.map((section) => (
               <div key={section.title} className="card p-6">
                 <div className="analysis-section">
-                  <h3><span aria-hidden="true">{section.icon}</span> {section.title}</h3>
+                  <h3 className="flex items-center gap-2">
+                    <section.icon className="w-[1.05em] h-[1.05em] flex-shrink-0" />
+                    {section.title}
+                  </h3>
                   <p className="text-xs text-slate-500 mb-3">{section.subtitle}</p>
                   <div className="whitespace-pre-wrap text-sm leading-relaxed">{section.content}</div>
                 </div>
@@ -409,7 +514,7 @@ function GroupAnalysisContent() {
           className="w-full card p-5 text-left hover:border-amber-500/50 transition-colors cursor-pointer flex items-center justify-between min-h-[44px]"
         >
           <div className="flex items-center gap-3">
-            <span className="text-xl" aria-hidden="true">⚙️</span>
+            <CogIcon className="w-5 h-5 text-slate-400 flex-shrink-0" />
             <div>
               <p className="font-semibold text-white">Custom Group Analysis</p>
               <p className="text-slate-500 text-sm">Ask a question across all selected conversations</p>
@@ -458,7 +563,14 @@ function GroupAnalysisContent() {
               aria-label="Run custom group analysis"
               className="bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-white text-white font-medium py-2 px-5 min-h-[44px] rounded-lg text-sm transition-colors"
             >
-              {customAnalyzing ? "⏳ Analyzing..." : "Run Custom Group Analysis"}
+              {customAnalyzing ? (
+                <span className="flex items-center gap-2">
+                  <LoaderIcon className="w-4 h-4 animate-spin" />
+                  Analyzing...
+                </span>
+              ) : (
+                "Run Custom Group Analysis"
+              )}
             </button>
           </div>
         )}
@@ -466,8 +578,9 @@ function GroupAnalysisContent() {
         {customResult && (
           <div className="card mt-2 p-6 border-amber-500/30">
             <div className="analysis-section" style={{ background: "var(--custom-analysis-bg, rgba(245, 158, 11, 0.06))" }}>
-              <h3 style={{ color: "var(--custom-analysis-text, #fbbf24)" }}>
-                <span aria-hidden="true">⚙️</span> Custom Group Analysis
+              <h3 className="flex items-center gap-2" style={{ color: "var(--custom-analysis-text, #fbbf24)" }}>
+                <CogIcon className="w-[1.05em] h-[1.05em] flex-shrink-0" />
+                Custom Group Analysis
               </h3>
               <p className="text-xs text-slate-500 mb-1">Prompt: &ldquo;{customPrompt}&rdquo;</p>
               <div className="whitespace-pre-wrap text-sm leading-relaxed mt-3">{customResult}</div>

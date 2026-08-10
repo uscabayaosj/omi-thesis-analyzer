@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getAnalyzedIds, getAnalysisAge } from "@/lib/storage";
 import { cacheGet, cacheSet } from "@/lib/cache";
+import { fetchJson } from "@/lib/fetch-json";
+import { formatDateTime } from "@/lib/format";
 import { BookIcon, SquareIcon, XIcon, CheckIcon, SparklesIcon, WarningIcon, MicIcon, FolderIcon, RefreshIcon } from "@/components/icons";
 
 const CONVERSATIONS_CACHE_KEY = "conversations";
@@ -55,16 +57,15 @@ export default function Home() {
   const loadConversations = useCallback(async (mode: "initial" | "refresh") => {
     if (mode === "refresh") setRefreshing(true);
     try {
-      const res = await fetch("/api/conversations", mode === "refresh" ? { cache: "no-store" } : undefined);
-      const data = await res.json();
-      if (data.error) {
-        setError(data.error);
-      } else {
-        setConversations(data);
-        setError(null);
-        setLastSynced(new Date().toISOString());
-        cacheSet(CONVERSATIONS_CACHE_KEY, data);
-      }
+      const data = await fetchJson<Conversation[]>(
+        "/api/conversations",
+        mode === "refresh" ? { cache: "no-store" } : undefined
+      );
+      const list = Array.isArray(data) ? data : [];
+      setConversations(list);
+      setError(null);
+      setLastSynced(new Date().toISOString());
+      cacheSet(CONVERSATIONS_CACHE_KEY, list);
     } catch (e) {
       // On an explicit refresh, always report. On the initial load, only surface
       // an error if there was no cached list to fall back on.
@@ -106,8 +107,12 @@ export default function Home() {
     });
   };
 
+  // "All selected" must check membership, not just counts — the selection can
+  // contain conversations hidden by the current filter.
+  const allFilteredSelected = filtered.length > 0 && filtered.every((c) => selected.has(c.id));
+
   const selectAll = () => {
-    if (selected.size === filtered.length) {
+    if (allFilteredSelected) {
       setSelected(new Set());
     } else {
       setSelected(new Set(filtered.map((c) => c.id)));
@@ -270,10 +275,11 @@ export default function Home() {
             <div className="flex items-center gap-3">
               <button
                 onClick={selectAll}
-                aria-label={selected.size === filtered.length ? "Deselect all conversations" : "Select all conversations"}
-                className="text-sm min-h-[44px] bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg transition-colors"
+                disabled={filtered.length === 0}
+                aria-label={allFilteredSelected ? "Deselect all conversations" : "Select all conversations"}
+                className="text-sm min-h-[44px] bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 px-4 py-2 rounded-lg transition-colors"
               >
-                {selected.size === filtered.length ? "Deselect All" : "Select All"}
+                {allFilteredSelected ? "Deselect All" : "Select All"}
               </button>
               <span className="text-sm text-slate-400" aria-live="polite">
                 {selected.size} selected
@@ -299,12 +305,21 @@ export default function Home() {
       )}
 
       {error && (
-        <div className="card p-6 border-red-500/50" role="alert">
+        <div className="card p-6 border-red-500/50 mb-6" role="alert">
           <p className="text-red-400 flex items-center gap-2">
             <WarningIcon className="w-5 h-5 flex-shrink-0" />
-            {error}
+            <span className="min-w-0 break-words">{error}</span>
           </p>
-          <p className="text-slate-300 text-sm mt-2">Make sure OMI_API_KEY is set in your environment.</p>
+          {conversations.length > 0 && (
+            <p className="text-slate-400 text-sm mt-2">Showing the last loaded conversations below.</p>
+          )}
+          <button
+            onClick={() => loadConversations(conversations.length > 0 ? "refresh" : "initial")}
+            disabled={loading || refreshing}
+            className="mt-3 text-sm bg-slate-900 hover:bg-slate-700 border border-slate-600 disabled:opacity-50 text-slate-200 px-4 py-2 min-h-[44px] rounded-lg transition-colors"
+          >
+            Try again
+          </button>
         </div>
       )}
 
@@ -368,12 +383,7 @@ export default function Home() {
                       <p className="text-slate-400 text-sm mt-1 line-clamp-1">{convo.structured.overview}</p>
                     )}
                     <div className="flex items-center gap-3 mt-2 text-xs text-slate-500">
-                      <span>
-                        {new Date(convo.created_at).toLocaleDateString("en-GB", {
-                          day: "numeric", month: "short", year: "numeric",
-                          hour: "2-digit", minute: "2-digit",
-                        })}
-                      </span>
+                      <span>{formatDateTime(convo.created_at)}</span>
                       {convo.structured?.category && (
                         <span className="bg-slate-800 px-2 py-0.5 rounded-full">{convo.structured.category}</span>
                       )}
@@ -403,12 +413,7 @@ export default function Home() {
                     <p className="text-slate-400 text-sm mt-1 line-clamp-2">{convo.structured.overview}</p>
                   )}
                   <div className="flex items-center gap-3 mt-2 text-xs text-slate-500">
-                    <span>
-                      {new Date(convo.created_at).toLocaleDateString("en-GB", {
-                        day: "numeric", month: "short", year: "numeric",
-                        hour: "2-digit", minute: "2-digit",
-                      })}
-                    </span>
+                    <span>{formatDateTime(convo.created_at)}</span>
                     {convo.structured?.category && (
                       <span className="bg-slate-800 px-2 py-0.5 rounded-full">{convo.structured.category}</span>
                     )}

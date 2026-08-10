@@ -3,6 +3,22 @@ import type { StoredAnalysis } from "./storage";
 interface ObsidianExport {
   uri: string;
   filename: string;
+  /** Some platforms refuse very long custom-scheme URIs; callers should
+   *  fall back to downloadMarkdown when this is true. */
+  uriTooLong: boolean;
+}
+
+// Windows caps ShellExecute URIs around 32KB; stay well under it.
+const MAX_URI_LENGTH = 30_000;
+
+function toISODate(value: string | undefined, fallback: string): string {
+  if (value) {
+    const d = new Date(value);
+    if (!Number.isNaN(d.getTime())) return d.toISOString().split("T")[0];
+  }
+  const f = new Date(fallback);
+  if (!Number.isNaN(f.getTime())) return f.toISOString().split("T")[0];
+  return new Date().toISOString().split("T")[0];
 }
 
 function buildNoteContent(analysis: StoredAnalysis, date: string): string {
@@ -74,9 +90,7 @@ ${analysis.custom.result}
 }
 
 export function exportToObsidian(analysis: StoredAnalysis): ObsidianExport {
-  const date = analysis.date
-    ? new Date(analysis.date).toISOString().split("T")[0]
-    : new Date(analysis.timestamp).toISOString().split("T")[0];
+  const date = toISODate(analysis.date, analysis.timestamp);
 
   const safeName = (analysis.title || "Untitled")
     .replace(/[\/\\:*?"<>|]/g, "-")
@@ -93,13 +107,11 @@ export function exportToObsidian(analysis: StoredAnalysis): ObsidianExport {
   });
 
   const uri = `obsidian://advanced-uri?${params.toString()}`;
-  return { uri, filename };
+  return { uri, filename, uriTooLong: uri.length > MAX_URI_LENGTH };
 }
 
 export function downloadMarkdown(analysis: StoredAnalysis): void {
-  const date = analysis.date
-    ? new Date(analysis.date).toISOString().split("T")[0]
-    : new Date(analysis.timestamp).toISOString().split("T")[0];
+  const date = toISODate(analysis.date, analysis.timestamp);
 
   const safeName = (analysis.title || "Untitled")
     .replace(/[\/\\:*?"<>|]/g, "-")

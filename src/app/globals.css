@@ -87,15 +87,6 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
   overflow-wrap: break-word;
 }
 
-.pulse-dot {
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
-}
-
 .skeleton {
   background: linear-gradient(90deg, var(--card) 25%, var(--card-hover) 50%, var(--card) 75%);
   background-size: 200% 100%;
@@ -110,10 +101,6 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
 
 /* Reduced motion — preserve state changes, kill decorative animation */
 @media (prefers-reduced-motion: reduce) {
-  .pulse-dot {
-    animation: none;
-    opacity: 1;
-  }
   .skeleton {
     animation: none;
     background: var(--card);

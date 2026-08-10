@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getConversation } from "@/lib/omi-api";
+import { friendlyError } from "@/lib/api-error";
 
 export async function GET(
   _req: NextRequest,
@@ -17,7 +18,8 @@ export async function GET(
       },
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("conversation fetch failed:", err);
+    const { error, status } = friendlyError(err);
+    return NextResponse.json({ error }, { status });
   }
 }

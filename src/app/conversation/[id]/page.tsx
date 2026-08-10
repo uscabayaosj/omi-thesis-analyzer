@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, type ComponentType } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -14,7 +14,29 @@ import {
 } from "@/lib/storage";
 import { exportToObsidian, downloadMarkdown } from "@/lib/obsidian";
 import { cacheGet, cacheSet } from "@/lib/cache";
-import { RefreshIcon } from "@/components/icons";
+import { fetchJson } from "@/lib/fetch-json";
+import { formatDateTime } from "@/lib/format";
+import {
+  RefreshIcon,
+  ArrowLeftIcon,
+  WarningIcon,
+  CheckIcon,
+  CompassIcon,
+  CogIcon,
+  ScrollIcon,
+  HomeIcon,
+  LinkIcon,
+  MountainsIcon,
+  TargetIcon,
+  ScaleIcon,
+  XCircleIcon,
+  TrendingUpIcon,
+  ClipboardIcon,
+  FileTextIcon,
+  DownloadIcon,
+  ExternalLinkIcon,
+  LoaderIcon,
+} from "@/components/icons";
 
 interface TranscriptSegment {
   text: string;
@@ -68,12 +90,12 @@ function TranscriptViewer({ segments }: { segments: TranscriptSegment[] }) {
 }
 
 function AnalysisSection({
-  icon,
+  icon: Icon,
   title,
   subtitle,
   content,
 }: {
-  icon: string;
+  icon: ComponentType<{ className?: string }>;
   title: string;
   subtitle: string;
   content: string;
@@ -81,8 +103,9 @@ function AnalysisSection({
   return (
     <div className="card p-6">
       <div className="analysis-section">
-        <h3>
-          <span aria-hidden="true">{icon}</span> {title}
+        <h3 className="flex items-center gap-2">
+          <Icon className="w-[1.05em] h-[1.05em] flex-shrink-0" />
+          {title}
         </h3>
         <p className="text-xs text-slate-500 mb-3">{subtitle}</p>
         <div className="whitespace-pre-wrap text-sm leading-relaxed">{content}</div>
@@ -101,7 +124,7 @@ function AnalysisAgeBadge({ timestamp }: { timestamp: string }) {
           ? "bg-amber-900/50 text-amber-300"
           : "bg-indigo-900/50 text-indigo-200"
       }`}
-      title={`Analyzed on ${new Date(timestamp).toLocaleDateString("en-GB", {
+      title={`Analyzed on ${formatDateTime(timestamp, {
         day: "numeric",
         month: "long",
         year: "numeric",
@@ -109,7 +132,8 @@ function AnalysisAgeBadge({ timestamp }: { timestamp: string }) {
         minute: "2-digit",
       })}`}
     >
-      {isStale ? "⚠ " : ""}{label}
+      {isStale && <WarningIcon className="w-3 h-3 inline -mt-0.5 mr-0.5" />}
+      {label}
     </span>
   );
 }
@@ -125,8 +149,9 @@ function VersionHistory({
 
   return (
     <details className="card mt-4">
-      <summary className="p-4 cursor-pointer text-sm text-slate-400 hover:text-slate-200 transition-colors min-h-[44px] flex items-center">
-        📋 Previous versions ({versions.length})
+      <summary className="p-4 cursor-pointer text-sm text-slate-400 hover:text-slate-200 transition-colors min-h-[44px] flex items-center gap-2">
+        <ClipboardIcon className="w-4 h-4 flex-shrink-0" />
+        Previous versions ({versions.length})
       </summary>
       <div className="px-4 pb-4 space-y-2">
         {versions.map((v, i) => (
@@ -139,15 +164,7 @@ function VersionHistory({
               <span className="text-sm text-slate-300">
                 Version {versions.length - i}
               </span>
-              <span className="text-xs text-slate-500">
-                {new Date(v.timestamp).toLocaleDateString("en-GB", {
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </span>
+              <span className="text-xs text-slate-500">{formatDateTime(v.timestamp)}</span>
             </div>
             <p className="text-xs text-slate-500 mt-1">Click to view this version</p>
           </button>
@@ -166,16 +183,31 @@ function ConfirmRerunDialog({
   onCancel: () => void;
   analyzedLabel: string;
 }) {
+  const cancelRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    cancelRef.current?.focus();
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onCancel]);
+
   return (
     <div
       className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
       role="dialog"
       aria-modal="true"
       aria-label="Confirm re-run analysis"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onCancel();
+      }}
     >
       <div className="card p-6 max-w-md w-full border-amber-500/30">
-        <h3 className="text-lg font-semibold text-white mb-2">
-          ⚠️ Replace existing analysis?
+        <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
+          <WarningIcon className="w-5 h-5 text-amber-400 flex-shrink-0" />
+          Replace existing analysis?
         </h3>
         <p className="text-sm text-slate-400 mb-4">
           This conversation was last analyzed <strong className="text-slate-200">{analyzedLabel}</strong>.
@@ -183,6 +215,7 @@ function ConfirmRerunDialog({
         </p>
         <div className="flex gap-3 justify-end">
           <button
+            ref={cancelRef}
             onClick={onCancel}
             className="px-4 py-2 min-h-[44px] text-sm text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
           >
@@ -266,19 +299,14 @@ export default function ConversationPage() {
     }
 
     try {
-      const res = await fetch(
-        `/api/conversations/${id}`,
+      const data = await fetchJson<Conversation>(
+        `/api/conversations/${encodeURIComponent(id)}`,
         mode === "refresh" ? { cache: "no-store" } : undefined
       );
-      const data = await res.json();
-      if (data.error) {
-        setError(data.error);
-      } else {
-        setConversation(data);
-        setError(null);
-        setLastSynced(new Date().toISOString());
-        if (data.transcript_segments?.length) cacheSet(cacheKey, data);
-      }
+      setConversation(data);
+      setError(null);
+      setLastSynced(new Date().toISOString());
+      if (data.transcript_segments?.length) cacheSet(cacheKey, data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to reach Omi");
     } finally {
@@ -296,34 +324,30 @@ export default function ConversationPage() {
     setError(null);
     setViewingVersion(null);
     try {
-      const res = await fetch("/api/analyze", {
+      const data = await fetchJson<{ analysis: Analysis; conversation?: Conversation }>("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conversationId: id }),
       });
-      const data = await res.json();
-      if (data.error) setError(data.error);
-      else {
-        setAnalysis(data.analysis);
-        if (data.conversation) {
-          setConversation(data.conversation);
-          if (data.conversation.transcript_segments?.length) {
-            cacheSet(`conversation:${id}`, data.conversation);
-          }
+      setAnalysis(data.analysis);
+      if (data.conversation) {
+        setConversation(data.conversation);
+        if (data.conversation.transcript_segments?.length) {
+          cacheSet(`conversation:${id}`, data.conversation);
         }
-        const stored = saveAnalysis({
-          conversationId: id,
-          title: data.conversation?.structured?.title || conversation?.structured?.title || "Untitled",
-          category: data.conversation?.structured?.category,
-          date: data.conversation?.created_at,
-          ...data.analysis,
-        });
-        setStoredAnalysis(stored);
-        setVersions(getAnalysisVersions(id));
-        // Tuck the verification/custom cards away now that results are up.
-        setTranscriptOpen(false);
-        setShowCustom(false);
       }
+      const stored = saveAnalysis({
+        conversationId: id,
+        title: data.conversation?.structured?.title || conversation?.structured?.title || "Untitled",
+        category: data.conversation?.structured?.category,
+        date: data.conversation?.created_at,
+        ...data.analysis,
+      });
+      setStoredAnalysis(stored);
+      setVersions(getAnalysisVersions(id));
+      // Tuck the verification/custom cards away now that results are up.
+      setTranscriptOpen(false);
+      setShowCustom(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Analysis failed");
     } finally {
@@ -345,21 +369,17 @@ export default function ConversationPage() {
     setCustomAnalyzing(true);
     setError(null);
     try {
-      const res = await fetch("/api/analyze/custom", {
+      const data = await fetchJson<{ result: string }>("/api/analyze/custom", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conversationId: id, prompt: customPrompt }),
       });
-      const data = await res.json();
-      if (data.error) setError(data.error);
-      else {
-        const custom = { prompt: customPrompt, result: data.result };
-        saveCustomAnalysis(id, custom);
-        setCustomResult(data.result);
-        setStoredAnalysis((prev) =>
-          prev ? { ...prev, custom: { ...custom, timestamp: new Date().toISOString() } } : prev
-        );
-      }
+      const custom = { prompt: customPrompt, result: data.result };
+      saveCustomAnalysis(id, custom);
+      setCustomResult(data.result);
+      setStoredAnalysis((prev) =>
+        prev ? { ...prev, custom: { ...custom, timestamp: new Date().toISOString() } } : prev
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Custom analysis failed");
     } finally {
@@ -369,8 +389,14 @@ export default function ConversationPage() {
 
   const handleExportObsidian = useCallback(() => {
     if (!storedAnalysis) return;
-    const { uri } = exportToObsidian(storedAnalysis);
-    window.open(uri, "_blank");
+    const { uri, uriTooLong } = exportToObsidian(storedAnalysis);
+    if (uriTooLong) {
+      // The OS may silently drop very long obsidian:// URIs — deliver the
+      // same note as a file download instead.
+      downloadMarkdown(storedAnalysis);
+    } else {
+      window.open(uri, "_blank");
+    }
     setExported(true);
     setTimeout(() => setExported(false), 2000);
   }, [storedAnalysis]);
@@ -403,24 +429,29 @@ export default function ConversationPage() {
     }
   }, [storedAnalysis]);
 
+  // Older stored analyses may predate server-side field validation
+  const dim = (text: string | undefined) =>
+    text && text.trim() ? text : "No content was recorded for this dimension. Re-run the analysis to fill it in.";
+
   const sections = analysis
     ? [
-        { icon: "📜", title: "RQ1 — Documentary Record", subtitle: "Historical-legal constitution of authority: patents, water rights, allotments, grazing permits", content: analysis.rq1_documentary_record },
-        { icon: "🏚️", title: "RQ2 — Everyday Practices", subtitle: "Kinship, inheritance, branding, boundary-maintenance, conflict — how authority is produced daily", content: analysis.rq2_everyday_practices },
-        { icon: "🪶", title: "RQ3 — CSKT Intersection", subtitle: "How ranching authority intersects with, depends on, and is contested by CSKT sovereignty", content: analysis.rq3_cskt_intersection },
-        { icon: "🐎", title: "RQ4 — Wildness Imaginary", subtitle: "Frontier mythology as double-erasure instrument (4A: Indigenous erasure, 4B: federal erasure)", content: analysis.rq4_wildness_imaginary },
-        { icon: "🎯", title: "Orienting Conditions", subtitle: "Which of the five conditions are evidenced in this conversation?", content: analysis.conditions_check },
-        { icon: "⚖️", title: "Rival Hypothesis Test", subtitle: "Is frontier framing public/strategic or intimate? Felt subjectivity or instrumental rhetoric?", content: analysis.rival_hypothesis_test },
-        { icon: "❌", title: "Refutation Signals", subtitle: "Does anything challenge or complicate the pioneer sovereignty concept?", content: analysis.refutation_signals },
-        { icon: "🚀", title: "Forward Thinking", subtitle: "Research directions, questions to pursue, connections to other data", content: analysis.forward_thinking },
+        { icon: ScrollIcon, title: "RQ1 — Documentary Record", subtitle: "Historical-legal constitution of authority: patents, water rights, allotments, grazing permits", content: dim(analysis.rq1_documentary_record) },
+        { icon: HomeIcon, title: "RQ2 — Everyday Practices", subtitle: "Kinship, inheritance, branding, boundary-maintenance, conflict — how authority is produced daily", content: dim(analysis.rq2_everyday_practices) },
+        { icon: LinkIcon, title: "RQ3 — CSKT Intersection", subtitle: "How ranching authority intersects with, depends on, and is contested by CSKT sovereignty", content: dim(analysis.rq3_cskt_intersection) },
+        { icon: MountainsIcon, title: "RQ4 — Wildness Imaginary", subtitle: "Frontier mythology as double-erasure instrument (4A: Indigenous erasure, 4B: federal erasure)", content: dim(analysis.rq4_wildness_imaginary) },
+        { icon: TargetIcon, title: "Orienting Conditions", subtitle: "Which of the five conditions are evidenced in this conversation?", content: dim(analysis.conditions_check) },
+        { icon: ScaleIcon, title: "Rival Hypothesis Test", subtitle: "Is frontier framing public/strategic or intimate? Felt subjectivity or instrumental rhetoric?", content: dim(analysis.rival_hypothesis_test) },
+        { icon: XCircleIcon, title: "Refutation Signals", subtitle: "Does anything challenge or complicate the pioneer sovereignty concept?", content: dim(analysis.refutation_signals) },
+        { icon: TrendingUpIcon, title: "Forward Thinking", subtitle: "Research directions, questions to pursue, connections to other data", content: dim(analysis.forward_thinking) },
       ]
     : [];
 
   return (
     <main className="max-w-3xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
-        <Link href="/" className="text-slate-400 hover:text-white text-sm inline-flex items-center gap-1 min-h-[44px] py-2">
-          ← Back to conversations
+        <Link href="/" className="text-slate-400 hover:text-white text-sm inline-flex items-center gap-1.5 min-h-[44px] py-2">
+          <ArrowLeftIcon className="w-4 h-4" />
+          Back to conversations
         </Link>
         <div className="flex items-center gap-3">
           <span className="text-sm text-slate-400" aria-live="polite">
@@ -448,7 +479,10 @@ export default function ConversationPage() {
 
       {error && (
         <div className="card p-6 border-red-500/50 mb-6" role="alert">
-          <p className="text-red-400">⚠ {error}</p>
+          <p className="text-red-400 flex items-center gap-2">
+            <WarningIcon className="w-5 h-5 flex-shrink-0" />
+            <span className="min-w-0 break-words">{error}</span>
+          </p>
           <button
             onClick={() => setError(null)}
             className="mt-2 text-sm text-slate-400 hover:text-white min-h-[44px] px-2"
@@ -470,7 +504,7 @@ export default function ConversationPage() {
               <p className="text-slate-400">{conversation.structured.overview}</p>
             )}
             <p className="text-slate-500 text-sm mt-2">
-              {new Date(conversation.created_at).toLocaleDateString("en-GB", {
+              {formatDateTime(conversation.created_at, {
                 weekday: "long", day: "numeric", month: "long", year: "numeric",
                 hour: "2-digit", minute: "2-digit",
               })}
@@ -487,7 +521,7 @@ export default function ConversationPage() {
             >
               {analyzing ? (
                 <div className="flex items-center justify-center gap-3">
-                  <span className="pulse-dot text-2xl" aria-hidden="true">⏳</span>
+                  <LoaderIcon className="w-6 h-6 text-indigo-400 animate-spin flex-shrink-0" />
                   <div>
                     <p className="font-semibold text-white">Analyzing conversation...</p>
                     <p className="text-slate-400 text-sm mt-1">Running 8-dimension Pioneer Sovereignty analysis</p>
@@ -495,7 +529,7 @@ export default function ConversationPage() {
                 </div>
               ) : (
                 <div>
-                  <p className="text-2xl mb-2" aria-hidden="true">🧠</p>
+                  <CompassIcon className="w-7 h-7 mx-auto mb-2 text-indigo-400" />
                   <p className="font-semibold text-white">Run Pioneer Sovereignty Analysis</p>
                   <p className="text-slate-400 text-sm mt-1">4 research questions + conditions + rival hypothesis + refutation</p>
                 </div>
@@ -508,7 +542,8 @@ export default function ConversationPage() {
             <section className="mb-8" aria-label="Pioneer Sovereignty analysis results">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2 flex-wrap">
-                  🧠 Pioneer Sovereignty Analysis
+                  <CompassIcon className="w-5 h-5 text-indigo-400 flex-shrink-0" />
+                  Pioneer Sovereignty Analysis
                   {storedAnalysis && (
                     <AnalysisAgeBadge timestamp={storedAnalysis.timestamp} />
                   )}
@@ -523,9 +558,10 @@ export default function ConversationPage() {
                     <button
                       onClick={viewCurrent}
                       aria-label="Return to current analysis"
-                      className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors"
+                      className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5"
                     >
-                      ← Current
+                      <ArrowLeftIcon className="w-3.5 h-3.5" />
+                      Current
                     </button>
                   )}
                   {storedAnalysis && !viewingVersion && (
@@ -533,16 +569,27 @@ export default function ConversationPage() {
                       <button
                         onClick={handleExportObsidian}
                         aria-label="Export analysis to Obsidian vault"
-                        className="text-sm bg-purple-900/40 hover:bg-purple-800/50 text-purple-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors"
+                        className="text-sm bg-purple-900/40 hover:bg-purple-800/50 text-purple-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5"
                       >
-                        {exported ? "✓ Saved" : "📓 Send to Obsidian"}
+                        {exported ? (
+                          <>
+                            <CheckIcon className="w-3.5 h-3.5" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <ExternalLinkIcon className="w-3.5 h-3.5" />
+                            Send to Obsidian
+                          </>
+                        )}
                       </button>
                       <button
                         onClick={handleDownload}
                         aria-label="Download analysis as markdown file"
-                        className="text-sm bg-amber-900/40 hover:bg-amber-800/50 text-amber-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors"
+                        className="text-sm bg-amber-900/40 hover:bg-amber-800/50 text-amber-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5"
                       >
-                        ⬇ Download .md
+                        <DownloadIcon className="w-3.5 h-3.5" />
+                        Download .md
                       </button>
                     </>
                   )}
@@ -551,9 +598,9 @@ export default function ConversationPage() {
                       onClick={handleAnalyzeClick}
                       disabled={analyzing}
                       aria-label="Re-run analysis"
-                      className="text-sm text-slate-400 hover:text-indigo-400 transition-colors px-2 py-2 min-h-[44px]"
+                      className="text-slate-400 hover:text-indigo-400 disabled:opacity-50 transition-colors p-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
                     >
-                      🔄
+                      <RefreshIcon className={`w-4 h-4 ${analyzing ? "animate-spin" : ""}`} />
                     </button>
                   )}
                 </div>
@@ -590,12 +637,12 @@ export default function ConversationPage() {
               className="w-full card p-5 text-left hover:border-amber-500/50 transition-colors cursor-pointer flex items-center justify-between min-h-[44px]"
             >
               <div className="flex items-center gap-3">
-                <span className="text-xl" aria-hidden="true">⚙️</span>
+                <CogIcon className="w-5 h-5 text-slate-400 flex-shrink-0" />
                 <div>
                   <p className="font-semibold text-white">Custom Analysis</p>
                   <p className="text-slate-500 text-sm">
                     {customResult
-                      ? `Last: "${customPrompt.substring(0, 50)}..."`
+                      ? `Last: "${customPrompt.length > 50 ? `${customPrompt.substring(0, 50)}…` : customPrompt}"`
                       : "Ask any question about this conversation through the lens of Pioneer Sovereignty"}
                   </p>
                 </div>
@@ -652,7 +699,10 @@ export default function ConversationPage() {
                   className="bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-white text-white font-medium py-2 px-5 min-h-[44px] rounded-lg text-sm transition-colors"
                 >
                   {customAnalyzing ? (
-                    <span className="flex items-center gap-2"><span className="pulse-dot" aria-hidden="true">⏳</span> Analyzing...</span>
+                    <span className="flex items-center gap-2">
+                      <LoaderIcon className="w-4 h-4 animate-spin" />
+                      Analyzing...
+                    </span>
                   ) : (
                     "Run Custom Analysis"
                   )}
@@ -663,8 +713,9 @@ export default function ConversationPage() {
             {customResult && (
               <div className="card mt-2 p-6 border-amber-500/30">
                 <div className="analysis-section" style={{ background: "var(--custom-analysis-bg, rgba(245, 158, 11, 0.06))" }}>
-                  <h3 style={{ color: "var(--custom-analysis-text, #fbbf24)" }}>
-                    <span aria-hidden="true">⚙️</span> Custom Analysis
+                  <h3 className="flex items-center gap-2" style={{ color: "var(--custom-analysis-text, #fbbf24)" }}>
+                    <CogIcon className="w-[1.05em] h-[1.05em] flex-shrink-0" />
+                    Custom Analysis
                   </h3>
                   <p className="text-xs text-slate-500 mb-1">Prompt: &ldquo;{customPrompt}&rdquo;</p>
                   <div className="whitespace-pre-wrap text-sm leading-relaxed mt-3">{customResult}</div>
@@ -681,8 +732,9 @@ export default function ConversationPage() {
               open={transcriptOpen}
               onToggle={(e) => setTranscriptOpen(e.currentTarget.open)}
             >
-              <summary className="p-5 cursor-pointer font-semibold text-white hover:text-indigo-300 transition-colors min-h-[44px] flex items-center">
-                📄 Transcript ({conversation.transcript_segments.length} segments)
+              <summary className="p-5 cursor-pointer font-semibold text-white hover:text-indigo-300 transition-colors min-h-[44px] flex items-center gap-2">
+                <FileTextIcon className="w-4 h-4 flex-shrink-0" />
+                Transcript ({conversation.transcript_segments.length} segments)
               </summary>
               <div className="px-5 pb-5">
                 <TranscriptViewer segments={conversation.transcript_segments} />

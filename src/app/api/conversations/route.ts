@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { getConversations } from "@/lib/omi-api";
+import { friendlyError } from "@/lib/api-error";
 
 export async function GET() {
   try {
     const conversations = await getConversations(50);
-    return NextResponse.json(conversations, {
+    return NextResponse.json(Array.isArray(conversations) ? conversations : [], {
       headers: {
         // Per-user data: let the browser reuse a recent list and revalidate
         // in the background rather than re-invoking the function each visit.
@@ -12,7 +13,8 @@ export async function GET() {
       },
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("conversations fetch failed:", err);
+    const { error, status } = friendlyError(err);
+    return NextResponse.json({ error }, { status });
   }
 }

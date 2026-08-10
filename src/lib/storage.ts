@@ -43,7 +43,13 @@ function getAll(): StoredConversation[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const parsed = raw ? JSON.parse(raw) : [];
+    // Guard against corrupted storage (manual edits, partial writes)
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (c): c is StoredConversation =>
+        c && typeof c === "object" && typeof c.conversationId === "string" && !!c.current
+    );
   } catch {
     return [];
   }
@@ -74,7 +80,10 @@ export function getAnalysisAge(timestamp: string): {
 } {
   const now = Date.now();
   const then = new Date(timestamp).getTime();
-  const ms = now - then;
+  if (Number.isNaN(then)) {
+    return { label: "at an unknown time", days: 0, isStale: false };
+  }
+  const ms = Math.max(0, now - then);
   const days = Math.floor(ms / (1000 * 60 * 60 * 24));
   const hours = Math.floor(ms / (1000 * 60 * 60));
   const minutes = Math.floor(ms / (1000 * 60));

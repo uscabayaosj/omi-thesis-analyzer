@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getConversation, segmentsToText, type Conversation } from "@/lib/omi-api";
-import { chatCompletion } from "@/lib/analysis";
+import { chatCompletion, clampTranscript, extractJsonObject } from "@/lib/analysis";
+import { friendlyError } from "@/lib/api-error";
+
+const MAX_GROUP_SIZE = 20;
+// Per-conversation budget so a large group still fits the model context.
+const PER_CONVO_CHARS = 60_000;
 
 const GROUP_SYSTEM_PROMPT = `You are an academic research assistant helping a PhD anthropology student analyze multiple fieldwork conversations together.
 
@@ -18,6 +23,14 @@ You MUST respond with valid JSON matching this exact schema:
 }
 
 Each field should be 2-4 paragraphs. Be specific — reference which conversation and speaker you are drawing from.`;
+
+const GROUP_FIELDS = [
+  "cross_conversation_themes",
+  "contradictions_and_tensions",
+  "evolution_and_patterns",
+  "synthesis",
+  "forward_thinking",
+] as const;
 
 function buildGroupPrompt(
   conversations: Array<{ title: string; date: string; transcript: string }>
@@ -48,35 +61,56 @@ ${c.transcript}`
 ${convoBlocks}`;
 }
 
+function sanitizeGroupIds(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  return Array.from(
+    new Set(
+      input.filter((id): id is string => typeof id === "string" && id.trim().length > 0)
+    )
+  );
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { conversationIds } = await req.json();
+    const ids = sanitizeGroupIds(conversationIds);
 
-    if (!conversationIds || !Array.isArray(conversationIds) || conversationIds.length < 2) {
+    if (ids.length < 2) {
       return NextResponse.json(
-        { error: "At least 2 conversationIds required" },
+        { error: "Select at least 2 conversations to run a group analysis." },
+        { status: 400 }
+      );
+    }
+    if (ids.length > MAX_GROUP_SIZE) {
+      return NextResponse.json(
+        { error: `Group analysis supports up to ${MAX_GROUP_SIZE} conversations at a time. Select fewer and try again.` },
         { status: 400 }
       );
     }
 
-    // Fetch all conversations in parallel
-    const convos = await Promise.all(
-      conversationIds.map((id: string) => getConversation(id))
-    );
+    // Fetch in parallel; tolerate individual failures (deleted conversations,
+    // transient Omi errors) as long as 2+ transcripts survive.
+    const results = await Promise.allSettled(ids.map((id) => getConversation(id)));
+    const convos = results
+      .filter((r): r is PromiseFulfilledResult<Conversation> => r.status === "fulfilled")
+      .map((r) => r.value);
+    const failedCount = results.length - convos.length;
 
-    // Build transcript data
     const conversationData = convos
-      .filter((c: Conversation) => c.transcript_segments && c.transcript_segments.length > 0)
-      .map((c: Conversation) => ({
+      .filter((c) => c.transcript_segments && c.transcript_segments.length > 0)
+      .map((c) => ({
         id: c.id,
         title: c.structured?.title || "Untitled",
         date: c.created_at,
-        transcript: segmentsToText(c.transcript_segments!),
+        transcript: clampTranscript(segmentsToText(c.transcript_segments!), PER_CONVO_CHARS),
       }));
 
     if (conversationData.length < 2) {
+      const reason = failedCount > 0
+        ? `${failedCount} of the selected conversations could not be loaded from Omi.`
+        : "Fewer than 2 of the selected conversations have transcripts.";
       return NextResponse.json(
-        { error: "At least 2 conversations must have transcripts" },
+        { error: `Not enough conversations to analyze as a group. ${reason}` },
         { status: 400 }
       );
     }
@@ -90,11 +124,23 @@ export async function POST(req: NextRequest) {
       true
     );
 
-    const analysis = JSON.parse(content);
+    const raw = extractJsonObject(content);
+    const analysis = Object.fromEntries(
+      GROUP_FIELDS.map((field) => {
+        const value = raw[field];
+        return [
+          field,
+          typeof value === "string" && value.trim()
+            ? value
+            : "The AI did not return this dimension. Re-run the analysis to fill it in.",
+        ];
+      })
+    );
 
     return NextResponse.json({
       analysis,
-      conversations: convos.map((c: Conversation) => ({
+      skipped: failedCount,
+      conversations: convos.map((c) => ({
         id: c.id,
         title: c.structured?.title || "Untitled",
         date: c.created_at,
@@ -102,7 +148,8 @@ export async function POST(req: NextRequest) {
       })),
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("group analysis failed:", err);
+    const { error, status } = friendlyError(err);
+    return NextResponse.json({ error }, { status });
   }
 }

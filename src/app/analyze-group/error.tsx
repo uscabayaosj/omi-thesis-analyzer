@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { CompassIcon, ArrowLeftIcon } from "@/components/icons";
 
 export default function GroupAnalysisError({
   error,
@@ -16,7 +17,7 @@ export default function GroupAnalysisError({
   return (
     <main className="max-w-3xl mx-auto px-4 py-16 text-center">
       <div className="card p-8 border-red-500/30">
-        <p className="text-4xl mb-4">🧠</p>
+        <CompassIcon className="w-10 h-10 mx-auto mb-4 text-red-400" />
         <h1 className="text-xl font-bold text-white mb-2">Group analysis failed</h1>
         <p className="text-slate-400 mb-6 text-sm">
           {error.message || "The group analysis could not be loaded. Try selecting conversations again."}
@@ -30,9 +31,10 @@ export default function GroupAnalysisError({
           </button>
           <a
             href="/"
-            className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium py-2 px-5 min-h-[44px] rounded-lg text-sm transition-colors inline-flex items-center"
+            className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium py-2 px-5 min-h-[44px] rounded-lg text-sm transition-colors inline-flex items-center gap-1.5"
           >
-            ← All conversations
+            <ArrowLeftIcon className="w-4 h-4" />
+            All conversations
           </a>
         </div>
       </div>
