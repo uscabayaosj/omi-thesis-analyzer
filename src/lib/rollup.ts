@@ -5,6 +5,7 @@ export interface DayConvoOutput {
   title: string;
   date: string;
   analysis: AdhdAnalysis;
+  doneKeys: string[];
 }
 
 const ROLLUP_FIELDS: (keyof Rollup)[] = [
@@ -61,14 +62,16 @@ You MUST respond with valid JSON matching this exact schema:
 
 Each field is a prose string (may contain newlines and simple markdown like bold or hyphen bullets). Do not return arrays or nested objects.`;
 
-function fmtCommitment(c: AdhdAnalysis["commitments"][number]): string {
+function fmtCommitment(c: AdhdAnalysis["commitments"][number], doneSet: Set<string>): string {
   const dir = c.direction === "other_to_user" ? `${c.who} owes me` : `I owe ${c.who}`;
-  return `    - [${c.confidence}] ${dir}: ${c.what} (deadline: ${c.deadline})`;
+  const status = doneSet.has(c.key) ? "DONE" : "OPEN";
+  return `    - [${status}][${c.confidence}] ${dir}: ${c.what} (deadline: ${c.deadline})`;
 }
 
 function fmtConvo(c: DayConvoOutput, i: number): string {
   const a = c.analysis;
-  const commitments = a.commitments.length ? a.commitments.map(fmtCommitment).join("\n") : "    - none";
+  const doneSet = new Set(c.doneKeys);
+  const commitments = a.commitments.length ? a.commitments.map((commit) => fmtCommitment(commit, doneSet)).join("\n") : "    - none";
   const people = a.people.length ? a.people.map((p) => `    - ${p.name} (${p.relationship}); owed: ${p.owed}`).join("\n") : "    - none";
   const loops = a.open_loops.length ? a.open_loops.map((l) => `    - ${l}`).join("\n") : "    - none";
   const ahead = a.ahead.length ? a.ahead.map((x) => `    - ${x.event} (${x.date}); prep: ${x.prep}; start: ${x.start_when}`).join("\n") : "    - none";

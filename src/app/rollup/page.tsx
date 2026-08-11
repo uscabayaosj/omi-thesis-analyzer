@@ -5,6 +5,7 @@ import Link from "next/link";
 import { fetchJson } from "@/lib/fetch-json";
 import { formatDateTime } from "@/lib/format";
 import type { AdhdAnalysis, Rollup } from "@/lib/adhd";
+import type { DayConvoOutput } from "@/lib/rollup";
 import {
   getAdhdAnalysis, saveAdhdAnalysis, getRollup, saveRollup, getPreviousRollup,
 } from "@/lib/adhd-storage";
@@ -41,7 +42,7 @@ export default function RollupPage() {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [rollup, setRollup] = useState<Rollup | null>(null);
   const [running, setRunning] = useState(false);
-  const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const [progress, setProgress] = useState({ done: 0, total: 0, failed: 0 });
   const [exported, setExported] = useState(false);
 
   useEffect(() => {
@@ -68,7 +69,7 @@ export default function RollupPage() {
 
   const selectDay = useCallback((day: string) => {
     setSelectedDay(day);
-    setProgress({ done: 0, total: 0 });
+    setProgress({ done: 0, total: 0, failed: 0 });
     const existing = getRollup(day);
     setRollup(existing ? existing.rollup : null);
   }, []);
@@ -76,13 +77,17 @@ export default function RollupPage() {
   const generate = useCallback(async (dayConvos: ConvoLite[], day: string) => {
     setRunning(true);
     setError(null);
-    try {
-      // 1. Ensure each conversation has an ADHD analysis.
-      const outputs: { title: string; date: string; analysis: AdhdAnalysis }[] = [];
-      const total = dayConvos.length;
-      setProgress({ done: 0, total });
-      for (let i = 0; i < dayConvos.length; i++) {
-        const c = dayConvos[i];
+
+    // 1. Ensure each conversation has an ADHD analysis. A single conversation
+    // failing (most commonly: no transcript, which the route 404s on) must not
+    // abort the whole day — it's skipped and counted, and the run continues.
+    const outputs: DayConvoOutput[] = [];
+    const total = dayConvos.length;
+    let failed = 0;
+    setProgress({ done: 0, total, failed: 0 });
+    for (let i = 0; i < dayConvos.length; i++) {
+      const c = dayConvos[i];
+      try {
         let stored = getAdhdAnalysis(c.id);
         if (!stored) {
           const data = await fetchJson<{ analysis: AdhdAnalysis; conversation?: { structured?: { title?: string }; created_at?: string } }>(
@@ -104,11 +109,22 @@ export default function RollupPage() {
           title: stored.title,
           date: stored.date || c.created_at,
           analysis: stored.analysis,
+          doneKeys: stored.doneKeys,
         });
-        setProgress({ done: i + 1, total });
+      } catch {
+        failed++;
       }
+      setProgress({ done: i + 1, total, failed });
+    }
 
-      // 2. Roll up, chaining to the prior day's rollup.
+    if (outputs.length === 0) {
+      setError("None of this day's conversations could be analyzed, so there is nothing to roll up.");
+      setRunning(false);
+      return;
+    }
+
+    // 2. Roll up whatever succeeded, chaining to the prior day's rollup.
+    try {
       const prev = getPreviousRollup(day);
       const data = await fetchJson<{ rollup: Rollup }>("/api/rollup", {
         method: "POST",
@@ -219,6 +235,23 @@ export default function RollupPage() {
           <div className="card p-5 mb-6">
             <p className="font-semibold text-white">{formatDateTime(`${selectedDay}T12:00:00`, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
             <p className="text-slate-400 text-sm mt-1">{selectedConvos.length} conversation{selectedConvos.length === 1 ? "" : "s"} this day</p>
+
+            <div className="mt-3 space-y-1.5" role="list" aria-label="Conversations this day">
+              {selectedConvos.map((c) => {
+                const analyzed = !!getAdhdAnalysis(c.id);
+                return (
+                  <div key={c.id} role="listitem" className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-slate-900/60">
+                    <span className="text-sm text-slate-300 truncate min-w-0">{c.structured?.title || "Untitled"}</span>
+                    {analyzed ? (
+                      <span className="text-xs bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 px-2 py-0.5 rounded-full flex-shrink-0">analyzed</span>
+                    ) : (
+                      <span className="text-xs bg-slate-800/60 border border-slate-700 text-slate-500 px-2 py-0.5 rounded-full flex-shrink-0">not yet</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
             <button
               onClick={() => generate(selectedConvos, selectedDay)}
               disabled={running || selectedConvos.length === 0}
@@ -235,6 +268,11 @@ export default function RollupPage() {
                 <><CalendarIcon className="w-4 h-4" /> Generate rollup</>
               )}
             </button>
+            {!running && progress.total > 0 && progress.failed > 0 && (
+              <p className="text-amber-300/90 text-sm mt-2" role="status">
+                {progress.failed} of {progress.total} could not be analyzed and {progress.failed === 1 ? "was" : "were"} skipped.
+              </p>
+            )}
           </div>
 
           {rollup && (

@@ -428,7 +428,7 @@ export default function Home() {
                 onClick={() => toggleSelect(convo.id)}
                 role="option"
                 aria-selected={isSelected}
-                aria-label={`${isSelected ? "Deselect" : "Select"} "${convo.structured?.title || "Untitled"}" for group analysis${isAnalyzed ? " (analyzed)" : ""}`}
+                aria-label={`${isSelected ? "Deselect" : "Select"} "${convo.structured?.title || "Untitled"}" for group analysis${isAnalyzedEither(convo.id) ? " (analyzed)" : ""}`}
                 className={`w-full text-left card p-5 transition-colors min-h-[44px] ${
                   isSelected
                     ? "border-indigo-500 bg-indigo-950/30"
@@ -472,9 +472,9 @@ export default function Home() {
             <Link
               key={convo.id}
               href={`/conversation/${convo.id}`}
-              aria-label={`${convo.structured?.title || "Untitled conversation"}${isAnalyzed ? " (analyzed)" : ""}`}
+              aria-label={`${convo.structured?.title || "Untitled conversation"}${isAnalyzedEither(convo.id) ? " (analyzed)" : ""}`}
               className={`card p-5 block transition-colors min-h-[44px] ${
-                isAnalyzed ? "hover:border-emerald-500/50" : "hover:border-indigo-500/50"
+                isAnalyzedEither(convo.id) ? "hover:border-emerald-500/50" : "hover:border-indigo-500/50"
               }`}
             >
               <div className="flex items-start gap-3">

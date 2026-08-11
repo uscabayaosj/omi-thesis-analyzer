@@ -428,11 +428,16 @@ export default function ConversationPage() {
     const { uri, uriTooLong } = exportAdhdToObsidian(stored);
     if (uriTooLong) downloadAdhdMarkdown(stored);
     else window.open(uri, "_blank");
+    setExported(true);
+    setTimeout(() => setExported(false), 2000);
   }, [id]);
 
   const handleAdhdDownload = useCallback(() => {
     const stored = getAdhdAnalysis(id);
-    if (stored) downloadAdhdMarkdown(stored);
+    if (!stored) return;
+    downloadAdhdMarkdown(stored);
+    setExported(true);
+    setTimeout(() => setExported(false), 2000);
   }, [id]);
 
   const viewVersion = useCallback((version: AnalysisVersion) => {
@@ -674,10 +679,30 @@ export default function ConversationPage() {
                     </h2>
                     <div className="flex items-center gap-2">
                       <button onClick={handleAdhdExport} className="text-sm bg-purple-900/40 hover:bg-purple-800/50 text-purple-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5">
-                        <ExternalLinkIcon className="w-3.5 h-3.5" /> Send to Obsidian
+                        {exported ? (
+                          <>
+                            <CheckIcon className="w-3.5 h-3.5" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <ExternalLinkIcon className="w-3.5 h-3.5" />
+                            Send to Obsidian
+                          </>
+                        )}
                       </button>
                       <button onClick={handleAdhdDownload} className="text-sm bg-amber-900/40 hover:bg-amber-800/50 text-amber-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5">
-                        <DownloadIcon className="w-3.5 h-3.5" /> Download .md
+                        {exported ? (
+                          <>
+                            <CheckIcon className="w-3.5 h-3.5" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <DownloadIcon className="w-3.5 h-3.5" />
+                            Download .md
+                          </>
+                        )}
                       </button>
                       <button onClick={executeAdhd} disabled={adhdAnalyzing} aria-label="Re-run ADHD Aid" className="text-slate-400 hover:text-indigo-400 disabled:opacity-50 transition-colors p-2 min-h-[44px] min-w-[44px] flex items-center justify-center">
                         <RefreshIcon className={`w-4 h-4 ${adhdAnalyzing ? "animate-spin" : ""}`} />
