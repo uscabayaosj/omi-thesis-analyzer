@@ -94,7 +94,7 @@ export function toggleCommitmentDone(id: string, key: string): string[] {
   const map = readMap<StoredAdhdAnalysis>(ANALYSES_KEY);
   const stored = map[id];
   if (!stored) return [];
-  const set = new Set(stored.doneKeys);
+  const set = new Set(Array.isArray(stored.doneKeys) ? stored.doneKeys : []);
   if (set.has(key)) set.delete(key);
   else set.add(key);
   stored.doneKeys = Array.from(set);
