@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, type ComponentType } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -16,6 +16,7 @@ import { exportToObsidian, downloadMarkdown } from "@/lib/obsidian";
 import { cacheGet, cacheSet } from "@/lib/cache";
 import { fetchJson } from "@/lib/fetch-json";
 import { formatDateTime } from "@/lib/format";
+import { ThesisResults, type Analysis } from "@/components/ThesisResults";
 import {
   RefreshIcon,
   ArrowLeftIcon,
@@ -23,14 +24,6 @@ import {
   CheckIcon,
   CompassIcon,
   CogIcon,
-  ScrollIcon,
-  HomeIcon,
-  LinkIcon,
-  MountainsIcon,
-  TargetIcon,
-  ScaleIcon,
-  XCircleIcon,
-  TrendingUpIcon,
   ClipboardIcon,
   FileTextIcon,
   DownloadIcon,
@@ -56,17 +49,6 @@ interface Conversation {
   transcript_segments?: TranscriptSegment[];
 }
 
-interface Analysis {
-  rq1_documentary_record: string;
-  rq2_everyday_practices: string;
-  rq3_cskt_intersection: string;
-  rq4_wildness_imaginary: string;
-  conditions_check: string;
-  rival_hypothesis_test: string;
-  refutation_signals: string;
-  forward_thinking: string;
-}
-
 // ── Components ──
 
 // Renders the full transcript. Long text wraps (min-w-0 + break-words) instead
@@ -85,31 +67,6 @@ function TranscriptViewer({ segments }: { segments: TranscriptSegment[] }) {
           </span>
         </div>
       ))}
-    </div>
-  );
-}
-
-function AnalysisSection({
-  icon: Icon,
-  title,
-  subtitle,
-  content,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  title: string;
-  subtitle: string;
-  content: string;
-}) {
-  return (
-    <div className="card p-6">
-      <div className="analysis-section">
-        <h3 className="flex items-center gap-2">
-          <Icon className="w-[1.05em] h-[1.05em] flex-shrink-0" />
-          {title}
-        </h3>
-        <p className="text-xs text-slate-500 mb-3">{subtitle}</p>
-        <div className="whitespace-pre-wrap text-sm leading-relaxed">{content}</div>
-      </div>
     </div>
   );
 }
@@ -429,23 +386,6 @@ export default function ConversationPage() {
     }
   }, [storedAnalysis]);
 
-  // Older stored analyses may predate server-side field validation
-  const dim = (text: string | undefined) =>
-    text && text.trim() ? text : "No content was recorded for this dimension. Re-run the analysis to fill it in.";
-
-  const sections = analysis
-    ? [
-        { icon: ScrollIcon, title: "RQ1 — Documentary Record", subtitle: "Historical-legal constitution of authority: patents, water rights, allotments, grazing permits", content: dim(analysis.rq1_documentary_record) },
-        { icon: HomeIcon, title: "RQ2 — Everyday Practices", subtitle: "Kinship, inheritance, branding, boundary-maintenance, conflict — how authority is produced daily", content: dim(analysis.rq2_everyday_practices) },
-        { icon: LinkIcon, title: "RQ3 — CSKT Intersection", subtitle: "How ranching authority intersects with, depends on, and is contested by CSKT sovereignty", content: dim(analysis.rq3_cskt_intersection) },
-        { icon: MountainsIcon, title: "RQ4 — Wildness Imaginary", subtitle: "Frontier mythology as double-erasure instrument (4A: Indigenous erasure, 4B: federal erasure)", content: dim(analysis.rq4_wildness_imaginary) },
-        { icon: TargetIcon, title: "Orienting Conditions", subtitle: "Which of the five conditions are evidenced in this conversation?", content: dim(analysis.conditions_check) },
-        { icon: ScaleIcon, title: "Rival Hypothesis Test", subtitle: "Is frontier framing public/strategic or intimate? Felt subjectivity or instrumental rhetoric?", content: dim(analysis.rival_hypothesis_test) },
-        { icon: XCircleIcon, title: "Refutation Signals", subtitle: "Does anything challenge or complicate the pioneer sovereignty concept?", content: dim(analysis.refutation_signals) },
-        { icon: TrendingUpIcon, title: "Forward Thinking", subtitle: "Research directions, questions to pursue, connections to other data", content: dim(analysis.forward_thinking) },
-      ]
-    : [];
-
   return (
     <main className="max-w-3xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
@@ -538,7 +478,7 @@ export default function ConversationPage() {
           )}
 
           {/* Analysis results */}
-          {sections.length > 0 && (
+          {analysis && (
             <section className="mb-8" aria-label="Pioneer Sovereignty analysis results">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2 flex-wrap">
@@ -605,11 +545,7 @@ export default function ConversationPage() {
                   )}
                 </div>
               </div>
-              <div className="space-y-6">
-                {sections.map((section) => (
-                  <AnalysisSection key={section.title} {...section} />
-                ))}
-              </div>
+              {analysis && <ThesisResults analysis={analysis} />}
 
               {/* Version history */}
               {!viewingVersion && (
