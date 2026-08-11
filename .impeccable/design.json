@@ -1,0 +1,173 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-11T00:00:00.000Z",
+  "title": "Design System: Omi Thesis Analyzer",
+  "extensions": {
+    "colorMeta": {
+      "night-field": {
+        "role": "neutral",
+        "displayName": "Night Field",
+        "canonical": "#0f172a",
+        "tonalRamp": ["#04070d", "#0a0f1a", "#0f172a", "#1e293b", "#334155", "#64748b", "#94a3b8", "#e2e8f0"]
+      },
+      "ink-panel": {
+        "role": "neutral",
+        "displayName": "Ink Panel",
+        "canonical": "#1e293b",
+        "tonalRamp": ["#04070d", "#0a0f1a", "#0f172a", "#1e293b", "#334155", "#64748b", "#94a3b8", "#e2e8f0"]
+      },
+      "ink-panel-raised": {
+        "role": "neutral",
+        "displayName": "Ink Panel, Raised",
+        "canonical": "#334155",
+        "tonalRamp": ["#04070d", "#0a0f1a", "#0f172a", "#1e293b", "#334155", "#64748b", "#94a3b8", "#e2e8f0"]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "#e2e8f0",
+        "tonalRamp": ["#04070d", "#0a0f1a", "#0f172a", "#1e293b", "#334155", "#64748b", "#94a3b8", "#e2e8f0"]
+      },
+      "graphite": {
+        "role": "neutral",
+        "displayName": "Graphite",
+        "canonical": "#64748b",
+        "tonalRamp": ["#1e2530", "#2c3644", "#3d4a5c", "#546177", "#64748b", "#8593a8", "#aab5c4", "#dbe1e9"]
+      },
+      "indigo-ink": {
+        "role": "primary",
+        "displayName": "Indigo Ink",
+        "canonical": "#6366f1",
+        "tonalRamp": ["#1e1b4b", "#312e81", "#3730a3", "#4338ca", "#4f46e5", "#6366f1", "#818cf8", "#c7d2fe"]
+      },
+      "indigo-ink-light": {
+        "role": "primary",
+        "displayName": "Indigo Ink, Light",
+        "canonical": "#818cf8",
+        "tonalRamp": ["#1e1b4b", "#312e81", "#3730a3", "#4338ca", "#4f46e5", "#6366f1", "#818cf8", "#c7d2fe"]
+      },
+      "amber-marginalia": {
+        "role": "accent",
+        "displayName": "Amber Marginalia",
+        "canonical": "#fbbf24",
+        "tonalRamp": ["#451a03", "#78350f", "#92400e", "#b45309", "#d97706", "#f59e0b", "#fbbf24", "#fde68a"]
+      },
+      "verified-green": {
+        "role": "success",
+        "displayName": "Verified Green",
+        "canonical": "#34d399",
+        "tonalRamp": ["#022c22", "#064e3b", "#065f46", "#047857", "#059669", "#10b981", "#34d399", "#a7f3d0"]
+      },
+      "alert-red": {
+        "role": "error",
+        "displayName": "Alert Red",
+        "canonical": "#f87171",
+        "tonalRamp": ["#450a0a", "#7f1d1d", "#991b1b", "#b91c1c", "#dc2626", "#ef4444", "#f87171", "#fecaca"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Page-level h1 only (\"Thesis Analyzer\", a conversation's title)." },
+      "headline": { "displayName": "Headline", "purpose": "Section-level h2 headings." },
+      "title": { "displayName": "Title", "purpose": "Analysis-block h3 headings (e.g. \"Do today\", \"RQ1 — Documentary Record\")." },
+      "body": { "displayName": "Body", "purpose": "Analysis prose and card copy; tall 1.7 line-height for dense generated text." },
+      "label": { "displayName": "Label", "purpose": "Mono metadata: timestamps, confidence tags, commitment direction." }
+    },
+    "motion": [
+      { "name": "state-transition", "value": "0.15s ease (background), 0.1s ease (transform)", "purpose": "Default hover/press transition on cards and buttons." },
+      { "name": "shimmer", "value": "1.5s infinite linear background-position sweep", "purpose": "Skeleton loading placeholders; disabled entirely under prefers-reduced-motion." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one primary action on a screen (Group Thesis, Run Custom Analysis, Generate Rollup).",
+      "html": "<button class=\"ds-btn-primary\">Run Custom Analysis</button>",
+      "css": ".ds-btn-primary { background: #6366f1; color: #e2e8f0; font-weight: 500; padding: 8px 20px; min-height: 44px; border-radius: 8px; border: none; transition: background 0.15s ease; } .ds-btn-primary:hover { background: #4f46e5; } .ds-btn-primary:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; } .ds-btn-primary:disabled { background: #334155; color: #64748b; cursor: not-allowed; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Non-primary actions (Cancel, Refresh, Deselect All).",
+      "html": "<button class=\"ds-btn-secondary\">Cancel</button>",
+      "css": ".ds-btn-secondary { background: #1e293b; color: #e2e8f0; font-weight: 500; padding: 8px 16px; min-height: 44px; border-radius: 8px; border: none; transition: background 0.15s ease; } .ds-btn-secondary:hover { background: #334155; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The base panel used for every list item, block, and toolbar in the app.",
+      "html": "<a href=\"#\" class=\"ds-card\"><h2 class=\"ds-card-title\">Untitled conversation</h2><p class=\"ds-card-meta\">Aug 11, 2026 · 9:12 AM</p></a>",
+      "css": ".ds-card { display: block; background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; text-decoration: none; transition: background 0.15s ease, transform 0.1s ease; } .ds-card:hover { background: #334155; } .ds-card:active { transform: scale(0.98); } .ds-card-title { color: #ffffff; font-weight: 600; } .ds-card-meta { color: #64748b; font-size: 0.75rem; margin-top: 8px; }"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "refersTo": "badge",
+      "description": "Semantic status only — analyzed / saved / not-yet — never used for navigation.",
+      "html": "<span class=\"ds-badge ds-badge-success\">analyzed</span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; font-size: 0.75rem; padding: 2px 8px; border-radius: 9999px; border: 1px solid transparent; } .ds-badge-success { background: rgba(52, 211, 153, 0.15); border-color: rgba(52, 211, 153, 0.4); color: #34d399; } .ds-badge-neutral { background: rgba(51, 65, 85, 0.6); border-color: #334155; color: #64748b; }"
+    },
+    {
+      "name": "Filter Pill",
+      "kind": "nav",
+      "refersTo": "badge",
+      "description": "The one navigation control that uses solid fill for selection state (All / Analyzed / Unanalyzed).",
+      "html": "<div role=\"radiogroup\" class=\"ds-pillgroup\"><button class=\"ds-pill ds-pill-active\">All</button><button class=\"ds-pill\">Analyzed</button></div>",
+      "css": ".ds-pillgroup { display: inline-flex; gap: 4px; } .ds-pill { min-height: 44px; padding: 8px 16px; border-radius: 9999px; font-size: 0.875rem; background: #1e293b; color: #cbd5e1; border: none; transition: background 0.15s ease, color 0.15s ease; } .ds-pill-active { background: #6366f1; color: #ffffff; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Recessed relative to its parent card — sits at the base Night Field color, not the panel color, so it reads as sunken.",
+      "html": "<textarea class=\"ds-textarea\" placeholder=\"e.g., Does the double erasure appear here?\" rows=\"3\"></textarea>",
+      "css": ".ds-textarea { width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px; font-size: 0.875rem; color: #e2e8f0; resize: none; } .ds-textarea::placeholder { color: #475569; } .ds-textarea:focus { border-color: #f59e0b; outline: none; }"
+    },
+    {
+      "name": "Lens Badge",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Signature component: a T/A dot pair beside every conversation, independently lit when the thesis and/or ADHD Aid lens has run on it.",
+      "html": "<div class=\"ds-lensbadge\"><span class=\"ds-lensdot ds-lensdot-on\">T</span><span class=\"ds-lensdot\">A</span></div>",
+      "css": ".ds-lensbadge { display: flex; flex-direction: column; gap: 4px; } .ds-lensdot { width: 20px; height: 20px; border-radius: 9999px; border: 1px solid #334155; background: rgba(30, 41, 59, 0.6); color: #475569; font-size: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center; } .ds-lensdot-on { background: rgba(52, 211, 153, 0.15); border-color: rgba(52, 211, 153, 0.4); color: #34d399; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Field Journal",
+    "overview": "This is a researcher's dark notebook, not a product marketing itself. Every screen reads as a page you turn to record, review, or close out — precise, patient, and unhurried, because the two people this journal serves are the same person: a PhD researcher extracting thesis evidence, and someone using the same tool at the end of the day to see what actually needs doing. The indigo accent behaves like ink on night paper: it marks what matters (the primary lens, the active state, the thing to act on) and disappears everywhere else. Amber behaves like a marginal note — the custom-analysis lens and its \"saved\" chip are handwritten asides against the notebook's default page, not a competing brand color.\n\nThe palette stays muted and clinical on purpose: desaturated slate, low-glare, nothing performing for attention. Warmth exists, but only where it's earned — amber for a personal aside, emerald for a thing genuinely done and checked off — never as decoration. This system explicitly rejects three lanes it could easily fall into: a productivity app selling itself (no gamification, no cheerful microcopy, no streaks), a clinical intake form (despite the ADHD framing, nothing reads as diagnostic or sterile), and a busy analytics dashboard (no multi-panel data-viz energy — this is a small set of calm, sequential pages, not a control room).",
+    "keyCharacteristics": [
+      "Single dark surface family (night field → ink panel → ink panel raised), no light mode",
+      "One accent color carries all \"this is active / this is primary\" meaning: indigo",
+      "Flat by default — depth comes from tonal layering, not shadows",
+      "Every interactive target is at least 44px tall; this is a phone-in-pocket tool as much as a desk tool",
+      "Amber and emerald are single-purpose accents (custom lens; done/verified) — never used decoratively"
+    ],
+    "rules": [
+      { "name": "The One Ink Rule", "body": "Indigo is the only color allowed to mean \"primary.\" If a second element on screen needs to look important, it does not get its own color — it gets weight, size, or position instead.", "section": "colors" },
+      { "name": "The Fluid-Only Rule", "body": "Headings never get a fixed pixel size; every heading level is a clamp() that scales between phone and desktop. There is no separate \"mobile type scale\" to maintain.", "section": "typography" },
+      { "name": "The Single Column Rule", "body": "No screen in this app ever splits into side-by-side panels. A researcher reading one thing at a time, in order, is the entire interaction model — resist the urge to add a sidebar or a two-pane layout even on wide viewports.", "section": "layout" },
+      { "name": "The Flat Field Rule", "body": "Nothing casts a shadow. If a surface needs to read as \"above\" another, lighten it one tonal step instead.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep indigo as the only color that means \"primary\" — see the One Ink Rule.",
+      "Do convey elevation with tonal steps only, never a shadow — see the Flat Field Rule.",
+      "Do keep every screen single-column inside the 768px container — see the Single Column Rule.",
+      "Do enforce 44px minimum touch targets on every interactive element; this is used one-handed on a phone as often as on a desk.",
+      "Do pair Verified Green and Alert Red with an icon or explicit text, never color alone.",
+      "Do respect prefers-reduced-motion on every new animation, matching the existing shimmer/spin/scale-press pattern."
+    ],
+    "donts": [
+      "Don't introduce a second accent color for \"importance.\" A new primary action reuses Indigo Ink; it does not get its own hue.",
+      "Don't add gamified feedback — no streaks, confetti, progress badges, or celebratory copy. This is a research and executive-function tool, not an engagement product.",
+      "Don't let the ADHD Aid surfaces drift toward a clinical/medical register (form-like labels, diagnostic tone, sterile whitespace). It should feel like the same field journal as the thesis lens, just a different page.",
+      "Don't add a sidebar, tab bar, or multi-column layout, even on desktop. If a screen feels cramped, that's a signal to add a wizard step or collapse content — not to add a column.",
+      "Don't use Amber Marginalia or Verified Green decoratively. They are reserved exactly for the custom-analysis lens and done/verified states, respectively."
+    ]
+  }
+}
