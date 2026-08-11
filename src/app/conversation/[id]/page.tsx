@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, type ComponentType } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -12,10 +12,19 @@ import {
   type StoredAnalysis,
   type AnalysisVersion,
 } from "@/lib/storage";
-import { exportToObsidian, downloadMarkdown } from "@/lib/obsidian";
+import {
+  exportToObsidian,
+  downloadMarkdown,
+  exportAdhdToObsidian,
+  downloadAdhdMarkdown,
+} from "@/lib/obsidian";
 import { cacheGet, cacheSet } from "@/lib/cache";
 import { fetchJson } from "@/lib/fetch-json";
 import { formatDateTime } from "@/lib/format";
+import { ThesisResults, type Analysis } from "@/components/ThesisResults";
+import { AdhdResults } from "@/components/AdhdResults";
+import type { AdhdAnalysis } from "@/lib/adhd";
+import { getAdhdAnalysis, saveAdhdAnalysis, toggleCommitmentDone } from "@/lib/adhd-storage";
 import {
   RefreshIcon,
   ArrowLeftIcon,
@@ -23,14 +32,6 @@ import {
   CheckIcon,
   CompassIcon,
   CogIcon,
-  ScrollIcon,
-  HomeIcon,
-  LinkIcon,
-  MountainsIcon,
-  TargetIcon,
-  ScaleIcon,
-  XCircleIcon,
-  TrendingUpIcon,
   ClipboardIcon,
   FileTextIcon,
   DownloadIcon,
@@ -56,17 +57,6 @@ interface Conversation {
   transcript_segments?: TranscriptSegment[];
 }
 
-interface Analysis {
-  rq1_documentary_record: string;
-  rq2_everyday_practices: string;
-  rq3_cskt_intersection: string;
-  rq4_wildness_imaginary: string;
-  conditions_check: string;
-  rival_hypothesis_test: string;
-  refutation_signals: string;
-  forward_thinking: string;
-}
-
 // ── Components ──
 
 // Renders the full transcript. Long text wraps (min-w-0 + break-words) instead
@@ -85,31 +75,6 @@ function TranscriptViewer({ segments }: { segments: TranscriptSegment[] }) {
           </span>
         </div>
       ))}
-    </div>
-  );
-}
-
-function AnalysisSection({
-  icon: Icon,
-  title,
-  subtitle,
-  content,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  title: string;
-  subtitle: string;
-  content: string;
-}) {
-  return (
-    <div className="card p-6">
-      <div className="analysis-section">
-        <h3 className="flex items-center gap-2">
-          <Icon className="w-[1.05em] h-[1.05em] flex-shrink-0" />
-          {title}
-        </h3>
-        <p className="text-xs text-slate-500 mb-3">{subtitle}</p>
-        <div className="whitespace-pre-wrap text-sm leading-relaxed">{content}</div>
-      </div>
     </div>
   );
 }
@@ -255,7 +220,13 @@ export default function ConversationPage() {
   const [customResult, setCustomResult] = useState<string | null>(null);
   const [showRerunConfirm, setShowRerunConfirm] = useState(false);
 
-  // Load stored analysis
+  type Lens = "thesis" | "adhd" | "both";
+  const [lens, setLens] = useState<Lens>("thesis");
+  const [adhd, setAdhd] = useState<AdhdAnalysis | null>(null);
+  const [adhdDoneKeys, setAdhdDoneKeys] = useState<string[]>([]);
+  const [adhdAnalyzing, setAdhdAnalyzing] = useState(false);
+
+  // Load stored analysis (both lenses) + pick the default lens.
   useEffect(() => {
     const stored = getStoredAnalysis(id);
     if (stored) {
@@ -276,6 +247,17 @@ export default function ConversationPage() {
       }
     }
     setVersions(getAnalysisVersions(id));
+
+    const storedAdhd = getAdhdAnalysis(id);
+    if (storedAdhd) {
+      setAdhd(storedAdhd.analysis);
+      setAdhdDoneKeys(storedAdhd.doneKeys);
+    }
+    // Default lens: the single lens that has results; else thesis.
+    const hasThesis = !!stored;
+    const hasAdhd = !!storedAdhd;
+    if (hasAdhd && !hasThesis) setLens("adhd");
+    else setLens("thesis");
   }, [id]);
 
   // Load a conversation (with transcript) from Omi.
@@ -408,6 +390,56 @@ export default function ConversationPage() {
     setTimeout(() => setExported(false), 2000);
   }, [storedAnalysis]);
 
+  const executeAdhd = useCallback(async () => {
+    setAdhdAnalyzing(true);
+    setError(null);
+    try {
+      const data = await fetchJson<{ analysis: AdhdAnalysis; conversation?: Conversation }>("/api/analyze-adhd", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId: id }),
+      });
+      setAdhd(data.analysis);
+      if (data.conversation?.transcript_segments?.length) {
+        setConversation(data.conversation);
+        cacheSet(`conversation:${id}`, data.conversation);
+      }
+      const stored = saveAdhdAnalysis({
+        conversationId: id,
+        title: data.conversation?.structured?.title || conversation?.structured?.title || "Untitled",
+        date: data.conversation?.created_at || conversation?.created_at,
+        analysis: data.analysis,
+      });
+      setAdhdDoneKeys(stored.doneKeys);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "ADHD analysis failed");
+    } finally {
+      setAdhdAnalyzing(false);
+    }
+  }, [id, conversation]);
+
+  const handleToggleDone = useCallback((key: string) => {
+    setAdhdDoneKeys(toggleCommitmentDone(id, key));
+  }, [id]);
+
+  const handleAdhdExport = useCallback(() => {
+    const stored = getAdhdAnalysis(id);
+    if (!stored) return;
+    const { uri, uriTooLong } = exportAdhdToObsidian(stored);
+    if (uriTooLong) downloadAdhdMarkdown(stored);
+    else window.open(uri, "_blank");
+    setExported(true);
+    setTimeout(() => setExported(false), 2000);
+  }, [id]);
+
+  const handleAdhdDownload = useCallback(() => {
+    const stored = getAdhdAnalysis(id);
+    if (!stored) return;
+    downloadAdhdMarkdown(stored);
+    setExported(true);
+    setTimeout(() => setExported(false), 2000);
+  }, [id]);
+
   const viewVersion = useCallback((version: AnalysisVersion) => {
     setViewingVersion(version);
     setAnalysis(version.analysis);
@@ -428,23 +460,6 @@ export default function ConversationPage() {
       });
     }
   }, [storedAnalysis]);
-
-  // Older stored analyses may predate server-side field validation
-  const dim = (text: string | undefined) =>
-    text && text.trim() ? text : "No content was recorded for this dimension. Re-run the analysis to fill it in.";
-
-  const sections = analysis
-    ? [
-        { icon: ScrollIcon, title: "RQ1 — Documentary Record", subtitle: "Historical-legal constitution of authority: patents, water rights, allotments, grazing permits", content: dim(analysis.rq1_documentary_record) },
-        { icon: HomeIcon, title: "RQ2 — Everyday Practices", subtitle: "Kinship, inheritance, branding, boundary-maintenance, conflict — how authority is produced daily", content: dim(analysis.rq2_everyday_practices) },
-        { icon: LinkIcon, title: "RQ3 — CSKT Intersection", subtitle: "How ranching authority intersects with, depends on, and is contested by CSKT sovereignty", content: dim(analysis.rq3_cskt_intersection) },
-        { icon: MountainsIcon, title: "RQ4 — Wildness Imaginary", subtitle: "Frontier mythology as double-erasure instrument (4A: Indigenous erasure, 4B: federal erasure)", content: dim(analysis.rq4_wildness_imaginary) },
-        { icon: TargetIcon, title: "Orienting Conditions", subtitle: "Which of the five conditions are evidenced in this conversation?", content: dim(analysis.conditions_check) },
-        { icon: ScaleIcon, title: "Rival Hypothesis Test", subtitle: "Is frontier framing public/strategic or intimate? Felt subjectivity or instrumental rhetoric?", content: dim(analysis.rival_hypothesis_test) },
-        { icon: XCircleIcon, title: "Refutation Signals", subtitle: "Does anything challenge or complicate the pioneer sovereignty concept?", content: dim(analysis.refutation_signals) },
-        { icon: TrendingUpIcon, title: "Forward Thinking", subtitle: "Research directions, questions to pursue, connections to other data", content: dim(analysis.forward_thinking) },
-      ]
-    : [];
 
   return (
     <main className="max-w-3xl mx-auto px-4 py-8">
@@ -511,8 +526,25 @@ export default function ConversationPage() {
             </p>
           </header>
 
+          {/* Lens toggle */}
+          <div className="flex gap-1 mb-6 p-1 bg-slate-900 rounded-lg w-fit" role="radiogroup" aria-label="Analysis lens">
+            {(["thesis", "adhd", "both"] as const).map((l) => (
+              <button
+                key={l}
+                onClick={() => setLens(l)}
+                role="radio"
+                aria-checked={lens === l}
+                className={`px-4 py-2 min-h-[44px] rounded-md text-sm transition-colors ${
+                  lens === l ? "bg-indigo-600 text-white" : "text-slate-300 hover:text-white"
+                }`}
+              >
+                {l === "thesis" ? "Thesis" : l === "adhd" ? "ADHD Aid" : "Both"}
+              </button>
+            ))}
+          </div>
+
           {/* Analyze button */}
-          {!analysis && (
+          {(lens === "thesis" || lens === "both") && !analysis && (
             <button
               onClick={handleAnalyzeClick}
               disabled={analyzing}
@@ -538,7 +570,7 @@ export default function ConversationPage() {
           )}
 
           {/* Analysis results */}
-          {sections.length > 0 && (
+          {(lens === "thesis" || lens === "both") && analysis && (
             <section className="mb-8" aria-label="Pioneer Sovereignty analysis results">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2 flex-wrap">
@@ -605,15 +637,80 @@ export default function ConversationPage() {
                   )}
                 </div>
               </div>
-              <div className="space-y-6">
-                {sections.map((section) => (
-                  <AnalysisSection key={section.title} {...section} />
-                ))}
-              </div>
+              {analysis && <ThesisResults analysis={analysis} />}
 
               {/* Version history */}
               {!viewingVersion && (
                 <VersionHistory versions={versions} onSelect={viewVersion} />
+              )}
+            </section>
+          )}
+
+          {/* ADHD Aid results */}
+          {(lens === "adhd" || lens === "both") && (
+            <section className="mb-8" aria-label="ADHD Aid analysis">
+              {!adhd && (
+                <button
+                  onClick={executeAdhd}
+                  disabled={adhdAnalyzing}
+                  aria-label="Run ADHD Aid analysis on this conversation"
+                  className="w-full card p-6 text-center hover:border-indigo-500/50 transition-colors cursor-pointer disabled:opacity-50 mb-6 min-h-[44px]"
+                >
+                  {adhdAnalyzing ? (
+                    <div className="flex items-center justify-center gap-3">
+                      <LoaderIcon className="w-6 h-6 text-indigo-400 animate-spin flex-shrink-0" />
+                      <p className="font-semibold text-white">Running ADHD Aid…</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <ClipboardIcon className="w-7 h-7 mx-auto mb-2 text-indigo-400" />
+                      <p className="font-semibold text-white">Run ADHD Aid</p>
+                      <p className="text-slate-400 text-sm mt-1">Commitments, people, open loops, and next actions</p>
+                    </div>
+                  )}
+                </button>
+              )}
+              {adhd && (
+                <>
+                  <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                      <ClipboardIcon className="w-5 h-5 text-indigo-400 flex-shrink-0" />
+                      ADHD Aid
+                    </h2>
+                    <div className="flex items-center gap-2">
+                      <button onClick={handleAdhdExport} className="text-sm bg-purple-900/40 hover:bg-purple-800/50 text-purple-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5">
+                        {exported ? (
+                          <>
+                            <CheckIcon className="w-3.5 h-3.5" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <ExternalLinkIcon className="w-3.5 h-3.5" />
+                            Send to Obsidian
+                          </>
+                        )}
+                      </button>
+                      <button onClick={handleAdhdDownload} className="text-sm bg-amber-900/40 hover:bg-amber-800/50 text-amber-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5">
+                        {exported ? (
+                          <>
+                            <CheckIcon className="w-3.5 h-3.5" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <DownloadIcon className="w-3.5 h-3.5" />
+                            Download .md
+                          </>
+                        )}
+                      </button>
+                      <button onClick={executeAdhd} disabled={adhdAnalyzing} aria-label="Re-run ADHD Aid" className="text-slate-400 hover:text-indigo-400 disabled:opacity-50 transition-colors p-2 min-h-[44px] min-w-[44px] flex items-center justify-center">
+                        <RefreshIcon className={`w-4 h-4 ${adhdAnalyzing ? "animate-spin" : ""}`} />
+                      </button>
+                    </div>
+                  </div>
+                  <AdhdResults analysis={adhd} doneKeys={adhdDoneKeys} onToggleDone={handleToggleDone} />
+                </>
               )}
             </section>
           )}
