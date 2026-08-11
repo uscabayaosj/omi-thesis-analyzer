@@ -4,10 +4,12 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getAnalyzedIds, getAnalysisAge } from "@/lib/storage";
+import { getAdhdAnalyzedIds, saveAdhdAnalysis } from "@/lib/adhd-storage";
+import type { AdhdAnalysis } from "@/lib/adhd";
 import { cacheGet, cacheSet } from "@/lib/cache";
 import { fetchJson } from "@/lib/fetch-json";
 import { formatDateTime } from "@/lib/format";
-import { BookIcon, SquareIcon, XIcon, CheckIcon, SparklesIcon, WarningIcon, MicIcon, FolderIcon, RefreshIcon } from "@/components/icons";
+import { BookIcon, SquareIcon, XIcon, CheckIcon, SparklesIcon, WarningIcon, MicIcon, FolderIcon, RefreshIcon, ClipboardIcon, CalendarIcon } from "@/components/icons";
 
 const CONVERSATIONS_CACHE_KEY = "conversations";
 
@@ -23,17 +25,21 @@ interface Conversation {
   folder_name?: string;
 }
 
-function AnalyzedIndicator({ analyzed }: { analyzed: boolean }) {
-  return (
-    <div
-      className={`w-8 h-8 mt-0.5 flex-shrink-0 rounded-full border flex items-center justify-center ${
-        analyzed
-          ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400"
-          : "bg-slate-800/60 border-slate-700 text-slate-600"
+function LensBadges({ thesis, adhd }: { thesis: boolean; adhd: boolean }) {
+  const dot = (on: boolean, label: string) => (
+    <span
+      title={`${label}: ${on ? "analyzed" : "not analyzed"}`}
+      className={`w-5 h-5 rounded-full border text-[10px] font-semibold flex items-center justify-center ${
+        on ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400" : "bg-slate-800/60 border-slate-700 text-slate-600"
       }`}
-      aria-hidden="true"
     >
-      {analyzed ? <CheckIcon className="w-4 h-4" /> : <span className="w-1.5 h-1.5 rounded-full bg-current" />}
+      {label}
+    </span>
+  );
+  return (
+    <div className="mt-0.5 flex-shrink-0 flex flex-col gap-1" aria-hidden="true">
+      {dot(thesis, "T")}
+      {dot(adhd, "A")}
     </div>
   );
 }
@@ -42,6 +48,7 @@ export default function Home() {
   const router = useRouter();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [analyzedIds, setAnalyzedIds] = useState<Set<string>>(new Set());
+  const [adhdIds, setAdhdIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastSynced, setLastSynced] = useState<string | null>(null);
@@ -49,6 +56,8 @@ export default function Home() {
   const [filter, setFilter] = useState<"all" | "analyzed" | "unanalyzed">("all");
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [batchRunning, setBatchRunning] = useState(false);
+  const [batchProgress, setBatchProgress] = useState({ done: 0, total: 0, failed: 0 });
 
   // Revalidate the list over the network and refresh the cache. A refresh
   // forces a fresh pull from Omi; the initial load can reuse the HTTP cache.
@@ -80,6 +89,7 @@ export default function Home() {
 
   useEffect(() => {
     setAnalyzedIds(getAnalyzedIds());
+    setAdhdIds(getAdhdAnalyzedIds());
 
     // Instant paint from cache (stale-while-revalidate), then revalidate.
     const cached = cacheGet<Conversation[]>(CONVERSATIONS_CACHE_KEY);
@@ -90,11 +100,16 @@ export default function Home() {
     loadConversations("initial");
   }, [loadConversations]);
 
-  const analyzedCount = conversations.filter((c) => analyzedIds.has(c.id)).length;
+  const isAnalyzedEither = useCallback(
+    (cid: string) => analyzedIds.has(cid) || adhdIds.has(cid),
+    [analyzedIds, adhdIds]
+  );
+
+  const analyzedCount = conversations.filter((c) => isAnalyzedEither(c.id)).length;
 
   const filtered = conversations.filter((c) => {
-    if (filter === "analyzed") return analyzedIds.has(c.id);
-    if (filter === "unanalyzed") return !analyzedIds.has(c.id);
+    if (filter === "analyzed") return isAnalyzedEither(c.id);
+    if (filter === "unanalyzed") return !isAnalyzedEither(c.id);
     return true;
   });
 
@@ -124,6 +139,38 @@ export default function Home() {
     const ids = Array.from(selected).join(",");
     router.push(`/analyze-group?ids=${ids}`);
   }, [selected, router]);
+
+  const runBatchAdhd = useCallback(async () => {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+    setBatchRunning(true);
+    setBatchProgress({ done: 0, total: ids.length, failed: 0 });
+    let failed = 0;
+    for (let i = 0; i < ids.length; i++) {
+      try {
+        const data = await fetchJson<{ analysis: AdhdAnalysis; conversation?: { structured?: { title?: string }; created_at?: string } }>(
+          "/api/analyze-adhd",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ conversationId: ids[i] }),
+          }
+        );
+        // Persist via the storage lib (same shape the conversation page uses).
+        saveAdhdAnalysis({
+          conversationId: ids[i],
+          title: data.conversation?.structured?.title || "Untitled",
+          date: data.conversation?.created_at,
+          analysis: data.analysis,
+        });
+      } catch {
+        failed++;
+      }
+      setBatchProgress({ done: i + 1, total: ids.length, failed });
+    }
+    setAdhdIds(getAdhdAnalyzedIds());
+    setBatchRunning(false);
+  }, [selected]);
 
   const exitSelectMode = () => {
     setSelectMode(false);
@@ -173,15 +220,24 @@ export default function Home() {
               ? `Synced ${getAnalysisAge(lastSynced).label}`
               : ""}
           </span>
-          <button
-            onClick={() => loadConversations("refresh")}
-            disabled={loading || refreshing}
-            aria-label="Refresh conversations from Omi"
-            className="flex items-center gap-1.5 text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
-          >
-            <RefreshIcon className={`w-4 h-4 flex-shrink-0 ${refreshing ? "animate-spin" : ""}`} />
-            {refreshing ? "Refreshing…" : "Refresh"}
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Link
+              href="/rollup"
+              className="flex items-center gap-1.5 text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors flex-shrink-0"
+            >
+              <CalendarIcon className="w-4 h-4 flex-shrink-0" />
+              Daily Rollup
+            </Link>
+            <button
+              onClick={() => loadConversations("refresh")}
+              disabled={loading || refreshing}
+              aria-label="Refresh conversations from Omi"
+              className="flex items-center gap-1.5 text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+            >
+              <RefreshIcon className={`w-4 h-4 flex-shrink-0 ${refreshing ? "animate-spin" : ""}`} />
+              {refreshing ? "Refreshing…" : "Refresh"}
+            </button>
+          </div>
         </div>
 
         {/* Onboarding: About this framework */}
@@ -267,33 +323,51 @@ export default function Home() {
 
         {/* Selection mode toolbar */}
         {selectMode && (
-          <div
-            className="mt-4 card p-4 border-indigo-500/30 flex items-center justify-between"
-            role="toolbar"
-            aria-label="Group analysis toolbar"
-          >
-            <div className="flex items-center gap-3">
-              <button
-                onClick={selectAll}
-                disabled={filtered.length === 0}
-                aria-label={allFilteredSelected ? "Deselect all conversations" : "Select all conversations"}
-                className="text-sm min-h-[44px] bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 px-4 py-2 rounded-lg transition-colors"
-              >
-                {allFilteredSelected ? "Deselect All" : "Select All"}
-              </button>
-              <span className="text-sm text-slate-400" aria-live="polite">
-                {selected.size} selected
-              </span>
-            </div>
-            <button
-              onClick={startGroupAnalysis}
-              disabled={selected.size < 2}
-              aria-label={`Analyze ${selected.size} selected conversations as a group`}
-              className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-white text-white font-medium py-2 px-5 min-h-[44px] rounded-lg text-sm transition-colors"
+          <div className="mt-4">
+            <div
+              className="card p-4 border-indigo-500/30 flex items-center justify-between"
+              role="toolbar"
+              aria-label="Group analysis toolbar"
             >
-              <SparklesIcon className="w-4 h-4" />
-              Analyze Group ({selected.size})
-            </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={selectAll}
+                  disabled={filtered.length === 0}
+                  aria-label={allFilteredSelected ? "Deselect all conversations" : "Select all conversations"}
+                  className="text-sm min-h-[44px] bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 px-4 py-2 rounded-lg transition-colors"
+                >
+                  {allFilteredSelected ? "Deselect All" : "Select All"}
+                </button>
+                <span className="text-sm text-slate-400" aria-live="polite">
+                  {selected.size} selected
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={startGroupAnalysis}
+                  disabled={selected.size < 2 || batchRunning}
+                  aria-label={`Group thesis analysis on ${selected.size} conversations`}
+                  className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 text-white font-medium py-2 px-4 min-h-[44px] rounded-lg text-sm transition-colors"
+                >
+                  <SparklesIcon className="w-4 h-4" />
+                  Group Thesis ({selected.size})
+                </button>
+                <button
+                  onClick={runBatchAdhd}
+                  disabled={selected.size < 1 || batchRunning}
+                  aria-label={`Run ADHD Aid on ${selected.size} conversations`}
+                  className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-100 font-medium py-2 px-4 min-h-[44px] rounded-lg text-sm transition-colors"
+                >
+                  <ClipboardIcon className="w-4 h-4" />
+                  {batchRunning ? `Running ${batchProgress.done}/${batchProgress.total}…` : `Run ADHD (${selected.size})`}
+                </button>
+              </div>
+            </div>
+            {!batchRunning && batchProgress.total > 0 && batchProgress.failed > 0 && (
+              <p className="text-amber-300/90 text-sm mt-2" role="status">
+                {batchProgress.failed} of {batchProgress.total} could not be analyzed and {batchProgress.failed === 1 ? "was" : "were"} skipped.
+              </p>
+            )}
           </div>
         )}
       </header>
@@ -374,7 +448,7 @@ export default function Home() {
                       <CheckIcon className="w-3 h-3 text-white" />
                     )}
                   </div>
-                  <AnalyzedIndicator analyzed={isAnalyzed} />
+                  <LensBadges thesis={isAnalyzed} adhd={adhdIds.has(convo.id)} />
                   <div className="flex-1 min-w-0">
                     <h2 className="font-semibold text-white truncate">
                       {convo.structured?.title || "Untitled"}
@@ -404,7 +478,7 @@ export default function Home() {
               }`}
             >
               <div className="flex items-start gap-3">
-                <AnalyzedIndicator analyzed={isAnalyzed} />
+                <LensBadges thesis={isAnalyzed} adhd={adhdIds.has(convo.id)} />
                 <div className="flex-1 min-w-0">
                   <h2 className="font-semibold text-white truncate">
                     {convo.structured?.title || "Untitled"}
