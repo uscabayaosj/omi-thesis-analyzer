@@ -30,7 +30,13 @@ function readMap<T>(key: string): Record<string, T> {
     const raw = localStorage.getItem(key);
     const parsed = raw ? JSON.parse(raw) : {};
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-    return parsed as Record<string, T>;
+    const result: Record<string, T> = {};
+    for (const [k, v] of Object.entries(parsed)) {
+      if (v && typeof v === "object" && !Array.isArray(v)) {
+        result[k] = v as T;
+      }
+    }
+    return result;
   } catch {
     return {};
   }
@@ -68,7 +74,8 @@ export function saveAdhdAnalysis(record: {
 
   // Preserve done-state for commitments that still exist after re-analysis.
   const liveKeys = new Set(record.analysis.commitments.map((c) => c.key));
-  const doneKeys = (prev?.doneKeys ?? []).filter((k) => liveKeys.has(k));
+  const prevDoneKeys = Array.isArray(prev?.doneKeys) ? prev.doneKeys : [];
+  const doneKeys = prevDoneKeys.filter((k) => liveKeys.has(k));
 
   const stored: StoredAdhdAnalysis = {
     conversationId: record.conversationId,
