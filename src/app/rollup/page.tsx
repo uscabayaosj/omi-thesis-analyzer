@@ -188,8 +188,9 @@ export default function RollupPage() {
               <button
                 key={day}
                 onClick={() => selectDay(day)}
+                disabled={running}
                 role="listitem"
-                className="w-full text-left card p-5 hover:border-indigo-500/50 transition-colors min-h-[44px] flex items-center justify-between"
+                className="w-full text-left card p-5 hover:border-indigo-500/50 transition-colors min-h-[44px] flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <div>
                   <p className="font-semibold text-white">{formatDateTime(`${day}T12:00:00`, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
@@ -211,7 +212,7 @@ export default function RollupPage() {
 
       {selectedDay && (
         <>
-          <button onClick={() => { setSelectedDay(null); setRollup(null); }} className="text-slate-400 hover:text-white text-sm mb-4 inline-flex items-center gap-1.5 min-h-[44px] py-2">
+          <button onClick={() => { setSelectedDay(null); setRollup(null); }} disabled={running} className="text-slate-400 hover:text-white text-sm mb-4 inline-flex items-center gap-1.5 min-h-[44px] py-2 disabled:opacity-50 disabled:cursor-not-allowed">
             <ArrowLeftIcon className="w-4 h-4" /> All days
           </button>
 
