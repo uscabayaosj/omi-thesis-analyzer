@@ -51,7 +51,7 @@ const ROLLUP_SYSTEM_PROMPT = `You are the end-of-day executive function layer fo
 
 You MUST respond with valid JSON matching this exact schema:
 {
-  "tomorrow_plan": "First block: <smallest first step, time estimate, suggested slot>. Then up to 4 more ranked items, each one line with the deadline in bold.",
+  "tomorrow_plan": "One suggested first block (smallest first step, with a time estimate and suggested time slot), followed by up to 4 more ranked items, each one line with its deadline in bold. 'Nothing time-sensitive for tomorrow.' if there is genuinely nothing to plan.",
   "aging_commitments": "Carried items with age in days; renegotiation script for anything 3+ days old. 'None.' if clean.",
   "conflicts_at_risk": "Contradictions between conversations, overcommitted slots, overflow tasks needing a decision or renegotiation. 'None.' if clean.",
   "social_ledger": "At most 3 cheap high-value social actions; longer-pending relationship debts below, one line each.",

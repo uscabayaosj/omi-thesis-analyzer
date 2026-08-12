@@ -9,7 +9,7 @@ import type { AdhdAnalysis } from "@/lib/adhd";
 import { cacheGet, cacheSet } from "@/lib/cache";
 import { fetchJson } from "@/lib/fetch-json";
 import { formatDateTime } from "@/lib/format";
-import { BookIcon, SquareIcon, XIcon, CheckIcon, SparklesIcon, WarningIcon, MicIcon, FolderIcon, RefreshIcon, ClipboardIcon, CalendarIcon } from "@/components/icons";
+import { BookIcon, SquareIcon, XIcon, CheckIcon, SparklesIcon, WarningIcon, MicIcon, FolderIcon, RefreshIcon, ClipboardIcon, CalendarIcon, ChevronRightIcon } from "@/components/icons";
 
 const CONVERSATIONS_CACHE_KEY = "conversations";
 
@@ -30,7 +30,10 @@ function LensBadges({ thesis, adhd }: { thesis: boolean; adhd: boolean }) {
     <span
       title={`${label}: ${on ? "analyzed" : "not analyzed"}`}
       className={`w-5 h-5 rounded-full border text-[10px] font-semibold flex items-center justify-center ${
-        on ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400" : "bg-slate-800/60 border-slate-700 text-slate-600"
+        // False positive below: the scanner pairs the "off" branch's text-slate-400 with the "on"
+        // branch's bg-emerald-500 since both live in one ternary string. Real pairs, both verified:
+        // emerald-400/emerald-wash (5.93:1) and slate-400/slate-800 (5.71:1).
+        on ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400" : "bg-slate-800/60 border-slate-700 text-slate-400" // impeccable-disable-line gray-on-color
       }`}
     >
       {label}
@@ -47,8 +50,13 @@ function LensBadges({ thesis, adhd }: { thesis: boolean; adhd: boolean }) {
 export default function Home() {
   const router = useRouter();
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [analyzedIds, setAnalyzedIds] = useState<Set<string>>(new Set());
-  const [adhdIds, setAdhdIds] = useState<Set<string>>(new Set());
+  // Lazy initializers, not an effect: both reads are synchronous, SSR-safe
+  // (guarded on `typeof window`), and side-effect-free — an effect here would
+  // only add a redundant render pass. analyzedIds never changes after mount
+  // (thesis analysis happens on a different page), so no setter is needed;
+  // adhdIds does change, after a batch ADHD run below.
+  const [analyzedIds] = useState<Set<string>>(() => getAnalyzedIds());
+  const [adhdIds, setAdhdIds] = useState<Set<string>>(() => getAdhdAnalyzedIds());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastSynced, setLastSynced] = useState<string | null>(null);
@@ -88,12 +96,16 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    setAnalyzedIds(getAnalyzedIds());
-    setAdhdIds(getAdhdAnalyzedIds());
-
     // Instant paint from cache (stale-while-revalidate), then revalidate.
+    // This can't become a lazy useState initializer like analyzedIds/adhdIds
+    // above: the server-rendered HTML always shows an empty list (no
+    // localStorage there), so reading the cache during the client's first
+    // render would diverge from that SSR output and trigger a hydration
+    // mismatch. Reading it here, post-mount, costs one extra render but
+    // keeps the first paint hydration-safe.
     const cached = cacheGet<Conversation[]>(CONVERSATIONS_CACHE_KEY);
     if (cached) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- see comment above; must run post-mount, not as a lazy initializer
       setConversations(cached.data);
       setLoading(false);
     }
@@ -179,38 +191,17 @@ export default function Home() {
 
   return (
     <main className="max-w-3xl mx-auto px-4 py-8">
-      <header className="mb-10">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-2">
-            <BookIcon className="w-7 h-7 text-indigo-400 flex-shrink-0" />
-            Thesis Analyzer
-          </h1>
-          {!selectMode ? (
-            <button
-              onClick={() => setSelectMode(true)}
-              aria-label="Enable selection mode to analyze multiple conversations as a group"
-              className="text-sm min-h-[44px] flex items-center gap-1.5 bg-indigo-900/40 hover:bg-indigo-800/50 text-indigo-200 px-4 py-2 rounded-lg transition-colors border border-indigo-700/30"
-            >
-              <SquareIcon className="w-3.5 h-3.5" />
-              Select &amp; Analyze Group
-            </button>
-          ) : (
-            <button
-              onClick={exitSelectMode}
-              aria-label="Cancel selection mode"
-              className="text-sm min-h-[44px] flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg transition-colors"
-            >
-              <XIcon className="w-3.5 h-3.5" />
-              Cancel
-            </button>
-          )}
-        </div>
+      <header className="mb-6">
+        <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-2">
+          <BookIcon className="w-7 h-7 text-indigo-400 flex-shrink-0" />
+          Thesis Analyzer
+        </h1>
         <p className="text-slate-400">
           AI-powered analysis of your Omi conversations through the lens of Pioneer Sovereignty
         </p>
 
-        {/* Sync status + refresh */}
-        <div className="flex items-center justify-between gap-3 mt-4">
+        {/* Sync status + refresh — quiet meta row, read once per visit */}
+        <div className="flex items-center justify-between gap-3 mt-4 pb-4 border-b border-slate-800">
           <span className="text-sm text-slate-400" aria-live="polite">
             {refreshing
               ? "Refreshing from Omi…"
@@ -240,16 +231,13 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Onboarding: About this framework */}
-        <details className="mt-4 card">
-          <summary className="p-4 cursor-pointer text-sm text-slate-400 hover:text-slate-200 transition-colors min-h-[44px] flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <BookIcon className="w-4 h-4 flex-shrink-0" />
-              What is Pioneer Sovereignty?
-            </span>
-            <span className="text-xs text-slate-600">For collaborators & first-time users</span>
+        {/* Onboarding: About this framework — a quiet footnote, not a section */}
+        <details className="mt-3 group">
+          <summary className="cursor-pointer list-none text-sm text-slate-500 hover:text-slate-300 transition-colors min-h-[44px] flex items-center gap-1.5">
+            <ChevronRightIcon className="w-3.5 h-3.5 flex-shrink-0 transition-transform group-open:rotate-90" />
+            What is Pioneer Sovereignty?
           </summary>
-          <div className="px-4 pb-4 text-sm text-slate-300 space-y-3">
+          <div className="pl-5 pt-1 pb-2 text-sm text-slate-300 space-y-3">
             <p>
               <strong className="text-white">Pioneer Sovereignty</strong> is a concept from a PhD anthropology thesis
               by Ulysses S. Cabayao, SJ (UCL). It examines how ranching families in Montana&apos;s Flathead Valley
@@ -295,35 +283,57 @@ export default function Home() {
           </div>
         </details>
 
+        {/* Scan row: count + filter + group-select entry — tight to the list it governs */}
         {conversations.length > 0 && (
-          <div className="flex items-center gap-4 mt-4 text-sm">
-            <span className="text-slate-400">
-              {analyzedCount}/{conversations.length} analyzed
-            </span>
-            <div className="flex gap-1" role="radiogroup" aria-label="Filter conversations by analysis status">
-              {(["all", "analyzed", "unanalyzed"] as const).map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setFilter(f)}
-                  role="radio"
-                  aria-checked={filter === f}
-                  aria-label={`Show ${f} conversations`}
-                  className={`px-4 py-2 min-h-[44px] rounded-full text-sm transition-colors ${
-                    filter === f
-                      ? "bg-indigo-600 text-white"
-                      : "bg-slate-800 text-slate-300 hover:text-white"
-                  }`}
-                >
-                  {f === "all" ? "All" : f === "analyzed" ? "Analyzed" : "Unanalyzed"}
-                </button>
-              ))}
+          <div className="flex flex-wrap items-center justify-between gap-3 mt-5">
+            <div className="flex items-center gap-4 text-sm">
+              <span className="text-slate-400 whitespace-nowrap">
+                {analyzedCount}/{conversations.length} analyzed
+              </span>
+              <div className="flex gap-1" role="radiogroup" aria-label="Filter conversations by analysis status">
+                {(["all", "analyzed", "unanalyzed"] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setFilter(f)}
+                    role="radio"
+                    aria-checked={filter === f}
+                    aria-label={`Show ${f} conversations`}
+                    className={`px-4 py-2 min-h-[44px] rounded-full text-sm transition-colors ${
+                      filter === f
+                        ? "bg-indigo-600 text-white"
+                        : "bg-slate-800 text-slate-300 hover:text-white"
+                    }`}
+                  >
+                    {f === "all" ? "All" : f === "analyzed" ? "Analyzed" : "Unanalyzed"}
+                  </button>
+                ))}
+              </div>
             </div>
+            {!selectMode ? (
+              <button
+                onClick={() => setSelectMode(true)}
+                aria-label="Enable selection mode to analyze multiple conversations as a group"
+                className="text-sm min-h-[44px] flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg transition-colors flex-shrink-0"
+              >
+                <SquareIcon className="w-3.5 h-3.5" />
+                Select &amp; Analyze Group
+              </button>
+            ) : (
+              <button
+                onClick={exitSelectMode}
+                aria-label="Cancel selection mode"
+                className="text-sm min-h-[44px] flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg transition-colors flex-shrink-0"
+              >
+                <XIcon className="w-3.5 h-3.5" />
+                Cancel
+              </button>
+            )}
           </div>
         )}
 
         {/* Selection mode toolbar */}
         {selectMode && (
-          <div className="mt-4">
+          <div className="mt-3">
             <div
               className="card p-4 border-indigo-500/30 flex items-center justify-between"
               role="toolbar"
