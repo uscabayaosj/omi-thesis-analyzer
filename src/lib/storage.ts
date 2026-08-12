@@ -39,6 +39,22 @@ const MAX_VERSIONS = 3;
 
 // ── Helpers ──
 
+// Pre-2026-08-08 records were stored as a flat StoredAnalysis, not wrapped in
+// { conversationId, current, versions }. Without this, getAll()'s `!!c.current`
+// guard silently drops every analysis saved before that migration — and since
+// every write (saveAnalysis, saveCustomAnalysis, deleteAnalysis) reads via
+// getAll() then overwrites the whole key, the next write permanently erases
+// them. Recognize the old shape and wrap it in-memory so it round-trips.
+function isLegacyFlatAnalysis(c: unknown): c is StoredAnalysis {
+  if (!c || typeof c !== "object") return false;
+  const r = c as Record<string, unknown>;
+  return (
+    typeof r.conversationId === "string" &&
+    typeof r.rq1_documentary_record === "string" &&
+    !("current" in r)
+  );
+}
+
 function getAll(): StoredConversation[] {
   if (typeof window === "undefined") return [];
   try {
@@ -46,7 +62,10 @@ function getAll(): StoredConversation[] {
     const parsed = raw ? JSON.parse(raw) : [];
     // Guard against corrupted storage (manual edits, partial writes)
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
+    const migrated = parsed.map((c) =>
+      isLegacyFlatAnalysis(c) ? { conversationId: c.conversationId, current: c, versions: [] } : c
+    );
+    return migrated.filter(
       (c): c is StoredConversation =>
         c && typeof c === "object" && typeof c.conversationId === "string" && !!c.current
     );

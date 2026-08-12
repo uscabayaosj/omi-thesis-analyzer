@@ -335,29 +335,29 @@ export default function Home() {
         {selectMode && (
           <div className="mt-3">
             <div
-              className="card p-4 border-indigo-500/30 flex items-center justify-between"
+              className="card p-4 border-indigo-500/30 flex flex-wrap items-center justify-between gap-3"
               role="toolbar"
               aria-label="Group analysis toolbar"
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 <button
                   onClick={selectAll}
                   disabled={filtered.length === 0}
                   aria-label={allFilteredSelected ? "Deselect all conversations" : "Select all conversations"}
-                  className="text-sm min-h-[44px] bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 px-4 py-2 rounded-lg transition-colors"
+                  className="text-sm min-h-[44px] bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
                 >
                   {allFilteredSelected ? "Deselect All" : "Select All"}
                 </button>
-                <span className="text-sm text-slate-400" aria-live="polite">
+                <span className="text-sm text-slate-400 whitespace-nowrap" aria-live="polite">
                   {selected.size} selected
                 </span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={startGroupAnalysis}
                   disabled={selected.size < 2 || batchRunning}
                   aria-label={`Group thesis analysis on ${selected.size} conversations`}
-                  className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 text-white font-medium py-2 px-4 min-h-[44px] rounded-lg text-sm transition-colors"
+                  className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 text-white font-medium py-2 px-4 min-h-[44px] rounded-lg text-sm transition-colors whitespace-nowrap"
                 >
                   <SparklesIcon className="w-4 h-4" />
                   Group Thesis ({selected.size})
@@ -366,7 +366,7 @@ export default function Home() {
                   onClick={runBatchAdhd}
                   disabled={selected.size < 1 || batchRunning}
                   aria-label={`Run ADHD Aid on ${selected.size} conversations`}
-                  className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-100 font-medium py-2 px-4 min-h-[44px] rounded-lg text-sm transition-colors"
+                  className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-100 font-medium py-2 px-4 min-h-[44px] rounded-lg text-sm transition-colors whitespace-nowrap"
                 >
                   <ClipboardIcon className="w-4 h-4" />
                   {batchRunning ? `Running ${batchProgress.done}/${batchProgress.total}…` : `Run ADHD (${selected.size})`}
