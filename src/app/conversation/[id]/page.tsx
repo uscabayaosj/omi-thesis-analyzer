@@ -226,10 +226,15 @@ export default function ConversationPage() {
   const [adhdDoneKeys, setAdhdDoneKeys] = useState<string[]>([]);
   const [adhdAnalyzing, setAdhdAnalyzing] = useState(false);
 
-  // Load stored analysis (both lenses) + pick the default lens.
+  // Load stored analysis (both lenses) + pick the default lens. Can't be a
+  // lazy useState initializer: this must re-run whenever `id` changes
+  // (navigating between conversations on the same mounted route), and
+  // localStorage isn't available during the server-rendered first paint —
+  // reading it before mount would cause a hydration mismatch.
   useEffect(() => {
     const stored = getStoredAnalysis(id);
     if (stored) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStoredAnalysis(stored);
       setAnalysis({
         rq1_documentary_record: stored.rq1_documentary_record,
@@ -298,6 +303,10 @@ export default function ConversationPage() {
   }, [id]);
 
   useEffect(() => {
+    // loadConversation's cache-hit branch calls setState synchronously
+    // (before any await), which is what the lint rule is catching here —
+    // the fetch-on-mount itself is the intended pattern.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadConversation("initial");
   }, [loadConversation]);
 

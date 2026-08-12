@@ -236,10 +236,15 @@ function GroupAnalysisContent() {
   const [skipped, setSkipped] = useState(0);
 
   useEffect(() => {
+    // Can't be a lazy useState initializer: this must re-run whenever `ids`
+    // changes (navigating to a different group on the same mounted route),
+    // and localStorage isn't available during the server-rendered first
+    // paint — reading it before mount would cause a hydration mismatch.
     const stored = getStoredGroupAnalyses();
     const key = groupKey(ids);
     const existing = stored.find((a) => groupKey(a.conversationIds) === key);
     if (existing) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAnalysis(existing.analysis);
       setConversations(existing.conversations);
       if (existing.custom) {
