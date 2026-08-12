@@ -203,6 +203,8 @@ A stacked pair of small rounded-full pills ("Thesis" / "ADHD") shown beside ever
 ### Calendar (month grid)
 The primary day-browsing entry point on the conversations list. A 7-column Monday-first grid inside a `.card`. The selected day reuses the filter pills' solid-fill pattern (Indigo Ink background, white text) — the same "true single-select navigation" rule, not a new one. Today gets an indigo ring (`border-indigo-500/60`) independent of selection, so it stays identifiable even when browsing a different day. Days with conversations get a small graphite dot; days without get none — no shadow, no elevation, just the dot and the two indigo treatments. Future dates render dimmed (`text-slate-600`) but stay clickable rather than disabled — simplicity over guarding an edge case that just resolves to an empty state.
 
+Collapsed to a one-line summary row by default (icon + selected day's label, chevron affordance) — the full grid would otherwise be the first thing painted on mobile, pushing that day's actual conversations below the fold. Tapping the row expands the grid; picking a day (or "Today") collapses it back automatically, so the grid never lingers once its job is done. The one exception: while group-select mode is active, picking a day does *not* collapse the grid, since batch-selecting across several days means jumping between them repeatedly — closing on every pick would fight that workflow. The month label doubles as a native `<input type="month">` (invisibly overlaid) for jumping distant months without a hand-built year picker.
+
 ## Do's and Don'ts
 
 ### Do:

@@ -59,7 +59,7 @@ function pad2(n: number): string {
 // the selected day reuses the same "true single-select navigation" pattern
 // the filter pills already use — see DESIGN.md's Navigation section.
 function CalendarMonth({
-  year, month, todayStr, selectedDate, daysWithEntries, onSelectDay, onPrevMonth, onNextMonth, onToday,
+  year, month, todayStr, selectedDate, daysWithEntries, onSelectDay, onPrevMonth, onNextMonth, onToday, onJumpToMonth, onCollapse,
 }: {
   year: number;
   month: number; // 0-indexed
@@ -70,6 +70,8 @@ function CalendarMonth({
   onPrevMonth: () => void;
   onNextMonth: () => void;
   onToday: () => void;
+  onJumpToMonth: (year: number, month: number) => void;
+  onCollapse: () => void;
 }) {
   const monthLabel = new Date(year, month, 1).toLocaleDateString("en-GB", { month: "long", year: "numeric" });
   const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7; // Monday = 0
@@ -91,7 +93,23 @@ function CalendarMonth({
           <ChevronRightIcon className="w-4 h-4 rotate-180" />
         </button>
         <div className="flex items-center gap-3">
-          <p className="font-semibold text-white text-sm whitespace-nowrap">{monthLabel}</p>
+          <div className="relative">
+            <p className="font-semibold text-white text-sm whitespace-nowrap pr-1">{monthLabel}</p>
+            {/* Native month picker overlaid on the label — jumps distant months without
+                hand-building a year selector; iOS/desktop Safari and Chrome render this as
+                a real wheel/dropdown picker. Firefox lacks support and falls back to a plain
+                text input, a graceful (not blocking) degradation. */}
+            <input
+              type="month"
+              value={`${year}-${pad2(month + 1)}`}
+              onChange={(e) => {
+                const [y, m] = e.target.value.split("-").map(Number);
+                if (y && m) onJumpToMonth(y, m - 1);
+              }}
+              aria-label="Jump to a different month"
+              className="absolute inset-0 opacity-0 cursor-pointer"
+            />
+          </div>
           <button
             onClick={onToday}
             className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors px-2 min-h-[32px] rounded-md hover:bg-slate-800 whitespace-nowrap"
@@ -147,7 +165,102 @@ function CalendarMonth({
           );
         })}
       </div>
+      <button
+        onClick={onCollapse}
+        className="text-indigo-400 text-sm hover:underline mt-3 min-h-[44px] px-1"
+      >
+        Collapse
+      </button>
     </div>
+  );
+}
+
+function ConversationRow({
+  convo, selectMode, isSelected, isAnalyzed, isAnalyzedEither, isAdhd, onToggleSelect,
+}: {
+  convo: Conversation;
+  selectMode: boolean;
+  isSelected: boolean;
+  isAnalyzed: boolean;
+  isAnalyzedEither: boolean;
+  isAdhd: boolean;
+  onToggleSelect: (id: string) => void;
+}) {
+  if (selectMode) {
+    return (
+      <button
+        onClick={() => onToggleSelect(convo.id)}
+        role="option"
+        aria-selected={isSelected}
+        aria-label={`${isSelected ? "Deselect" : "Select"} "${convo.structured?.title || "Untitled"}" for group analysis${isAnalyzedEither ? " (analyzed)" : ""}`}
+        className={`w-full text-left card p-5 transition-colors min-h-[44px] ${
+          isSelected ? "border-indigo-500 bg-indigo-950/30" : "hover:border-slate-600"
+        }`}
+      >
+        <div className="flex items-start gap-3">
+          <div
+            className={`w-5 h-5 mt-1 flex-shrink-0 rounded border-2 flex items-center justify-center transition-colors ${
+              isSelected ? "bg-indigo-600 border-indigo-600" : "border-slate-600"
+            }`}
+            aria-hidden="true"
+          >
+            {isSelected && <CheckIcon className="w-3 h-3 text-white" />}
+          </div>
+          <LensBadges thesis={isAnalyzed} adhd={isAdhd} />
+          <div className="flex-1 min-w-0">
+            <h2 className="font-semibold text-white truncate">
+              {convo.structured?.title || "Untitled"}
+            </h2>
+            {convo.structured?.overview && (
+              <p className="text-slate-400 text-sm mt-1 line-clamp-1">{convo.structured.overview}</p>
+            )}
+            <div className="flex items-center gap-3 mt-2 text-xs text-slate-500 flex-wrap">
+              <span className="whitespace-nowrap">{formatDateTime(convo.created_at)}</span>
+              {convo.structured?.category && (
+                <span className="bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap">{convo.structured.category}</span>
+              )}
+            </div>
+          </div>
+        </div>
+      </button>
+    );
+  }
+
+  return (
+    <Link
+      href={`/conversation/${convo.id}`}
+      aria-label={`${convo.structured?.title || "Untitled conversation"}${isAnalyzedEither ? " (analyzed)" : ""}`}
+      className={`card p-5 block transition-colors min-h-[44px] ${
+        isAnalyzedEither ? "hover:border-emerald-500/50" : "hover:border-indigo-500/50"
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <LensBadges thesis={isAnalyzed} adhd={isAdhd} />
+        <div className="flex-1 min-w-0">
+          <h2 className="font-semibold text-white truncate">
+            {convo.structured?.title || "Untitled"}
+          </h2>
+          {convo.structured?.overview && (
+            <p className="text-slate-400 text-sm mt-1 line-clamp-2">{convo.structured.overview}</p>
+          )}
+          <div className="flex items-center gap-3 mt-2 text-xs text-slate-500 flex-wrap">
+            <span className="whitespace-nowrap">{formatDateTime(convo.created_at)}</span>
+            {convo.structured?.category && (
+              <span className="bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap">{convo.structured.category}</span>
+            )}
+            {convo.folder_name && (
+              <span className="flex items-center gap-1 bg-indigo-900/50 text-indigo-300 px-2 py-0.5 rounded-full whitespace-nowrap">
+                <FolderIcon className="w-3 h-3" />
+                {convo.folder_name}
+              </span>
+            )}
+          </div>
+        </div>
+        <svg className="w-5 h-5 text-slate-600 mt-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </div>
+    </Link>
   );
 }
 
@@ -184,6 +297,11 @@ export default function Home() {
     const d = new Date();
     return { year: d.getFullYear(), month: d.getMonth() };
   });
+  // Collapsed by default: the grid would otherwise be the first thing painted
+  // on mobile, pushing the day's actual conversations below the fold. Picking
+  // a day (outside select mode) collapses it back, so it stays out of the way
+  // once its job — jumping to a day — is done.
+  const [calendarExpanded, setCalendarExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   // Revalidate the list over the network and refresh the cache. A refresh
@@ -275,6 +393,19 @@ export default function Home() {
     return true;
   });
 
+  // Date-group search results only when they actually span more than one day —
+  // a single-day search doesn't need a redundant heading repeating what the
+  // "Results for…" line above already says.
+  const filteredByDay = isSearching
+    ? Array.from(
+        filtered.reduce((map, c) => {
+          const d = dayOf(c.created_at);
+          (map.get(d) ?? map.set(d, []).get(d)!).push(c);
+          return map;
+        }, new Map<string, Conversation[]>())
+      ).sort((a, b) => (a[0] < b[0] ? 1 : -1))
+    : null;
+
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -287,6 +418,18 @@ export default function Home() {
   // "All selected" must check membership, not just counts — the selection can
   // contain conversations hidden by the current filter (or on other days).
   const allFilteredSelected = filtered.length > 0 && filtered.every((c) => selected.has(c.id));
+
+  // How many distinct days the current selection actually spans — drives the
+  // "(across all days)" toolbar qualifier. A count-based check would fire on
+  // a 5-item same-day selection just as readily as a real cross-day one.
+  const selectedDaySpan = useMemo(() => {
+    if (selected.size === 0) return 0;
+    const days = new Set<string>();
+    for (const c of conversations) {
+      if (selected.has(c.id)) days.add(dayOf(c.created_at));
+    }
+    return days.size;
+  }, [selected, conversations]);
 
   const selectAll = () => {
     if (allFilteredSelected) {
@@ -345,12 +488,19 @@ export default function Home() {
   const goToNextMonth = () => {
     setCalendarMonth(({ year, month }) => (month === 11 ? { year: year + 1, month: 0 } : { year, month: month + 1 }));
   };
+  const jumpToMonth = (year: number, month: number) => setCalendarMonth({ year, month });
   const goToToday = () => {
     const d = new Date();
     setCalendarMonth({ year: d.getFullYear(), month: d.getMonth() });
     setSelectedDate(todayStr);
+    // In select mode, leave the grid open — a cross-day batch selection needs
+    // to jump between several days in a row without it snapping shut each time.
+    if (!selectMode) setCalendarExpanded(false);
   };
-  const selectDay = (day: string) => setSelectedDate(day);
+  const selectDay = (day: string) => {
+    setSelectedDate(day);
+    if (!selectMode) setCalendarExpanded(false);
+  };
 
   const selectedDateLabel = formatDateTime(`${selectedDate}T12:00:00`, {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
@@ -475,31 +625,49 @@ export default function Home() {
         )}
 
         {/* Calendar — the "browse by day" entry point; hidden while a search query is active
-            so there's only ever one navigation mode showing at once. */}
+            so there's only ever one navigation mode showing at once. Collapsed by default to
+            a one-line summary (which also states the day being viewed) so it doesn't push
+            today's conversations below the fold on first paint. */}
         {conversations.length > 0 && !isSearching && (
           <div className="mt-4">
-            <CalendarMonth
-              year={calendarMonth.year}
-              month={calendarMonth.month}
-              todayStr={todayStr}
-              selectedDate={selectedDate}
-              daysWithEntries={daysWithEntries}
-              onSelectDay={selectDay}
-              onPrevMonth={goToPrevMonth}
-              onNextMonth={goToNextMonth}
-              onToday={goToToday}
-            />
+            {calendarExpanded ? (
+              <CalendarMonth
+                year={calendarMonth.year}
+                month={calendarMonth.month}
+                todayStr={todayStr}
+                selectedDate={selectedDate}
+                daysWithEntries={daysWithEntries}
+                onSelectDay={selectDay}
+                onPrevMonth={goToPrevMonth}
+                onNextMonth={goToNextMonth}
+                onToday={goToToday}
+                onJumpToMonth={jumpToMonth}
+                onCollapse={() => setCalendarExpanded(false)}
+              />
+            ) : (
+              <button
+                onClick={() => setCalendarExpanded(true)}
+                aria-expanded={false}
+                aria-label="Expand calendar to browse a different day"
+                className="w-full card p-3 flex items-center justify-between gap-2 text-left hover:border-slate-600 transition-colors min-h-[44px]"
+              >
+                <span className="flex items-center gap-2 text-sm text-slate-200 min-w-0">
+                  <CalendarIcon className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                  <span className="truncate">
+                    {selectedDateLabel}
+                    {selectedDate === todayStr && <span className="text-slate-500"> · Today</span>}
+                  </span>
+                </span>
+                <ChevronRightIcon className="w-4 h-4 text-slate-500 flex-shrink-0" />
+              </button>
+            )}
           </div>
         )}
 
-        {/* Which day / search we're looking at */}
-        {conversations.length > 0 && (
+        {/* Search results heading */}
+        {conversations.length > 0 && isSearching && (
           <p className="text-sm text-slate-400 mt-4">
-            {isSearching ? (
-              <>Results for &ldquo;{searchQuery.trim()}&rdquo;</>
-            ) : (
-              <>{selectedDateLabel}{selectedDate === todayStr ? " (today)" : ""}</>
-            )}
+            Results for &ldquo;{searchQuery.trim()}&rdquo;
           </p>
         )}
 
@@ -569,7 +737,7 @@ export default function Home() {
                   {allFilteredSelected ? "Deselect All" : "Select All"}
                 </button>
                 <span className="text-sm text-slate-400 whitespace-nowrap" aria-live="polite">
-                  {selected.size} selected{selected.size > 0 ? " (across all days)" : ""}
+                  {selected.size} selected{selectedDaySpan > 1 ? " (across all days)" : ""}
                 </span>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -667,95 +835,40 @@ export default function Home() {
       )}
 
       <div className="space-y-3 conversation-list" role={selectMode ? "listbox" : "list"} aria-label="Conversations" aria-multiselectable={selectMode || undefined}>
-        {filtered.map((convo) => {
-          const isAnalyzed = analyzedIds.has(convo.id);
-          const isSelected = selected.has(convo.id);
-
-          if (selectMode) {
-            return (
-              <button
-                key={convo.id}
-                onClick={() => toggleSelect(convo.id)}
-                role="option"
-                aria-selected={isSelected}
-                aria-label={`${isSelected ? "Deselect" : "Select"} "${convo.structured?.title || "Untitled"}" for group analysis${isAnalyzedEither(convo.id) ? " (analyzed)" : ""}`}
-                className={`w-full text-left card p-5 transition-colors min-h-[44px] ${
-                  isSelected
-                    ? "border-indigo-500 bg-indigo-950/30"
-                    : "hover:border-slate-600"
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <div
-                    className={`w-5 h-5 mt-1 flex-shrink-0 rounded border-2 flex items-center justify-center transition-colors ${
-                      isSelected
-                        ? "bg-indigo-600 border-indigo-600"
-                        : "border-slate-600"
-                    }`}
-                    aria-hidden="true"
-                  >
-                    {isSelected && (
-                      <CheckIcon className="w-3 h-3 text-white" />
-                    )}
-                  </div>
-                  <LensBadges thesis={isAnalyzed} adhd={adhdIds.has(convo.id)} />
-                  <div className="flex-1 min-w-0">
-                    <h2 className="font-semibold text-white truncate">
-                      {convo.structured?.title || "Untitled"}
-                    </h2>
-                    {convo.structured?.overview && (
-                      <p className="text-slate-400 text-sm mt-1 line-clamp-1">{convo.structured.overview}</p>
-                    )}
-                    <div className="flex items-center gap-3 mt-2 text-xs text-slate-500 flex-wrap">
-                      <span className="whitespace-nowrap">{formatDateTime(convo.created_at)}</span>
-                      {convo.structured?.category && (
-                        <span className="bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap">{convo.structured.category}</span>
-                      )}
-                    </div>
-                  </div>
+        {filteredByDay && filteredByDay.length > 1
+          ? filteredByDay.map(([day, items]) => (
+              <div key={day}>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2 mt-4 first:mt-0">
+                  {formatDateTime(`${day}T12:00:00`, { weekday: "long", day: "numeric", month: "long" })}
+                </p>
+                <div className="space-y-3">
+                  {items.map((convo) => (
+                    <ConversationRow
+                      key={convo.id}
+                      convo={convo}
+                      selectMode={selectMode}
+                      isSelected={selected.has(convo.id)}
+                      isAnalyzed={analyzedIds.has(convo.id)}
+                      isAnalyzedEither={isAnalyzedEither(convo.id)}
+                      isAdhd={adhdIds.has(convo.id)}
+                      onToggleSelect={toggleSelect}
+                    />
+                  ))}
                 </div>
-              </button>
-            );
-          }
-
-          return (
-            <Link
-              key={convo.id}
-              href={`/conversation/${convo.id}`}
-              aria-label={`${convo.structured?.title || "Untitled conversation"}${isAnalyzedEither(convo.id) ? " (analyzed)" : ""}`}
-              className={`card p-5 block transition-colors min-h-[44px] ${
-                isAnalyzedEither(convo.id) ? "hover:border-emerald-500/50" : "hover:border-indigo-500/50"
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                <LensBadges thesis={isAnalyzed} adhd={adhdIds.has(convo.id)} />
-                <div className="flex-1 min-w-0">
-                  <h2 className="font-semibold text-white truncate">
-                    {convo.structured?.title || "Untitled"}
-                  </h2>
-                  {convo.structured?.overview && (
-                    <p className="text-slate-400 text-sm mt-1 line-clamp-2">{convo.structured.overview}</p>
-                  )}
-                  <div className="flex items-center gap-3 mt-2 text-xs text-slate-500 flex-wrap">
-                    <span className="whitespace-nowrap">{formatDateTime(convo.created_at)}</span>
-                    {convo.structured?.category && (
-                      <span className="bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap">{convo.structured.category}</span>
-                    )}
-                    {convo.folder_name && (
-                      <span className="flex items-center gap-1 bg-indigo-900/50 text-indigo-300 px-2 py-0.5 rounded-full whitespace-nowrap">
-                        <FolderIcon className="w-3 h-3" />
-                        {convo.folder_name}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <svg className="w-5 h-5 text-slate-600 mt-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
               </div>
-            </Link>
-          );
-        })}
+            ))
+          : filtered.map((convo) => (
+              <ConversationRow
+                key={convo.id}
+                convo={convo}
+                selectMode={selectMode}
+                isSelected={selected.has(convo.id)}
+                isAnalyzed={analyzedIds.has(convo.id)}
+                isAnalyzedEither={isAnalyzedEither(convo.id)}
+                isAdhd={adhdIds.has(convo.id)}
+                onToggleSelect={toggleSelect}
+              />
+            ))}
       </div>
     </main>
   );
