@@ -16,6 +16,20 @@ import {
 
 const CONVERSATIONS_CACHE_KEY = "conversations";
 
+// Shared by every button in the selection toolbar (Group Thesis, Run ADHD):
+// these are parallel choices acting on the same selection, not a primary/
+// secondary pair, so both get the identical class string rather than one
+// claiming the app's solid-fill indigo "one primary action" treatment.
+// The indigo-tinted "ready" state reuses the same wash ConversationRow uses
+// for a selected item (border-indigo-500 bg-indigo-950/30) instead of a new
+// pattern, so the toolbar reads as "lit up because your selection is."
+// disabled:bg-slate-700, not slate-800: this toolbar is itself a .card
+// (Ink Panel, #1e293b === bg-slate-800), so slate-800 here would repeat the
+// exact "invisible against its own container" bug the Secondary Button rule
+// exists to prevent (see DESIGN.md's Buttons section).
+const TOOLBAR_ACTION_CLASS =
+  "flex items-center gap-1.5 rounded-lg border border-indigo-500/50 bg-indigo-950/40 px-4 py-2 min-h-[44px] text-sm font-medium text-indigo-200 transition-colors hover:border-indigo-500/70 hover:bg-indigo-950/60 hover:text-indigo-100 disabled:border-transparent disabled:bg-slate-700 disabled:text-slate-400 whitespace-nowrap";
+
 interface Conversation {
   id: string;
   created_at: string;
@@ -750,7 +764,7 @@ export default function Home() {
                   onClick={startGroupAnalysis}
                   disabled={selected.size < 2 || batchRunning}
                   aria-label={`Group thesis analysis on ${selected.size} conversations`}
-                  className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 text-white font-medium py-2 px-4 min-h-[44px] rounded-lg text-sm transition-colors whitespace-nowrap"
+                  className={TOOLBAR_ACTION_CLASS}
                 >
                   <SparklesIcon className="w-4 h-4" />
                   Group Thesis ({selected.size})
@@ -759,7 +773,7 @@ export default function Home() {
                   onClick={runBatchAdhd}
                   disabled={selected.size < 1 || batchRunning}
                   aria-label={`Run ADHD Aid on ${selected.size} conversations`}
-                  className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 text-white font-medium py-2 px-4 min-h-[44px] rounded-lg text-sm transition-colors whitespace-nowrap"
+                  className={TOOLBAR_ACTION_CLASS}
                 >
                   <ClipboardIcon className="w-4 h-4" />
                   {batchRunning ? `Running ${batchProgress.done}/${batchProgress.total}…` : `Run ADHD (${selected.size})`}
