@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef, type ComponentType } from "react";
 import Link from "next/link";
 import { fetchJson } from "@/lib/fetch-json";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, dayOf } from "@/lib/format";
 import type { AdhdAnalysis, Rollup } from "@/lib/adhd";
 import type { DayConvoOutput } from "@/lib/rollup";
 import {
@@ -20,10 +20,6 @@ interface ConvoLite {
   id: string;
   created_at: string;
   structured?: { title?: string };
-}
-
-function dayOf(iso: string): string {
-  return iso.length >= 10 ? iso.split("T")[0] : "unknown-date";
 }
 
 // Local hour, not UTC — matches how every other timestamp in this app renders.
