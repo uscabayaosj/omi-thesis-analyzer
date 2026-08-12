@@ -4,7 +4,8 @@ import type { ComponentType, ReactNode } from "react";
 import { confidenceLabel, type AdhdAnalysis } from "@/lib/adhd";
 import {
   ZapIcon, ClipboardIcon, CogIcon, UsersIcon, RefreshIcon,
-  CalendarIcon, CheckSquareIcon,
+  CalendarIcon, CheckSquareIcon, ScaleIcon, FeatherIcon,
+  TargetIcon, CompassIcon,
 } from "@/components/icons";
 
 function Block({
@@ -145,6 +146,43 @@ export function AdhdResults({
           </div>
         ) : <Empty />}
       </Block>
+
+      {/* Reflection pass — meta-cognition and interpersonal dynamics, rendered
+          only for analyses that carry it (older stored analyses predate it,
+          and four "None." blocks would wrongly imply the pass ran and found
+          nothing). Sections with no observations are likewise skipped: an
+          absent observation is the good outcome, not a gap worth a card. */}
+      {analysis.reflection?.social_balance?.length ? (
+        <Block icon={ScaleIcon} title="Social balance & engagement">
+          <ul className="list-disc pl-5 space-y-1.5 marker:text-slate-600">
+            {analysis.reflection.social_balance.map((item, i) => <li key={i}>{item}</li>)}
+          </ul>
+        </Block>
+      ) : null}
+
+      {analysis.reflection?.emotional_check?.length ? (
+        <Block icon={FeatherIcon} title="Emotional & RSD check">
+          <ul className="list-disc pl-5 space-y-1.5 marker:text-slate-600">
+            {analysis.reflection.emotional_check.map((item, i) => <li key={i}>{item}</li>)}
+          </ul>
+        </Block>
+      ) : null}
+
+      {analysis.reflection?.capacity_check?.length ? (
+        <Block icon={TargetIcon} title="Bandwidth & overcommitment">
+          <ul className="list-disc pl-5 space-y-1.5 marker:text-slate-600">
+            {analysis.reflection.capacity_check.map((item, i) => <li key={i}>{item}</li>)}
+          </ul>
+        </Block>
+      ) : null}
+
+      {analysis.reflection?.strategic_takeaway?.length ? (
+        <Block icon={CompassIcon} title="Strategic takeaway">
+          <ul className="list-disc pl-5 space-y-1.5 marker:text-slate-600">
+            {analysis.reflection.strategic_takeaway.map((item, i) => <li key={i}>{item}</li>)}
+          </ul>
+        </Block>
+      ) : null}
     </div>
   );
 }
