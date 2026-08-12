@@ -14,25 +14,25 @@ export function friendlyError(err: unknown): FriendlyError {
   const raw = err instanceof Error ? err.message : String(err);
 
   if (raw.includes("OMI_API_KEY")) {
-    return { error: "Omi is not configured. Set OMI_API_KEY in your environment.", status: 500 };
+    return { error: "Your Omi connection isn't set up yet. Add your Omi API key and reload.", status: 500 };
   }
   if (raw.includes("Omi API 404")) {
     return { error: "That conversation no longer exists on Omi. It may have been deleted.", status: 404 };
   }
   if (raw.includes("Omi API 401") || raw.includes("Omi API 403")) {
-    return { error: "Omi rejected the request. Check that OMI_API_KEY is valid.", status: 502 };
+    return { error: "Omi didn't accept your API key. Double-check it's correct and try again.", status: 502 };
   }
   if (raw.includes("Omi API 429")) {
     return { error: "Omi is rate-limiting requests. Wait a moment and try again.", status: 429 };
   }
   if (raw.includes("Omi API")) {
-    return { error: "Could not reach Omi. Check your connection and OMI_API_KEY, then try again.", status: 502 };
+    return { error: "Could not reach Omi. Check your connection and your Omi API key, then try again.", status: 502 };
   }
   if (raw.includes("API key not set")) {
-    return { error: "AI provider is not configured. Set the API key for your AI_PROVIDER in .env.local.", status: 500 };
+    return { error: "Your AI analysis key isn't set up yet. Add your provider's API key and reload.", status: 500 };
   }
   if (raw.includes("Unknown AI_PROVIDER")) {
-    return { error: "AI_PROVIDER is set to an unknown value. Use openai, anthropic, google, or openrouter.", status: 500 };
+    return { error: "The AI provider setting isn't recognized. Use one of: OpenAI, Anthropic, Google, or OpenRouter.", status: 500 };
   }
   if (raw.includes("API 401") || raw.includes("API 403")) {
     return { error: "AI service authentication failed. Check your API key.", status: 502 };

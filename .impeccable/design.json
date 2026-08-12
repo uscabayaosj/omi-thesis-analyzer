@@ -134,9 +134,9 @@
       "name": "Lens Badge",
       "kind": "custom",
       "refersTo": null,
-      "description": "Signature component: a T/A dot pair beside every conversation, independently lit when the thesis and/or ADHD Aid lens has run on it.",
-      "html": "<div class=\"ds-lensbadge\"><span class=\"ds-lensdot ds-lensdot-on\">T</span><span class=\"ds-lensdot\">A</span></div>",
-      "css": ".ds-lensbadge { display: flex; flex-direction: column; gap: 4px; } .ds-lensdot { width: 20px; height: 20px; border-radius: 9999px; border: 1px solid #334155; background: rgba(30, 41, 59, 0.6); color: #475569; font-size: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center; } .ds-lensdot-on { background: rgba(52, 211, 153, 0.15); border-color: rgba(52, 211, 153, 0.4); color: #34d399; }"
+      "description": "Signature component: a stacked \"Thesis\"/\"ADHD\" pill pair beside every conversation, independently lit when that lens has run on it. Plain words, not a coded glyph.",
+      "html": "<div class=\"ds-lensbadge\"><span class=\"ds-lenspill ds-lenspill-on\">Thesis</span><span class=\"ds-lenspill\">ADHD</span></div>",
+      "css": ".ds-lensbadge { display: flex; flex-direction: column; gap: 4px; } .ds-lenspill { min-width: 46px; padding: 2px 6px; border-radius: 9999px; border: 1px solid #334155; background: rgba(30, 41, 59, 0.6); color: #94a3b8; font-size: 10px; font-weight: 600; line-height: 1; text-align: center; white-space: nowrap; } .ds-lenspill-on { background: rgba(52, 211, 153, 0.15); border-color: rgba(52, 211, 153, 0.4); color: #34d399; }"
     }
   ],
   "narrative": {

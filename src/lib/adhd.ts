@@ -6,6 +6,20 @@ import { chatCompletion, clampTranscript, extractJsonObject } from "./analysis";
 
 export type Confidence = "FIRM" | "SOFT" | "PROPOSED";
 
+/** Plain-language label for a confidence tag — the internal enum values
+ *  stay as-is (stable keys, prompt vocabulary); only the displayed text
+ *  changes so the UI never shows a raw system code. */
+export function confidenceLabel(c: Confidence): string {
+  switch (c) {
+    case "FIRM":
+      return "Confirmed";
+    case "SOFT":
+      return "Tentative";
+    case "PROPOSED":
+      return "Estimated";
+  }
+}
+
 export interface AdhdCommitment {
   /** Deterministic hash of normalized who+what. Stable across re-runs so
    *  done-state (tracked by key) survives re-analysis. */
@@ -100,7 +114,7 @@ function toCommitment(raw: unknown): AdhdCommitment | null {
     direction,
     who,
     what,
-    deadline: asString(r.deadline, "PROPOSED: no date stated"),
+    deadline: asString(r.deadline, "No date given"),
     confidence: asConfidence(r.confidence),
     quote: asString(r.quote),
   };
@@ -165,7 +179,7 @@ The transcript comes from speech-to-text and may have errors, missing punctuatio
 
 ## Processing rules
 
-1. Commitments are sacred. Extract every promise, task, or obligation — both directions: what the user committed to do, and what others committed to the user. Include IMPLIED commitments (agreeing with "yeah, okay" counts). Softened language ("I might", "I'll try to") still counts — set confidence SOFT. For each: who owes whom, exactly what, deadline (explicit or inferred), and the quote it came from. If no deadline was stated, propose one and prefix the deadline with "PROPOSED: " and set confidence PROPOSED. An untimed task is a forgotten task.
+1. Commitments are sacred. Extract every promise, task, or obligation — both directions: what the user committed to do, and what others committed to the user. Include IMPLIED commitments (agreeing with "yeah, okay" counts). Softened language ("I might", "I'll try to") still counts — set confidence SOFT. For each: who owes whom, exactly what, deadline (explicit or inferred), and the quote it came from. If no deadline was stated, propose one and prefix the deadline with "Estimated: " and set confidence PROPOSED. An untimed task is a forgotten task.
 
 2. Convert intentions into next actions. Whenever the user expresses an intention, rewrite it as the smallest concrete first step, with a realistic time estimate. Multiply the user's own stated time estimates by 1.5. If a task has more than one step, break out step one only.
 
@@ -189,7 +203,7 @@ You MUST respond with valid JSON matching this exact schema:
       "direction": "user_to_other" | "other_to_user",
       "who": "the counterparty",
       "what": "exactly what is owed",
-      "deadline": "explicit date, or 'PROPOSED: <date>' when inferred",
+      "deadline": "explicit date, or 'Estimated: <date>' when inferred",
       "confidence": "FIRM" | "SOFT" | "PROPOSED",
       "quote": "short source quote"
     }

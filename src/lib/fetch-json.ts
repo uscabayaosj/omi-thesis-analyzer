@@ -18,7 +18,7 @@ export async function fetchJson<T>(input: string, init?: RequestInit): Promise<T
     throw new Error(
       res.ok
         ? "The server sent an unexpected response. Refresh and try again."
-        : `The server returned an error (${res.status}). Please try again.`
+        : `Something went wrong on the server. Please try again. (error ${res.status})`
     );
   }
 
@@ -27,7 +27,7 @@ export async function fetchJson<T>(input: string, init?: RequestInit): Promise<T
     if (typeof msg === "string" && msg) throw new Error(msg);
   }
   if (!res.ok) {
-    throw new Error(`The server returned an error (${res.status}). Please try again.`);
+    throw new Error(`Something went wrong on the server. Please try again. (error ${res.status})`);
   }
 
   return data as T;

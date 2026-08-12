@@ -26,10 +26,10 @@ interface Conversation {
 }
 
 function LensBadges({ thesis, adhd }: { thesis: boolean; adhd: boolean }) {
-  const dot = (on: boolean, label: string) => (
+  const pill = (on: boolean, label: string) => (
     <span
       title={`${label}: ${on ? "analyzed" : "not analyzed"}`}
-      className={`w-5 h-5 rounded-full border text-[10px] font-semibold flex items-center justify-center ${
+      className={`min-w-[46px] px-1.5 py-0.5 rounded-full border text-[10px] font-semibold leading-none whitespace-nowrap text-center ${
         // False positive below: the scanner pairs the "off" branch's text-slate-400 with the "on"
         // branch's bg-emerald-500 since both live in one ternary string. Real pairs, both verified:
         // emerald-400/emerald-wash (5.93:1) and slate-400/slate-800 (5.71:1).
@@ -41,8 +41,8 @@ function LensBadges({ thesis, adhd }: { thesis: boolean; adhd: boolean }) {
   );
   return (
     <div className="mt-0.5 flex-shrink-0 flex flex-col gap-1" aria-hidden="true">
-      {dot(thesis, "T")}
-      {dot(adhd, "A")}
+      {pill(thesis, "Thesis")}
+      {pill(adhd, "ADHD")}
     </div>
   );
 }
@@ -466,10 +466,10 @@ export default function Home() {
                     {convo.structured?.overview && (
                       <p className="text-slate-400 text-sm mt-1 line-clamp-1">{convo.structured.overview}</p>
                     )}
-                    <div className="flex items-center gap-3 mt-2 text-xs text-slate-500">
-                      <span>{formatDateTime(convo.created_at)}</span>
+                    <div className="flex items-center gap-3 mt-2 text-xs text-slate-500 flex-wrap">
+                      <span className="whitespace-nowrap">{formatDateTime(convo.created_at)}</span>
                       {convo.structured?.category && (
-                        <span className="bg-slate-800 px-2 py-0.5 rounded-full">{convo.structured.category}</span>
+                        <span className="bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap">{convo.structured.category}</span>
                       )}
                     </div>
                   </div>
@@ -496,13 +496,13 @@ export default function Home() {
                   {convo.structured?.overview && (
                     <p className="text-slate-400 text-sm mt-1 line-clamp-2">{convo.structured.overview}</p>
                   )}
-                  <div className="flex items-center gap-3 mt-2 text-xs text-slate-500">
-                    <span>{formatDateTime(convo.created_at)}</span>
+                  <div className="flex items-center gap-3 mt-2 text-xs text-slate-500 flex-wrap">
+                    <span className="whitespace-nowrap">{formatDateTime(convo.created_at)}</span>
                     {convo.structured?.category && (
-                      <span className="bg-slate-800 px-2 py-0.5 rounded-full">{convo.structured.category}</span>
+                      <span className="bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap">{convo.structured.category}</span>
                     )}
                     {convo.folder_name && (
-                      <span className="flex items-center gap-1 bg-indigo-900/50 text-indigo-300 px-2 py-0.5 rounded-full">
+                      <span className="flex items-center gap-1 bg-indigo-900/50 text-indigo-300 px-2 py-0.5 rounded-full whitespace-nowrap">
                         <FolderIcon className="w-3 h-3" />
                         {convo.folder_name}
                       </span>
