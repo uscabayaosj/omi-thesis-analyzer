@@ -463,17 +463,19 @@ function GroupAnalysisContent() {
                 aria-label="Export group analysis to Obsidian vault"
                 className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5 whitespace-nowrap"
               >
-                {exported ? (
-                  <>
-                    <CheckIcon className="w-3.5 h-3.5" />
-                    Saved
-                  </>
-                ) : (
-                  <>
-                    <ExternalLinkIcon className="w-3.5 h-3.5" />
-                    Send to Obsidian
-                  </>
-                )}
+                <span key={exported ? "saved" : "idle"} className="label-swap inline-flex items-center gap-1.5">
+                  {exported ? (
+                    <>
+                      <CheckIcon className="w-3.5 h-3.5" />
+                      Saved
+                    </>
+                  ) : (
+                    <>
+                      <ExternalLinkIcon className="w-3.5 h-3.5" />
+                      Send to Obsidian
+                    </>
+                  )}
+                </span>
               </button>
               <button
                 onClick={handleDownloadGroup}
@@ -493,7 +495,7 @@ function GroupAnalysisContent() {
               </button>
             </div>
           </div>
-          <div className="space-y-6">
+          <div className="stagger-in space-y-6">
             {sections.map((section) => (
               <div key={section.title} className="card p-6">
                 <div className="analysis-section">
@@ -525,13 +527,13 @@ function GroupAnalysisContent() {
               <p className="text-slate-400 text-sm">Ask a question across all selected conversations</p>
             </div>
           </div>
-          <svg className={`w-5 h-5 text-slate-400 transition-transform ${showCustom ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <svg className={`w-5 h-5 text-slate-400 transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] ${showCustom ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </button>
 
         {showCustom && (
-          <div id="custom-group-panel" className="card mt-2 p-6 border-amber-500/30">
+          <div id="custom-group-panel" className="enter-rise card mt-2 p-6 border-amber-500/30">
             <label className="block mb-3">
               <span className="text-sm font-medium text-slate-300 mb-2 block">What do you want to explore across these conversations?</span>
               <textarea
@@ -581,7 +583,7 @@ function GroupAnalysisContent() {
         )}
 
         {customResult && (
-          <div className="card mt-2 p-6 border-amber-500/30">
+          <div className="enter-rise card mt-2 p-6 border-amber-500/30">
             <div className="analysis-section" style={{ background: "var(--custom-analysis-bg, rgba(245, 158, 11, 0.06))" }}>
               <h3 className="flex items-center gap-2" style={{ color: "var(--custom-analysis-text, #fbbf24)" }}>
                 <CogIcon className="w-[1.05em] h-[1.05em] flex-shrink-0" />

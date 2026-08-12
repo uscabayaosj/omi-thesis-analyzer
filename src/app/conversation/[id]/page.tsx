@@ -149,27 +149,39 @@ function ConfirmRerunDialog({
   analyzedLabel: string;
 }) {
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const [closing, setClosing] = useState(false);
+
+  // Play a fast exit transition instead of vanishing instantly — the dialog
+  // should leave the way it arrived, just quicker, since the decision is
+  // already made. Guarded so a second trigger during the exit is a no-op.
+  const requestClose = useCallback((action: () => void) => {
+    setClosing((already) => {
+      if (already) return already;
+      setTimeout(action, 100);
+      return true;
+    });
+  }, []);
 
   useEffect(() => {
     cancelRef.current?.focus();
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCancel();
+      if (e.key === "Escape") requestClose(onCancel);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onCancel]);
+  }, [onCancel, requestClose]);
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+      className={`overlay-backdrop fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 ${closing ? "overlay-closing" : ""}`}
       role="dialog"
       aria-modal="true"
       aria-label="Confirm re-run analysis"
       onClick={(e) => {
-        if (e.target === e.currentTarget) onCancel();
+        if (e.target === e.currentTarget) requestClose(onCancel);
       }}
     >
-      <div className="card p-6 max-w-md w-full border-amber-500/30">
+      <div className={`overlay-panel card p-6 max-w-md w-full border-amber-500/30 ${closing ? "overlay-closing" : ""}`}>
         <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
           <WarningIcon className="w-5 h-5 text-amber-400 flex-shrink-0" />
           Replace existing analysis?
@@ -181,13 +193,13 @@ function ConfirmRerunDialog({
         <div className="flex gap-3 justify-end">
           <button
             ref={cancelRef}
-            onClick={onCancel}
+            onClick={() => requestClose(onCancel)}
             className="px-4 py-2 min-h-[44px] text-sm text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
           >
             Cancel
           </button>
           <button
-            onClick={onConfirm}
+            onClick={() => requestClose(onConfirm)}
             className="px-4 py-2 min-h-[44px] text-sm text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg transition-colors"
           >
             Re-analyze
@@ -225,6 +237,16 @@ export default function ConversationPage() {
   const [adhd, setAdhd] = useState<AdhdAnalysis | null>(null);
   const [adhdDoneKeys, setAdhdDoneKeys] = useState<string[]>([]);
   const [adhdAnalyzing, setAdhdAnalyzing] = useState(false);
+
+  // Results sections stagger in on first reveal, but the lens toggle
+  // unmounts/remounts them as the user switches tabs — a frequent action
+  // that must stay instant. These track which analysis object has already
+  // played its entrance, set from the lens-switch click handler (not
+  // during render) so re-mounts from switching tabs skip the replay.
+  const [thesisSeen, setThesisSeen] = useState<Analysis | null>(null);
+  const [adhdSeen, setAdhdSeen] = useState<AdhdAnalysis | null>(null);
+  const animateThesis = analysis !== null && thesisSeen !== analysis;
+  const animateAdhd = adhd !== null && adhdSeen !== adhd;
 
   // Load stored analysis (both lenses) + pick the default lens. Can't be a
   // lazy useState initializer: this must re-run whenever `id` changes
@@ -540,7 +562,14 @@ export default function ConversationPage() {
             {(["thesis", "adhd", "both"] as const).map((l) => (
               <button
                 key={l}
-                onClick={() => setLens(l)}
+                onClick={() => {
+                  // Mark whatever is currently showing as "seen" before switching,
+                  // so flipping back to this lens later reveals it instantly instead
+                  // of replaying the entrance stagger.
+                  if (analysis) setThesisSeen(analysis);
+                  if (adhd) setAdhdSeen(adhd);
+                  setLens(l);
+                }}
                 role="radio"
                 aria-checked={lens === l}
                 className={`px-4 py-2 min-h-[44px] rounded-md text-sm transition-colors ${
@@ -616,17 +645,19 @@ export default function ConversationPage() {
                         aria-label="Export analysis to Obsidian vault"
                         className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5 whitespace-nowrap"
                       >
-                        {exported ? (
-                          <>
-                            <CheckIcon className="w-3.5 h-3.5" />
-                            Saved
-                          </>
-                        ) : (
-                          <>
-                            <ExternalLinkIcon className="w-3.5 h-3.5" />
-                            Send to Obsidian
-                          </>
-                        )}
+                        <span key={exported ? "saved" : "idle"} className="label-swap inline-flex items-center gap-1.5">
+                          {exported ? (
+                            <>
+                              <CheckIcon className="w-3.5 h-3.5" />
+                              Saved
+                            </>
+                          ) : (
+                            <>
+                              <ExternalLinkIcon className="w-3.5 h-3.5" />
+                              Send to Obsidian
+                            </>
+                          )}
+                        </span>
                       </button>
                       <button
                         onClick={handleDownload}
@@ -650,7 +681,7 @@ export default function ConversationPage() {
                   )}
                 </div>
               </div>
-              {analysis && <ThesisResults analysis={analysis} />}
+              {analysis && <ThesisResults analysis={analysis} animate={animateThesis} />}
 
               {/* Version history */}
               {!viewingVersion && (
@@ -692,37 +723,41 @@ export default function ConversationPage() {
                     </h2>
                     <div className="flex items-center gap-2 flex-wrap">
                       <button onClick={handleAdhdExport} className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5 whitespace-nowrap">
-                        {exported ? (
-                          <>
-                            <CheckIcon className="w-3.5 h-3.5" />
-                            Saved
-                          </>
-                        ) : (
-                          <>
-                            <ExternalLinkIcon className="w-3.5 h-3.5" />
-                            Send to Obsidian
-                          </>
-                        )}
+                        <span key={exported ? "saved" : "idle"} className="label-swap inline-flex items-center gap-1.5">
+                          {exported ? (
+                            <>
+                              <CheckIcon className="w-3.5 h-3.5" />
+                              Saved
+                            </>
+                          ) : (
+                            <>
+                              <ExternalLinkIcon className="w-3.5 h-3.5" />
+                              Send to Obsidian
+                            </>
+                          )}
+                        </span>
                       </button>
                       <button onClick={handleAdhdDownload} className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5 whitespace-nowrap">
-                        {exported ? (
-                          <>
-                            <CheckIcon className="w-3.5 h-3.5" />
-                            Saved
-                          </>
-                        ) : (
-                          <>
-                            <DownloadIcon className="w-3.5 h-3.5" />
-                            Download .md
-                          </>
-                        )}
+                        <span key={exported ? "saved" : "idle"} className="label-swap inline-flex items-center gap-1.5">
+                          {exported ? (
+                            <>
+                              <CheckIcon className="w-3.5 h-3.5" />
+                              Saved
+                            </>
+                          ) : (
+                            <>
+                              <DownloadIcon className="w-3.5 h-3.5" />
+                              Download .md
+                            </>
+                          )}
+                        </span>
                       </button>
                       <button onClick={executeAdhd} disabled={adhdAnalyzing} aria-label="Re-run ADHD Aid" className="text-slate-400 hover:text-indigo-400 disabled:opacity-50 transition-colors p-2 min-h-[44px] min-w-[44px] flex items-center justify-center">
                         <RefreshIcon className={`w-4 h-4 ${adhdAnalyzing ? "animate-spin" : ""}`} />
                       </button>
                     </div>
                   </div>
-                  <AdhdResults analysis={adhd} doneKeys={adhdDoneKeys} onToggleDone={handleToggleDone} />
+                  <AdhdResults analysis={adhd} doneKeys={adhdDoneKeys} onToggleDone={handleToggleDone} animate={animateAdhd} />
                 </>
               )}
             </section>
@@ -760,7 +795,7 @@ export default function ConversationPage() {
               <div className="flex items-center gap-2">
                 {customResult && <span className="text-xs bg-amber-900/40 text-amber-200 px-2 py-0.5 rounded-full">saved</span>}
                 <svg
-                  className={`w-5 h-5 text-slate-400 transition-transform ${showCustom ? "rotate-180" : ""}`}
+                  className={`w-5 h-5 text-slate-400 transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] ${showCustom ? "rotate-180" : ""}`}
                   fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -769,7 +804,7 @@ export default function ConversationPage() {
             </button>
 
             {showCustom && (
-              <div id="custom-analysis-panel" className="card mt-2 p-6 border-amber-500/30">
+              <div id="custom-analysis-panel" className="enter-rise card mt-2 p-6 border-amber-500/30">
                 <label className="block mb-3">
                   <span className="text-sm font-medium text-slate-300 mb-2 block">What do you want to explore?</span>
                   <textarea

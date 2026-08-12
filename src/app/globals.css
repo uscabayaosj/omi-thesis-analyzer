@@ -11,6 +11,13 @@
   --border: #334155;
   --custom-analysis-bg: rgba(245, 158, 11, 0.06);
   --custom-analysis-text: #fbbf24;
+
+  /* Motion tokens */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --dur-fast: 100ms;
+  --dur-base: 150ms;
+  --dur-enter: 200ms;
 }
 
 body {
@@ -31,6 +38,20 @@ button, [role="button"] {
   cursor: pointer;
 }
 
+/* Press feedback — every pressable element gets instant, subtle scale-down
+   feedback so the UI feels like it heard the tap/click. Scale on active only;
+   color/background transitions use the shared duration/easing tokens. */
+button:not(:disabled), [role="button"] {
+  transition: transform var(--dur-fast) var(--ease-out),
+    background-color var(--dur-base) ease,
+    color var(--dur-base) ease,
+    border-color var(--dur-base) ease;
+}
+
+button:not(:disabled):active, [role="button"]:active {
+  transform: scale(0.97);
+}
+
 /* Focus indicators — visible on keyboard nav, hidden on mouse */
 *:focus-visible {
   outline: 2px solid var(--accent);
@@ -47,20 +68,18 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 12px;
-  transition: background 0.15s ease, transform 0.1s ease;
+  transition: background var(--dur-base) ease, transform var(--dur-fast) var(--ease-out);
 }
 
-/* Touch feedback — :active for devices that can't hover */
+.card:active {
+  background: var(--card-hover);
+  transform: scale(0.98);
+}
+
+/* Hover-only affordance — gated so touch taps don't trigger a false hover */
 @media (hover: hover) {
   .card:hover {
     background: var(--card-hover);
-  }
-}
-
-@media (hover: none) {
-  .card:active {
-    background: var(--card-hover);
-    transform: scale(0.98);
   }
 }
 
@@ -108,17 +127,128 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
   100% { background-position: -200% 0; }
 }
 
-/* Reduced motion — preserve state changes, kill decorative animation */
+.animate-spin {
+  animation-duration: 0.8s;
+}
+
+/* Overlay dialogs (ConfirmRerunDialog, ConfirmRegenDialog) — backdrop fades,
+   panel scales up from center. Modals aren't anchored to a trigger, so
+   transform-origin stays centered (unlike popovers). */
+.overlay-backdrop {
+  opacity: 1;
+  transition: opacity var(--dur-enter) var(--ease-out);
+
+  @starting-style {
+    opacity: 0;
+  }
+}
+
+.overlay-panel {
+  opacity: 1;
+  transform: scale(1);
+  transform-origin: center;
+  transition: opacity var(--dur-enter) var(--ease-out), transform var(--dur-enter) var(--ease-out);
+
+  @starting-style {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
+/* Exit state — applied just before unmount so the dialog leaves the way it
+   arrived instead of vanishing. Faster than the entrance: the user already
+   made their decision, so the system should confirm it snappily. */
+.overlay-backdrop.overlay-closing {
+  opacity: 0;
+  transition-duration: var(--dur-fast);
+}
+
+.overlay-panel.overlay-closing {
+  opacity: 0;
+  transform: scale(0.95);
+  transition-duration: var(--dur-fast);
+}
+
+/* Generic enter animation for panels/sections that mount conditionally
+   (custom-analysis panels, expanded calendar, error/empty states). */
+.enter-rise {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity var(--dur-enter) var(--ease-out), transform var(--dur-enter) var(--ease-out);
+
+  @starting-style {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+/* Staggered cascade for analysis result sections on first render. */
+.stagger-in > * {
+  opacity: 0;
+  transform: translateY(8px);
+  animation: rise-in 250ms var(--ease-out) forwards;
+}
+
+.stagger-in > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-in > *:nth-child(2) { animation-delay: 40ms; }
+.stagger-in > *:nth-child(3) { animation-delay: 80ms; }
+.stagger-in > *:nth-child(4) { animation-delay: 120ms; }
+.stagger-in > *:nth-child(5) { animation-delay: 160ms; }
+.stagger-in > *:nth-child(n+6) { animation-delay: 200ms; }
+
+@keyframes rise-in {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Crossfade for button labels that swap text (e.g. "Export" -> "Saved").
+   Pair with a React `key` change on the label span so this re-triggers. */
+.label-swap {
+  opacity: 1;
+  filter: blur(0);
+  transition: opacity var(--dur-enter) ease, filter var(--dur-enter) ease;
+
+  @starting-style {
+    opacity: 0;
+    filter: blur(2px);
+  }
+}
+
+/* Reduced motion — preserve state changes, kill decorative/positional motion.
+   Fades and color transitions stay; anything that moves or scales is removed. */
 @media (prefers-reduced-motion: reduce) {
   .skeleton {
     animation: none;
     background: var(--card);
   }
-  .card {
-    transition: none;
-  }
   .animate-spin {
     animation: none;
+  }
+  .card {
+    transition: background var(--dur-base) ease;
+  }
+  .card:active {
+    transform: none;
+  }
+  button:not(:disabled):active, [role="button"]:active {
+    transform: none;
+  }
+  .stagger-in > * {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .enter-rise, .overlay-panel {
+    transition-property: opacity;
+
+    @starting-style {
+      transform: none;
+    }
+  }
+  .overlay-panel.overlay-closing {
+    transform: none;
   }
 }
 
@@ -126,12 +256,5 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
 @media (display-mode: standalone) {
   body {
     padding-bottom: env(safe-area-inset-bottom);
-  }
-}
-
-/* Scroll snap for conversation list on mobile */
-@media (max-width: 640px) {
-  .conversation-list > * {
-    scroll-snap-align: start;
   }
 }

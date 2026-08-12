@@ -80,7 +80,14 @@
       "micro": { "displayName": "Micro", "purpose": "Single glyph in a compact circular badge (lens dots, numbered dimension markers)." }
     },
     "motion": [
-      { "name": "state-transition", "value": "0.15s ease (background), 0.1s ease (transform)", "purpose": "Default hover/press transition on cards and buttons." },
+      { "name": "tokens", "value": "--ease-out: cubic-bezier(0.23, 1, 0.32, 1); --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1); --dur-fast: 100ms; --dur-base: 150ms; --dur-enter: 200ms", "purpose": "Shared easing/duration variables every other motion entry below is built from." },
+      { "name": "state-transition", "value": "var(--dur-base) ease (background/color), var(--dur-fast) var(--ease-out) (transform)", "purpose": "Default hover/press transition on cards and buttons." },
+      { "name": "press-feedback", "value": "scale(0.97) on :active, var(--dur-fast) var(--ease-out)", "purpose": "Every button and [role=\"button\"] confirms it heard the tap/click, on all devices (not just touch)." },
+      { "name": "overlay-enter", "value": "backdrop opacity fade + panel scale(0.95)→1, var(--dur-enter) var(--ease-out), via @starting-style", "purpose": "ConfirmRerunDialog / RegenerateConfirmDialog entrance. Centered transform-origin (modals aren't trigger-anchored)." },
+      { "name": "overlay-exit", "value": "same path in reverse via .overlay-closing, var(--dur-fast) — faster than the entrance", "purpose": "Dialogs leave the way they arrived instead of vanishing instantly; unmount is deferred ~100ms via React state so the transition can play. Confirm and Cancel both trigger it." },
+      { "name": "panel-enter", "value": "opacity + translateY(4px)→0, var(--dur-enter) var(--ease-out), via @starting-style", "purpose": "Conditionally-mounted panels (custom analysis, expanded calendar) so they don't pop in." },
+      { "name": "stagger-cascade", "value": "opacity + translateY(8px)→0, 250ms var(--ease-out), 40ms delay per child up to 5, then 200ms", "purpose": "Analysis result sections cascade in on first reveal only — lens-switch remounts are excluded (see conversation/[id]/page.tsx's thesisSeen/adhdSeen state) so tab switching stays instant." },
+      { "name": "label-crossfade", "value": "opacity + blur(2px)→0, var(--dur-enter) ease, keyed by React key", "purpose": "Export button label swap (e.g. \"Send to Obsidian\" → \"Saved\") — blur masks the two-state overlap." },
       { "name": "shimmer", "value": "1.5s infinite linear background-position sweep", "purpose": "Skeleton loading placeholders; disabled entirely under prefers-reduced-motion." }
     ],
     "breakpoints": [
