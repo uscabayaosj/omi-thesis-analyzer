@@ -452,11 +452,11 @@ function GroupAnalysisContent() {
               Cross-Conversation Analysis
               <span className="text-xs bg-indigo-900/50 text-indigo-200 px-2 py-0.5 rounded-full font-normal">saved</span>
             </h2>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={handleExportObsidian}
                 aria-label="Export group analysis to Obsidian vault"
-                className="text-sm bg-purple-900/40 hover:bg-purple-800/50 text-purple-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5"
+                className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5 whitespace-nowrap"
               >
                 {exported ? (
                   <>
@@ -473,7 +473,7 @@ function GroupAnalysisContent() {
               <button
                 onClick={handleDownloadGroup}
                 aria-label="Download group analysis as markdown file"
-                className="text-sm bg-amber-900/40 hover:bg-amber-800/50 text-amber-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5"
+                className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5 whitespace-nowrap"
               >
                 <DownloadIcon className="w-3.5 h-3.5" />
                 Download .md
