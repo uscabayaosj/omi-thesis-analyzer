@@ -732,7 +732,7 @@ export default function Home() {
                   onClick={selectAll}
                   disabled={filtered.length === 0}
                   aria-label={allFilteredSelected ? "Deselect all conversations in this view" : "Select all conversations in this view"}
-                  className="text-sm min-h-[44px] bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
+                  className="text-sm min-h-[44px] bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-200 px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
                 >
                   {allFilteredSelected ? "Deselect All" : "Select All"}
                 </button>
@@ -754,7 +754,7 @@ export default function Home() {
                   onClick={runBatchAdhd}
                   disabled={selected.size < 1 || batchRunning}
                   aria-label={`Run ADHD Aid on ${selected.size} conversations`}
-                  className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-100 font-medium py-2 px-4 min-h-[44px] rounded-lg text-sm transition-colors whitespace-nowrap"
+                  className="flex items-center gap-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-100 font-medium py-2 px-4 min-h-[44px] rounded-lg text-sm transition-colors whitespace-nowrap"
                 >
                   <ClipboardIcon className="w-4 h-4" />
                   {batchRunning ? `Running ${batchProgress.done}/${batchProgress.total}…` : `Run ADHD (${selected.size})`}
