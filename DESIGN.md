@@ -40,6 +40,11 @@ typography:
     fontSize: "0.75rem"
     fontWeight: 500
     lineHeight: 1.4
+  micro:
+    fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif"
+    fontSize: "0.625rem"
+    fontWeight: 600
+    lineHeight: 1
 rounded:
   xs: "4px"
   sm: "6px"
@@ -131,6 +136,7 @@ The palette is a narrow, deliberately dark stack: one background, one panel colo
 - **Title** (600, `clamp(1rem, 2.5vw, 1.25rem)`, 1.3): `h3`, individual analysis-block headings (e.g. "Do today," "RQ1 — Documentary Record").
 - **Body** (400, 0.875rem/14px, 1.7): Analysis prose and card copy. The unusually tall 1.7 line-height is deliberate — this is dense generated text read at arm's length, not marketing copy.
 - **Label** (500, 0.75rem/12px mono, 1.4): Timestamps, confidence tags, directional metadata ("them → me").
+- **Micro** (600, 0.625rem/10px sans, 1): A single glyph inside a compact circular badge (the T/A lens dots, the accordion's numbered dimension markers) — the smallest step, reserved for exactly that role. It exists because 12px (Label) doesn't fit comfortably as a centered single character inside a 20px circle; two components converged on 10px independently before either used a token for it.
 
 ### Named Rules
 **The Fluid-Only Rule.** Headings never get a fixed pixel size; every heading level is a `clamp()` that scales between phone and desktop. There is no separate "mobile type scale" to maintain.

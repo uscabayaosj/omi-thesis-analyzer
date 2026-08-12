@@ -70,7 +70,8 @@
       "headline": { "displayName": "Headline", "purpose": "Section-level h2 headings." },
       "title": { "displayName": "Title", "purpose": "Analysis-block h3 headings (e.g. \"Do today\", \"RQ1 — Documentary Record\")." },
       "body": { "displayName": "Body", "purpose": "Analysis prose and card copy; tall 1.7 line-height for dense generated text." },
-      "label": { "displayName": "Label", "purpose": "Mono metadata: timestamps, confidence tags, commitment direction." }
+      "label": { "displayName": "Label", "purpose": "Mono metadata: timestamps, confidence tags, commitment direction." },
+      "micro": { "displayName": "Micro", "purpose": "Single glyph in a compact circular badge (lens dots, numbered dimension markers)." }
     },
     "motion": [
       { "name": "state-transition", "value": "0.15s ease (background), 0.1s ease (transform)", "purpose": "Default hover/press transition on cards and buttons." },

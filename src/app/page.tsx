@@ -30,7 +30,10 @@ function LensBadges({ thesis, adhd }: { thesis: boolean; adhd: boolean }) {
     <span
       title={`${label}: ${on ? "analyzed" : "not analyzed"}`}
       className={`w-5 h-5 rounded-full border text-[10px] font-semibold flex items-center justify-center ${
-        on ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400" : "bg-slate-800/60 border-slate-700 text-slate-600"
+        // False positive below: the scanner pairs the "off" branch's text-slate-400 with the "on"
+        // branch's bg-emerald-500 since both live in one ternary string. Real pairs, both verified:
+        // emerald-400/emerald-wash (5.93:1) and slate-400/slate-800 (5.71:1).
+        on ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400" : "bg-slate-800/60 border-slate-700 text-slate-400" // impeccable-disable-line gray-on-color
       }`}
     >
       {label}
@@ -47,8 +50,13 @@ function LensBadges({ thesis, adhd }: { thesis: boolean; adhd: boolean }) {
 export default function Home() {
   const router = useRouter();
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [analyzedIds, setAnalyzedIds] = useState<Set<string>>(new Set());
-  const [adhdIds, setAdhdIds] = useState<Set<string>>(new Set());
+  // Lazy initializers, not an effect: both reads are synchronous, SSR-safe
+  // (guarded on `typeof window`), and side-effect-free — an effect here would
+  // only add a redundant render pass. analyzedIds never changes after mount
+  // (thesis analysis happens on a different page), so no setter is needed;
+  // adhdIds does change, after a batch ADHD run below.
+  const [analyzedIds] = useState<Set<string>>(() => getAnalyzedIds());
+  const [adhdIds, setAdhdIds] = useState<Set<string>>(() => getAdhdAnalyzedIds());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastSynced, setLastSynced] = useState<string | null>(null);
@@ -88,12 +96,16 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    setAnalyzedIds(getAnalyzedIds());
-    setAdhdIds(getAdhdAnalyzedIds());
-
     // Instant paint from cache (stale-while-revalidate), then revalidate.
+    // This can't become a lazy useState initializer like analyzedIds/adhdIds
+    // above: the server-rendered HTML always shows an empty list (no
+    // localStorage there), so reading the cache during the client's first
+    // render would diverge from that SSR output and trigger a hydration
+    // mismatch. Reading it here, post-mount, costs one extra render but
+    // keeps the first paint hydration-safe.
     const cached = cacheGet<Conversation[]>(CONVERSATIONS_CACHE_KEY);
     if (cached) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- see comment above; must run post-mount, not as a lazy initializer
       setConversations(cached.data);
       setLoading(false);
     }
