@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getAnalyzedIds, getAnalysisAge } from "@/lib/storage";
@@ -8,8 +8,11 @@ import { getAdhdAnalyzedIds, saveAdhdAnalysis } from "@/lib/adhd-storage";
 import type { AdhdAnalysis } from "@/lib/adhd";
 import { cacheGet, cacheSet } from "@/lib/cache";
 import { fetchJson } from "@/lib/fetch-json";
-import { formatDateTime } from "@/lib/format";
-import { BookIcon, SquareIcon, XIcon, CheckIcon, SparklesIcon, WarningIcon, MicIcon, FolderIcon, RefreshIcon, ClipboardIcon, CalendarIcon, ChevronRightIcon } from "@/components/icons";
+import { formatDateTime, dayOf } from "@/lib/format";
+import {
+  BookIcon, SquareIcon, XIcon, CheckIcon, SparklesIcon, WarningIcon, MicIcon,
+  FolderIcon, RefreshIcon, ClipboardIcon, CalendarIcon, ChevronRightIcon, SearchIcon,
+} from "@/components/icons";
 
 const CONVERSATIONS_CACHE_KEY = "conversations";
 
@@ -47,6 +50,107 @@ function LensBadges({ thesis, adhd }: { thesis: boolean; adhd: boolean }) {
   );
 }
 
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : `${n}`;
+}
+
+// Month-grid calendar: the primary "browse by day" entry point. Monday-first
+// (matches the app's en-GB date formatting elsewhere). Solid indigo fill for
+// the selected day reuses the same "true single-select navigation" pattern
+// the filter pills already use — see DESIGN.md's Navigation section.
+function CalendarMonth({
+  year, month, todayStr, selectedDate, daysWithEntries, onSelectDay, onPrevMonth, onNextMonth, onToday,
+}: {
+  year: number;
+  month: number; // 0-indexed
+  todayStr: string;
+  selectedDate: string;
+  daysWithEntries: Set<string>;
+  onSelectDay: (day: string) => void;
+  onPrevMonth: () => void;
+  onNextMonth: () => void;
+  onToday: () => void;
+}) {
+  const monthLabel = new Date(year, month, 1).toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+  const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7; // Monday = 0
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells: Array<{ day: number; dayStr: string } | null> = [];
+  for (let i = 0; i < firstWeekday; i++) cells.push(null);
+  for (let day = 1; day <= daysInMonth; day++) {
+    cells.push({ day, dayStr: `${year}-${pad2(month + 1)}-${pad2(day)}` });
+  }
+
+  return (
+    <div className="card p-4">
+      <div className="flex items-center justify-between mb-3">
+        <button
+          onClick={onPrevMonth}
+          aria-label="Previous month"
+          className="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-white transition-colors flex-shrink-0"
+        >
+          <ChevronRightIcon className="w-4 h-4 rotate-180" />
+        </button>
+        <div className="flex items-center gap-3">
+          <p className="font-semibold text-white text-sm whitespace-nowrap">{monthLabel}</p>
+          <button
+            onClick={onToday}
+            className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors px-2 min-h-[32px] rounded-md hover:bg-slate-800 whitespace-nowrap"
+          >
+            Today
+          </button>
+        </div>
+        <button
+          onClick={onNextMonth}
+          aria-label="Next month"
+          className="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-white transition-colors flex-shrink-0"
+        >
+          <ChevronRightIcon className="w-4 h-4" />
+        </button>
+      </div>
+      <div className="grid grid-cols-7 gap-1 mb-1">
+        {["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map((d) => (
+          <div key={d} className="text-center text-[10px] font-semibold text-slate-500" aria-hidden="true">
+            {d}
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-1" role="group" aria-label="Pick a day">
+        {cells.map((cell, i) => {
+          if (!cell) return <div key={`blank-${i}`} aria-hidden="true" />;
+          const { day, dayStr } = cell;
+          const isToday = dayStr === todayStr;
+          const isSelected = dayStr === selectedDate;
+          const hasEntries = daysWithEntries.has(dayStr);
+          const isFuture = dayStr > todayStr;
+          return (
+            <button
+              key={dayStr}
+              onClick={() => onSelectDay(dayStr)}
+              aria-label={`${new Date(year, month, day).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}${isToday ? ", today" : ""}${hasEntries ? ", has conversations" : ""}`}
+              aria-pressed={isSelected}
+              className={`aspect-square min-h-[40px] rounded-md flex flex-col items-center justify-center gap-0.5 text-sm transition-colors ${
+                isSelected
+                  ? "bg-indigo-600 text-white font-semibold"
+                  : isToday
+                  ? "border border-indigo-500/60 text-white hover:bg-slate-800"
+                  : isFuture
+                  ? "text-slate-600 hover:bg-slate-800"
+                  : "text-slate-300 hover:bg-slate-800"
+              }`}
+            >
+              {day}
+              <span
+                className={`w-1 h-1 rounded-full ${hasEntries ? (isSelected ? "bg-white" : "bg-slate-500") : "bg-transparent"}`}
+                aria-hidden="true"
+              />
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const router = useRouter();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -63,9 +167,24 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "analyzed" | "unanalyzed">("all");
   const [selectMode, setSelectMode] = useState(false);
+  // Cross-day, cross-search selection: intentionally never reset when
+  // selectedDate or searchQuery change, so picking conversations from
+  // several different days for one Group Thesis / ADHD batch run works.
+  // Session-only by design — a reload clears it, same as before this feature.
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState({ done: 0, total: 0, failed: 0 });
+
+  // Recomputed each render (cheap) so "today" stays correct if the tab is
+  // left open past midnight. selectedDate is pinned at mount instead —
+  // jumping the view out from under the user mid-session would be jarring.
+  const todayStr = dayOf(new Date().toISOString());
+  const [selectedDate, setSelectedDate] = useState(todayStr);
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const d = new Date();
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Revalidate the list over the network and refresh the cache. A refresh
   // forces a fresh pull from Omi; the initial load can reuse the HTTP cache.
@@ -117,9 +236,40 @@ export default function Home() {
     [analyzedIds, adhdIds]
   );
 
-  const analyzedCount = conversations.filter((c) => isAnalyzedEither(c.id)).length;
+  // Group once per conversation-list change, not per render — feeds both the
+  // calendar's "has entries" dots and the selected day's list.
+  const conversationsByDay = useMemo(() => {
+    const map = new Map<string, Conversation[]>();
+    for (const c of conversations) {
+      const d = dayOf(c.created_at);
+      (map.get(d) ?? map.set(d, []).get(d)!).push(c);
+    }
+    return map;
+  }, [conversations]);
 
-  const filtered = conversations.filter((c) => {
+  const daysWithEntries = useMemo(() => new Set(conversationsByDay.keys()), [conversationsByDay]);
+
+  const isSearching = searchQuery.trim().length > 0;
+
+  // Search deliberately bypasses day-scoping entirely — the whole point is
+  // "I remember the topic, not the date". Client-side only: the full list is
+  // already loaded, no server-side search exists (or needs to).
+  const searchResults = useMemo(() => {
+    if (!isSearching) return [];
+    const q = searchQuery.trim().toLowerCase();
+    return conversations.filter((c) => {
+      const title = c.structured?.title?.toLowerCase() ?? "";
+      const overview = c.structured?.overview?.toLowerCase() ?? "";
+      return title.includes(q) || overview.includes(q);
+    });
+  }, [conversations, searchQuery, isSearching]);
+
+  const dayConversations = conversationsByDay.get(selectedDate) ?? [];
+  const visibleConversations = isSearching ? searchResults : dayConversations;
+
+  const visibleAnalyzedCount = visibleConversations.filter((c) => isAnalyzedEither(c.id)).length;
+
+  const filtered = visibleConversations.filter((c) => {
     if (filter === "analyzed") return isAnalyzedEither(c.id);
     if (filter === "unanalyzed") return !isAnalyzedEither(c.id);
     return true;
@@ -135,14 +285,14 @@ export default function Home() {
   };
 
   // "All selected" must check membership, not just counts — the selection can
-  // contain conversations hidden by the current filter.
+  // contain conversations hidden by the current filter (or on other days).
   const allFilteredSelected = filtered.length > 0 && filtered.every((c) => selected.has(c.id));
 
   const selectAll = () => {
     if (allFilteredSelected) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(filtered.map((c) => c.id)));
+      setSelected((prev) => new Set([...prev, ...filtered.map((c) => c.id)]));
     }
   };
 
@@ -188,6 +338,23 @@ export default function Home() {
     setSelectMode(false);
     setSelected(new Set());
   };
+
+  const goToPrevMonth = () => {
+    setCalendarMonth(({ year, month }) => (month === 0 ? { year: year - 1, month: 11 } : { year, month: month - 1 }));
+  };
+  const goToNextMonth = () => {
+    setCalendarMonth(({ year, month }) => (month === 11 ? { year: year + 1, month: 0 } : { year, month: month + 1 }));
+  };
+  const goToToday = () => {
+    const d = new Date();
+    setCalendarMonth({ year: d.getFullYear(), month: d.getMonth() });
+    setSelectedDate(todayStr);
+  };
+  const selectDay = (day: string) => setSelectedDate(day);
+
+  const selectedDateLabel = formatDateTime(`${selectedDate}T12:00:00`, {
+    weekday: "long", day: "numeric", month: "long", year: "numeric",
+  });
 
   return (
     <main className="max-w-3xl mx-auto px-4 py-8">
@@ -283,12 +450,65 @@ export default function Home() {
           </div>
         </details>
 
-        {/* Scan row: count + filter + group-select entry — tight to the list it governs */}
+        {/* Search — bypasses day-scoping entirely; the fast path when you know the topic, not the date */}
         {conversations.length > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-3 mt-5">
+          <div className="relative mt-4">
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search conversations by title or topic…"
+              aria-label="Search all conversations"
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-10 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:border-indigo-500 focus:outline-none transition-colors min-h-[44px]"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                aria-label="Clear search"
+                className="absolute right-2 top-1/2 -translate-y-1/2 min-h-[32px] min-w-[32px] flex items-center justify-center text-slate-500 hover:text-white transition-colors"
+              >
+                <XIcon className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Calendar — the "browse by day" entry point; hidden while a search query is active
+            so there's only ever one navigation mode showing at once. */}
+        {conversations.length > 0 && !isSearching && (
+          <div className="mt-4">
+            <CalendarMonth
+              year={calendarMonth.year}
+              month={calendarMonth.month}
+              todayStr={todayStr}
+              selectedDate={selectedDate}
+              daysWithEntries={daysWithEntries}
+              onSelectDay={selectDay}
+              onPrevMonth={goToPrevMonth}
+              onNextMonth={goToNextMonth}
+              onToday={goToToday}
+            />
+          </div>
+        )}
+
+        {/* Which day / search we're looking at */}
+        {conversations.length > 0 && (
+          <p className="text-sm text-slate-400 mt-4">
+            {isSearching ? (
+              <>Results for &ldquo;{searchQuery.trim()}&rdquo;</>
+            ) : (
+              <>{selectedDateLabel}{selectedDate === todayStr ? " (today)" : ""}</>
+            )}
+          </p>
+        )}
+
+        {/* Scan row: count + filter + group-select entry — tight to the list it governs */}
+        {visibleConversations.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 mt-3">
             <div className="flex items-center gap-4 text-sm">
               <span className="text-slate-400 whitespace-nowrap">
-                {analyzedCount}/{conversations.length} analyzed
+                {visibleAnalyzedCount}/{visibleConversations.length} analyzed
               </span>
               <div className="flex gap-1" role="radiogroup" aria-label="Filter conversations by analysis status">
                 {(["all", "analyzed", "unanalyzed"] as const).map((f) => (
@@ -331,7 +551,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* Selection mode toolbar */}
+        {/* Selection mode toolbar — count reflects the true cross-day, cross-search total */}
         {selectMode && (
           <div className="mt-3">
             <div
@@ -343,13 +563,13 @@ export default function Home() {
                 <button
                   onClick={selectAll}
                   disabled={filtered.length === 0}
-                  aria-label={allFilteredSelected ? "Deselect all conversations" : "Select all conversations"}
+                  aria-label={allFilteredSelected ? "Deselect all conversations in this view" : "Select all conversations in this view"}
                   className="text-sm min-h-[44px] bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
                 >
                   {allFilteredSelected ? "Deselect All" : "Select All"}
                 </button>
                 <span className="text-sm text-slate-400 whitespace-nowrap" aria-live="polite">
-                  {selected.size} selected
+                  {selected.size} selected{selected.size > 0 ? " (across all days)" : ""}
                 </span>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -415,10 +635,30 @@ export default function Home() {
         </div>
       )}
 
-      {!loading && filtered.length === 0 && conversations.length > 0 && (
+      {!loading && !error && conversations.length > 0 && isSearching && searchResults.length === 0 && (
+        <div className="card p-8 text-center">
+          <SearchIcon className="w-8 h-8 mx-auto mb-4 text-slate-600" />
+          <p className="text-slate-300">No matches for &ldquo;{searchQuery.trim()}&rdquo;.</p>
+          <button onClick={() => setSearchQuery("")} className="text-indigo-400 text-sm mt-2 hover:underline min-h-[44px] px-2">
+            Clear search
+          </button>
+        </div>
+      )}
+
+      {!loading && !error && conversations.length > 0 && !isSearching && dayConversations.length === 0 && (
+        <div className="card p-8 text-center">
+          <CalendarIcon className="w-8 h-8 mx-auto mb-4 text-slate-600" />
+          <p className="text-slate-300">
+            {selectedDate === todayStr ? "Nothing recorded today yet." : `No conversations on ${selectedDateLabel}.`}
+          </p>
+          <p className="text-slate-400 text-sm mt-2">Pick another day above, or search for something specific.</p>
+        </div>
+      )}
+
+      {!loading && visibleConversations.length > 0 && filtered.length === 0 && (
         <div className="card p-8 text-center">
           <p className="text-slate-400">
-            {filter === "analyzed" ? "No analyzed conversations yet." : "All conversations have been analyzed!"}
+            {filter === "analyzed" ? "No analyzed conversations here yet." : "Everything here has been analyzed!"}
           </p>
           <button onClick={() => setFilter("all")} className="text-indigo-400 text-sm mt-2 hover:underline min-h-[44px] px-2">
             Show all

@@ -200,6 +200,9 @@ Every interactive component shares one behavior contract: `background` and `tran
 ### Lens Badge (signature component)
 A stacked pair of small rounded-full pills ("Thesis" / "ADHD") shown beside every conversation list item, each independently lit (emerald fill + border) or dim (flat slate) depending on whether that lens has run. Reads as plain words, not a coded glyph — a first-time reader doesn't need a tooltip to know what's been processed. This is the system's one custom-invented primitive — a status readout that lets the researcher scan a whole list at a glance.
 
+### Calendar (month grid)
+The primary day-browsing entry point on the conversations list. A 7-column Monday-first grid inside a `.card`. The selected day reuses the filter pills' solid-fill pattern (Indigo Ink background, white text) — the same "true single-select navigation" rule, not a new one. Today gets an indigo ring (`border-indigo-500/60`) independent of selection, so it stays identifiable even when browsing a different day. Days with conversations get a small graphite dot; days without get none — no shadow, no elevation, just the dot and the two indigo treatments. Future dates render dimmed (`text-slate-600`) but stay clickable rather than disabled — simplicity over guarding an edge case that just resolves to an empty state.
+
 ## Do's and Don'ts
 
 ### Do:
