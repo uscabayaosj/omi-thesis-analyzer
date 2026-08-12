@@ -93,7 +93,10 @@ function CalendarMonth({
           <ChevronRightIcon className="w-4 h-4 rotate-180" />
         </button>
         <div className="flex items-center gap-3">
-          <div className="relative">
+          {/* min-h-[44px] so the overlaid month input below gets a full-size tap
+              target: globals.css's coarse-pointer 44px floor covers buttons and
+              links, but not inputs, so this one has to carry its own. */}
+          <div className="relative flex items-center min-h-[44px]">
             <p className="font-semibold text-white text-sm whitespace-nowrap pr-1">{monthLabel}</p>
             {/* Native month picker overlaid on the label — jumps distant months without
                 hand-building a year selector; iOS/desktop Safari and Chrome render this as
@@ -674,7 +677,9 @@ export default function Home() {
         {/* Scan row: count + filter + group-select entry — tight to the list it governs */}
         {visibleConversations.length > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-3 mt-3">
-            <div className="flex items-center gap-4 text-sm">
+            {/* Wraps: at 375px the count + all three pills need ~360px against
+                343px of available width, which clipped "Unanalyzed" off-screen. */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
               <span className="text-slate-400 whitespace-nowrap">
                 {visibleAnalyzedCount}/{visibleConversations.length} analyzed
               </span>
