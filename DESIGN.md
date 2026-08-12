@@ -174,7 +174,7 @@ Every interactive component shares one behavior contract: `background` and `tran
 ### Buttons
 - **Shape:** 8px radius (`rounded-lg`), 44px minimum height always.
 - **Primary:** Indigo Ink background, white/paper text, `font-medium`, used for the one primary action per screen (Group Thesis, Run Custom Analysis, Generate Rollup).
-- **Secondary:** Ink Panel background (`bg-slate-800`), lightens to Ink Panel Raised on hover — used for every non-primary action (Cancel, Refresh, Deselect All).
+- **Secondary:** one tonal step lighter than whatever surface it sits on, lightening one further step on hover — used for every non-primary action (Cancel, Refresh, Deselect All). On the page field this is Ink Panel background (`bg-slate-800`) → Ink Panel Raised on hover; **inside a `.card`, that step must shift down to `bg-slate-700` → `bg-slate-600`**, since a card's own background already *is* Ink Panel — a secondary button using `bg-slate-800` there is invisible at rest (confirmed bug, fixed across the toolbar, both confirm dialogs, and both quick-prompt-preset blocks: same-color-as-container, no shape until hovered). The rule is relative to the immediate surface, never a fixed class.
 - **Ghost/ text-link:** No background, `text-indigo-400`, underline on hover — used for low-emphasis actions inline in text ("Show all").
 - **Disabled:** Background drops to a flat slate with reduced opacity; no hover/press feedback.
 

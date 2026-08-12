@@ -551,7 +551,7 @@ function GroupAnalysisContent() {
                   key={p}
                   onClick={() => setCustomPrompt(p)}
                   aria-label={`Use prompt: ${p}`}
-                  className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-3 py-2 min-h-[44px] rounded-md transition-colors"
+                  className="text-sm bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white px-3 py-2 min-h-[44px] rounded-md transition-colors"
                 >
                   {p}
                 </button>

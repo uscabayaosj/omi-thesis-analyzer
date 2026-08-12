@@ -112,7 +112,7 @@ function CalendarMonth({
           </div>
           <button
             onClick={onToday}
-            className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors px-2 min-h-[32px] rounded-md hover:bg-slate-800 whitespace-nowrap"
+            className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors px-2 min-h-[32px] rounded-md hover:bg-slate-700 whitespace-nowrap"
           >
             Today
           </button>
@@ -150,10 +150,10 @@ function CalendarMonth({
                 isSelected
                   ? "bg-indigo-600 text-white font-semibold"
                   : isToday
-                  ? "border border-indigo-500/60 text-white hover:bg-slate-800"
+                  ? "border border-indigo-500/60 text-white hover:bg-slate-700"
                   : isFuture
-                  ? "text-slate-600 hover:bg-slate-800"
-                  : "text-slate-300 hover:bg-slate-800"
+                  ? "text-slate-600 hover:bg-slate-700"
+                  : "text-slate-300 hover:bg-slate-700"
               }`}
             >
               {day}

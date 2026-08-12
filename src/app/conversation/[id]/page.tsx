@@ -123,7 +123,7 @@ function VersionHistory({
           <button
             key={v.id}
             onClick={() => onSelect(v)}
-            className="w-full text-left p-3 rounded-lg bg-slate-900 hover:bg-slate-800 transition-colors min-h-[44px]"
+            className="w-full text-left p-3 rounded-lg bg-slate-900 hover:bg-slate-700 transition-colors min-h-[44px]"
           >
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-300">
@@ -182,7 +182,7 @@ function ConfirmRerunDialog({
           <button
             ref={cancelRef}
             onClick={onCancel}
-            className="px-4 py-2 min-h-[44px] text-sm text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+            className="px-4 py-2 min-h-[44px] text-sm text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
           >
             Cancel
           </button>
@@ -783,7 +783,7 @@ export default function ConversationPage() {
                       key={preset}
                       onClick={() => setCustomPrompt(preset)}
                       aria-label={`Use prompt: ${preset}`}
-                      className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-3 py-2 min-h-[44px] rounded-md transition-colors"
+                      className="text-sm bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white px-3 py-2 min-h-[44px] rounded-md transition-colors"
                     >
                       {preset}
                     </button>
