@@ -22,6 +22,15 @@ body {
   padding-right: env(safe-area-inset-right);
 }
 
+/* Tailwind v4 dropped Preflight's `button { cursor: pointer }` reset, so
+   buttons fall back to the browser default `cursor: default`. On iOS Safari
+   that makes WebKit treat the element as not-really-clickable: the first tap
+   only fires the simulated :hover state and the click itself needs a second
+   tap. Restoring the reset here is what fixes it. */
+button, [role="button"] {
+  cursor: pointer;
+}
+
 /* Focus indicators — visible on keyboard nav, hidden on mouse */
 *:focus-visible {
   outline: 2px solid var(--accent);

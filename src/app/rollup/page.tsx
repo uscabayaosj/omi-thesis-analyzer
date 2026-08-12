@@ -75,7 +75,7 @@ function RollupSectionBlock({
           {heading}
         </h3>
         {isEmpty ? (
-          <p className="text-sm text-slate-500 mt-3">None.</p>
+          <p className="text-sm text-slate-400 mt-3">None.</p>
         ) : (
           <p className="whitespace-pre-wrap text-sm leading-relaxed mt-3">{content}</p>
         )}
@@ -126,7 +126,7 @@ function RegenerateConfirmDialog({
           <button
             ref={cancelRef}
             onClick={onCancel}
-            className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 min-h-[44px] rounded-lg transition-colors"
+            className="text-sm bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 min-h-[44px] rounded-lg transition-colors"
           >
             Cancel
           </button>
@@ -350,7 +350,7 @@ export default function RollupPage() {
                 : ([[null, selectedConvos]] as [string | null, ConvoLite[]][])
               ).map(([label, group]) => (
                 <div key={label ?? "all"}>
-                  {label && <p className="text-xs font-semibold text-slate-500 mb-1.5">{label}</p>}
+                  {label && <p className="text-xs font-semibold text-slate-400 mb-1.5">{label}</p>}
                   <div className="space-y-1.5">
                     {group.map((c) => {
                       const analyzed = !!getAdhdAnalysis(c.id);
@@ -360,7 +360,7 @@ export default function RollupPage() {
                           {analyzed ? (
                             <span className="text-xs bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 px-2 py-0.5 rounded-full flex-shrink-0">analyzed</span>
                           ) : (
-                            <span className="text-xs bg-slate-800/60 border border-slate-700 text-slate-500 px-2 py-0.5 rounded-full flex-shrink-0">not yet</span>
+                            <span className="text-xs bg-slate-800/60 border border-slate-700 text-slate-400 px-2 py-0.5 rounded-full flex-shrink-0">not yet</span>
                           )}
                         </div>
                       );

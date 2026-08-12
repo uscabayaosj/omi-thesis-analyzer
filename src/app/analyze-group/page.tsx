@@ -236,10 +236,15 @@ function GroupAnalysisContent() {
   const [skipped, setSkipped] = useState(0);
 
   useEffect(() => {
+    // Can't be a lazy useState initializer: this must re-run whenever `ids`
+    // changes (navigating to a different group on the same mounted route),
+    // and localStorage isn't available during the server-rendered first
+    // paint — reading it before mount would cause a hydration mismatch.
     const stored = getStoredGroupAnalyses();
     const key = groupKey(ids);
     const existing = stored.find((a) => groupKey(a.conversationIds) === key);
     if (existing) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAnalysis(existing.analysis);
       setConversations(existing.conversations);
       if (existing.custom) {
@@ -345,7 +350,7 @@ function GroupAnalysisContent() {
           Back to conversations
         </Link>
         <div className="card p-8 text-center">
-          <CompassIcon className="w-8 h-8 mx-auto mb-3 text-slate-500" />
+          <CompassIcon className="w-8 h-8 mx-auto mb-3 text-slate-400" />
           <h1 className="text-xl font-bold text-white mb-2">Group analysis needs at least 2 conversations</h1>
           <p className="text-slate-400 text-sm mb-6">
             Use &ldquo;Select &amp; Analyze Group&rdquo; on the conversations list to pick two or more, then come back here.
@@ -496,7 +501,7 @@ function GroupAnalysisContent() {
                     <section.icon className="w-[1.05em] h-[1.05em] flex-shrink-0" />
                     {section.title}
                   </h3>
-                  <p className="text-xs text-slate-500 mb-3">{section.subtitle}</p>
+                  <p className="text-xs text-slate-400 mb-3">{section.subtitle}</p>
                   <div className="whitespace-pre-wrap text-sm leading-relaxed">{section.content}</div>
                 </div>
               </div>
@@ -517,10 +522,10 @@ function GroupAnalysisContent() {
             <CogIcon className="w-5 h-5 text-slate-400 flex-shrink-0" />
             <div>
               <p className="font-semibold text-white">Custom Group Analysis</p>
-              <p className="text-slate-500 text-sm">Ask a question across all selected conversations</p>
+              <p className="text-slate-400 text-sm">Ask a question across all selected conversations</p>
             </div>
           </div>
-          <svg className={`w-5 h-5 text-slate-500 transition-transform ${showCustom ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <svg className={`w-5 h-5 text-slate-400 transition-transform ${showCustom ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </button>
@@ -535,10 +540,10 @@ function GroupAnalysisContent() {
                 placeholder="e.g., How do different speakers frame land ownership? What shared assumptions about 'the good life' emerge?"
                 aria-label="Custom group analysis question"
                 maxLength={2000}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-600 focus:border-amber-500 focus:outline-none resize-none"
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-400 focus:border-amber-500 focus:outline-none resize-none"
                 rows={3}
               />
-              <div className="text-xs text-slate-600 text-right mt-1">{customPrompt.length}/2000</div>
+              <div className="text-xs text-slate-400 text-right mt-1">{customPrompt.length}/2000</div>
             </label>
             <div className="flex flex-wrap gap-2 mb-3" role="group" aria-label="Quick prompt suggestions">
               {[
@@ -551,7 +556,7 @@ function GroupAnalysisContent() {
                   key={p}
                   onClick={() => setCustomPrompt(p)}
                   aria-label={`Use prompt: ${p}`}
-                  className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-3 py-2 min-h-[44px] rounded-md transition-colors"
+                  className="text-sm bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white px-3 py-2 min-h-[44px] rounded-md transition-colors"
                 >
                   {p}
                 </button>
@@ -582,7 +587,7 @@ function GroupAnalysisContent() {
                 <CogIcon className="w-[1.05em] h-[1.05em] flex-shrink-0" />
                 Custom Group Analysis
               </h3>
-              <p className="text-xs text-slate-500 mb-1">Prompt: &ldquo;{customPrompt}&rdquo;</p>
+              <p className="text-xs text-slate-400 mb-1">Prompt: &ldquo;{customPrompt}&rdquo;</p>
               <div className="whitespace-pre-wrap text-sm leading-relaxed mt-3">{customResult}</div>
             </div>
           </div>

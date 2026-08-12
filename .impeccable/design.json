@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-11T00:00:00.000Z",
+  "generatedAt": "2026-08-12T00:00:00.000Z",
   "title": "Design System: Omi Thesis Analyzer",
   "extensions": {
     "colorMeta": {
@@ -31,6 +31,12 @@
       "graphite": {
         "role": "neutral",
         "displayName": "Graphite",
+        "canonical": "#94a3b8",
+        "tonalRamp": ["#1e2530", "#2c3644", "#3d4a5c", "#546177", "#64748b", "#8593a8", "#aab5c4", "#dbe1e9"]
+      },
+      "graphite-nontext": {
+        "role": "neutral",
+        "displayName": "Graphite (non-text only)",
         "canonical": "#64748b",
         "tonalRamp": ["#1e2530", "#2c3644", "#3d4a5c", "#546177", "#64748b", "#8593a8", "#aab5c4", "#dbe1e9"]
       },
@@ -94,7 +100,7 @@
       "name": "Secondary Button",
       "kind": "button",
       "refersTo": "button-secondary",
-      "description": "Non-primary actions (Cancel, Refresh, Deselect All).",
+      "description": "Non-primary actions (Cancel, Refresh, Deselect All). One tonal step lighter than whatever surface it sits on, lightening one further step on hover — never a fixed color. On the page field: Ink Panel → Ink Panel Raised (shown here). Inside a .card, that step must shift down to #334155 → #475569 (Tailwind slate-700 → slate-600), since the card itself already is Ink Panel; reusing Ink Panel there renders the button invisible at rest (confirmed bug, fixed everywhere it recurred: the selection toolbar, both \"replace analysis?\" confirm dialogs, and both quick-prompt-preset panels).",
       "html": "<button class=\"ds-btn-secondary\">Cancel</button>",
       "css": ".ds-btn-secondary { background: #1e293b; color: #e2e8f0; font-weight: 500; padding: 8px 16px; min-height: 44px; border-radius: 8px; border: none; transition: background 0.15s ease; } .ds-btn-secondary:hover { background: #334155; }"
     },
@@ -137,6 +143,14 @@
       "description": "Signature component: a stacked \"Thesis\"/\"ADHD\" pill pair beside every conversation, independently lit when that lens has run on it. Plain words, not a coded glyph.",
       "html": "<div class=\"ds-lensbadge\"><span class=\"ds-lenspill ds-lenspill-on\">Thesis</span><span class=\"ds-lenspill\">ADHD</span></div>",
       "css": ".ds-lensbadge { display: flex; flex-direction: column; gap: 4px; } .ds-lenspill { min-width: 46px; padding: 2px 6px; border-radius: 9999px; border: 1px solid #334155; background: rgba(30, 41, 59, 0.6); color: #94a3b8; font-size: 10px; font-weight: 600; line-height: 1; text-align: center; white-space: nowrap; } .ds-lenspill-on { background: rgba(52, 211, 153, 0.15); border-color: rgba(52, 211, 153, 0.4); color: #34d399; }"
+    },
+    {
+      "name": "Calendar (month grid)",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Signature component: the primary day-browsing entry point on the conversations list. Collapsed to a one-line summary row by default (shown first) so the grid doesn't push that day's conversations below the fold on mobile; tapping it expands the 7-column Monday-first grid (shown second). Selected day reuses the filter pills' solid-fill pattern; today gets an indigo ring independent of selection; days with entries get a graphite dot. Day-cell hover and the Today button's hover both use #334155 (slate-700), one step up from the grid's own #1e293b card — never #1e293b itself, which would be invisible against the card it's inside.",
+      "html": "<button class=\"ds-cal-summary\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"18\" rx=\"2\"/><path d=\"M16 2v4M8 2v4M3 10h18\"/></svg><span>Wednesday, 12 August 2026 · Today</span><svg class=\"ds-cal-chevron\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M9 5l7 7-7 7\"/></svg></button><div class=\"ds-cal-grid\"><button class=\"ds-cal-day\">10</button><button class=\"ds-cal-day ds-cal-day-today\">11</button><button class=\"ds-cal-day ds-cal-day-selected\">12<span class=\"ds-cal-dot ds-cal-dot-on\"></span></button><button class=\"ds-cal-day\">13</button></div>",
+      "css": ".ds-cal-summary { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 12px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #e2e8f0; font-size: 0.875rem; transition: background 0.15s ease; } .ds-cal-summary:hover { background: #334155; } .ds-cal-chevron { color: #64748b; flex-shrink: 0; } .ds-cal-grid { display: flex; gap: 4px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 16px; } .ds-cal-day { aspect-ratio: 1; min-height: 40px; min-width: 40px; border-radius: 8px; border: none; background: transparent; color: #cbd5e1; font-size: 0.875rem; position: relative; transition: background 0.15s ease; } .ds-cal-day:hover { background: #334155; } .ds-cal-day-today { border: 1px solid rgba(99, 102, 241, 0.6); color: #ffffff; } .ds-cal-day-selected { background: #4f39f6; color: #ffffff; font-weight: 600; } .ds-cal-dot { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 9999px; } .ds-cal-dot-on { background: #ffffff; }"
     }
   ],
   "narrative": {
@@ -151,6 +165,7 @@
     ],
     "rules": [
       { "name": "The One Ink Rule", "body": "Indigo is the only color allowed to mean \"primary.\" If a second element on screen needs to look important, it does not get its own color — it gets weight, size, or position instead.", "section": "colors" },
+      { "name": "The Two Greys Rule", "body": "There are exactly two muted greys, and only one of them is ever allowed to carry text: Graphite (#94a3b8) for any text, and #64748b for non-text marks only (dots, markers, decorative icons). A third, darker grey is never introduced for \"extra quiet\" text — quieter is expressed through size and weight. Audit test: every text colour in the app must clear 4.5:1 against both Night Field and Ink Panel; #64748b fails both, which is exactly why it is barred from text.", "section": "colors" },
       { "name": "The Fluid-Only Rule", "body": "Headings never get a fixed pixel size; every heading level is a clamp() that scales between phone and desktop. There is no separate \"mobile type scale\" to maintain.", "section": "typography" },
       { "name": "The Single Column Rule", "body": "No screen in this app ever splits into side-by-side panels. A researcher reading one thing at a time, in order, is the entire interaction model — resist the urge to add a sidebar or a two-pane layout even on wide viewports.", "section": "layout" },
       { "name": "The Flat Field Rule", "body": "Nothing casts a shadow. If a surface needs to read as \"above\" another, lighten it one tonal step instead.", "section": "elevation" }

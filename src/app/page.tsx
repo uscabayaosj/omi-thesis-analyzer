@@ -93,7 +93,10 @@ function CalendarMonth({
           <ChevronRightIcon className="w-4 h-4 rotate-180" />
         </button>
         <div className="flex items-center gap-3">
-          <div className="relative">
+          {/* min-h-[44px] so the overlaid month input below gets a full-size tap
+              target: globals.css's coarse-pointer 44px floor covers buttons and
+              links, but not inputs, so this one has to carry its own. */}
+          <div className="relative flex items-center min-h-[44px]">
             <p className="font-semibold text-white text-sm whitespace-nowrap pr-1">{monthLabel}</p>
             {/* Native month picker overlaid on the label — jumps distant months without
                 hand-building a year selector; iOS/desktop Safari and Chrome render this as
@@ -112,7 +115,7 @@ function CalendarMonth({
           </div>
           <button
             onClick={onToday}
-            className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors px-2 min-h-[32px] rounded-md hover:bg-slate-800 whitespace-nowrap"
+            className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors px-2 min-h-[32px] rounded-md hover:bg-slate-700 whitespace-nowrap"
           >
             Today
           </button>
@@ -127,7 +130,7 @@ function CalendarMonth({
       </div>
       <div className="grid grid-cols-7 gap-1 mb-1">
         {["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map((d) => (
-          <div key={d} className="text-center text-[10px] font-semibold text-slate-500" aria-hidden="true">
+          <div key={d} className="text-center text-[10px] font-semibold text-slate-400" aria-hidden="true">
             {d}
           </div>
         ))}
@@ -150,10 +153,10 @@ function CalendarMonth({
                 isSelected
                   ? "bg-indigo-600 text-white font-semibold"
                   : isToday
-                  ? "border border-indigo-500/60 text-white hover:bg-slate-800"
+                  ? "border border-indigo-500/60 text-white hover:bg-slate-700"
                   : isFuture
-                  ? "text-slate-600 hover:bg-slate-800"
-                  : "text-slate-300 hover:bg-slate-800"
+                  ? "text-slate-400 hover:bg-slate-700"
+                  : "text-slate-300 hover:bg-slate-700"
               }`}
             >
               {day}
@@ -214,7 +217,7 @@ function ConversationRow({
             {convo.structured?.overview && (
               <p className="text-slate-400 text-sm mt-1 line-clamp-1">{convo.structured.overview}</p>
             )}
-            <div className="flex items-center gap-3 mt-2 text-xs text-slate-500 flex-wrap">
+            <div className="flex items-center gap-3 mt-2 text-xs text-slate-400 flex-wrap">
               <span className="whitespace-nowrap">{formatDateTime(convo.created_at)}</span>
               {convo.structured?.category && (
                 <span className="bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap">{convo.structured.category}</span>
@@ -243,7 +246,7 @@ function ConversationRow({
           {convo.structured?.overview && (
             <p className="text-slate-400 text-sm mt-1 line-clamp-2">{convo.structured.overview}</p>
           )}
-          <div className="flex items-center gap-3 mt-2 text-xs text-slate-500 flex-wrap">
+          <div className="flex items-center gap-3 mt-2 text-xs text-slate-400 flex-wrap">
             <span className="whitespace-nowrap">{formatDateTime(convo.created_at)}</span>
             {convo.structured?.category && (
               <span className="bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap">{convo.structured.category}</span>
@@ -550,7 +553,7 @@ export default function Home() {
 
         {/* Onboarding: About this framework — a quiet footnote, not a section */}
         <details className="mt-3 group">
-          <summary className="cursor-pointer list-none text-sm text-slate-500 hover:text-slate-300 transition-colors min-h-[44px] flex items-center gap-1.5">
+          <summary className="cursor-pointer list-none text-sm text-slate-400 hover:text-slate-300 transition-colors min-h-[44px] flex items-center gap-1.5">
             <ChevronRightIcon className="w-3.5 h-3.5 flex-shrink-0 transition-transform group-open:rotate-90" />
             What is Pioneer Sovereignty?
           </summary>
@@ -593,7 +596,7 @@ export default function Home() {
                 ))}
               </ul>
             </div>
-            <p className="text-xs text-slate-500 pt-2">
+            <p className="text-xs text-slate-400 pt-2">
               This tool analyzes conversations captured by the Omi DK2 wearable device
               and runs them through an AI model grounded in the thesis&apos;s full theoretical framework.
             </p>
@@ -603,20 +606,20 @@ export default function Home() {
         {/* Search — bypasses day-scoping entirely; the fast path when you know the topic, not the date */}
         {conversations.length > 0 && (
           <div className="relative mt-4">
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search conversations by title or topic…"
               aria-label="Search all conversations"
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-10 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:border-indigo-500 focus:outline-none transition-colors min-h-[44px]"
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-10 py-2.5 text-sm text-slate-200 placeholder-slate-400 focus:border-indigo-500 focus:outline-none transition-colors min-h-[44px]"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
                 aria-label="Clear search"
-                className="absolute right-2 top-1/2 -translate-y-1/2 min-h-[32px] min-w-[32px] flex items-center justify-center text-slate-500 hover:text-white transition-colors"
+                className="absolute right-2 top-1/2 -translate-y-1/2 min-h-[32px] min-w-[32px] flex items-center justify-center text-slate-400 hover:text-white transition-colors"
               >
                 <XIcon className="w-3.5 h-3.5" />
               </button>
@@ -655,10 +658,10 @@ export default function Home() {
                   <CalendarIcon className="w-4 h-4 text-indigo-400 flex-shrink-0" />
                   <span className="truncate">
                     {selectedDateLabel}
-                    {selectedDate === todayStr && <span className="text-slate-500"> · Today</span>}
+                    {selectedDate === todayStr && <span className="text-slate-400"> · Today</span>}
                   </span>
                 </span>
-                <ChevronRightIcon className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                <ChevronRightIcon className="w-4 h-4 text-slate-400 flex-shrink-0" />
               </button>
             )}
           </div>
@@ -674,7 +677,9 @@ export default function Home() {
         {/* Scan row: count + filter + group-select entry — tight to the list it governs */}
         {visibleConversations.length > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-3 mt-3">
-            <div className="flex items-center gap-4 text-sm">
+            {/* Wraps: at 375px the count + all three pills need ~360px against
+                343px of available width, which clipped "Unanalyzed" off-screen. */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
               <span className="text-slate-400 whitespace-nowrap">
                 {visibleAnalyzedCount}/{visibleConversations.length} analyzed
               </span>
@@ -732,7 +737,7 @@ export default function Home() {
                   onClick={selectAll}
                   disabled={filtered.length === 0}
                   aria-label={allFilteredSelected ? "Deselect all conversations in this view" : "Select all conversations in this view"}
-                  className="text-sm min-h-[44px] bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
+                  className="text-sm min-h-[44px] bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-200 px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
                 >
                   {allFilteredSelected ? "Deselect All" : "Select All"}
                 </button>
@@ -754,7 +759,7 @@ export default function Home() {
                   onClick={runBatchAdhd}
                   disabled={selected.size < 1 || batchRunning}
                   aria-label={`Run ADHD Aid on ${selected.size} conversations`}
-                  className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-100 font-medium py-2 px-4 min-h-[44px] rounded-lg text-sm transition-colors whitespace-nowrap"
+                  className="flex items-center gap-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-100 font-medium py-2 px-4 min-h-[44px] rounded-lg text-sm transition-colors whitespace-nowrap"
                 >
                   <ClipboardIcon className="w-4 h-4" />
                   {batchRunning ? `Running ${batchProgress.done}/${batchProgress.total}…` : `Run ADHD (${selected.size})`}
@@ -838,7 +843,7 @@ export default function Home() {
         {filteredByDay && filteredByDay.length > 1
           ? filteredByDay.map(([day, items]) => (
               <div key={day}>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2 mt-4 first:mt-0">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 mt-4 first:mt-0">
                   {formatDateTime(`${day}T12:00:00`, { weekday: "long", day: "numeric", month: "long" })}
                 </p>
                 <div className="space-y-3">

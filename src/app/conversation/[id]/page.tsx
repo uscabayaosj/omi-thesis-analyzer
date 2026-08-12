@@ -67,7 +67,7 @@ function TranscriptViewer({ segments }: { segments: TranscriptSegment[] }) {
     <div className="space-y-2">
       {segments.map((seg, i) => (
         <div key={i} className="flex flex-col sm:flex-row gap-0.5 sm:gap-3 text-sm">
-          <span className="text-slate-500 font-mono flex-shrink-0 sm:w-20 sm:text-right">
+          <span className="text-slate-400 font-mono flex-shrink-0 sm:w-20 sm:text-right">
             {seg.speaker_name || `S${seg.speaker_id ?? 0}`}
           </span>
           <span className="flex-1 min-w-0 break-words whitespace-pre-wrap text-slate-300">
@@ -123,15 +123,15 @@ function VersionHistory({
           <button
             key={v.id}
             onClick={() => onSelect(v)}
-            className="w-full text-left p-3 rounded-lg bg-slate-900 hover:bg-slate-800 transition-colors min-h-[44px]"
+            className="w-full text-left p-3 rounded-lg bg-slate-900 hover:bg-slate-700 transition-colors min-h-[44px]"
           >
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-300">
                 Version {versions.length - i}
               </span>
-              <span className="text-xs text-slate-500">{formatDateTime(v.timestamp)}</span>
+              <span className="text-xs text-slate-400">{formatDateTime(v.timestamp)}</span>
             </div>
-            <p className="text-xs text-slate-500 mt-1">Click to view this version</p>
+            <p className="text-xs text-slate-400 mt-1">Click to view this version</p>
           </button>
         ))}
       </div>
@@ -182,7 +182,7 @@ function ConfirmRerunDialog({
           <button
             ref={cancelRef}
             onClick={onCancel}
-            className="px-4 py-2 min-h-[44px] text-sm text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+            className="px-4 py-2 min-h-[44px] text-sm text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
           >
             Cancel
           </button>
@@ -226,10 +226,15 @@ export default function ConversationPage() {
   const [adhdDoneKeys, setAdhdDoneKeys] = useState<string[]>([]);
   const [adhdAnalyzing, setAdhdAnalyzing] = useState(false);
 
-  // Load stored analysis (both lenses) + pick the default lens.
+  // Load stored analysis (both lenses) + pick the default lens. Can't be a
+  // lazy useState initializer: this must re-run whenever `id` changes
+  // (navigating between conversations on the same mounted route), and
+  // localStorage isn't available during the server-rendered first paint —
+  // reading it before mount would cause a hydration mismatch.
   useEffect(() => {
     const stored = getStoredAnalysis(id);
     if (stored) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStoredAnalysis(stored);
       setAnalysis({
         rq1_documentary_record: stored.rq1_documentary_record,
@@ -298,6 +303,10 @@ export default function ConversationPage() {
   }, [id]);
 
   useEffect(() => {
+    // loadConversation's cache-hit branch calls setState synchronously
+    // (before any await), which is what the lint rule is catching here —
+    // the fetch-on-mount itself is the intended pattern.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadConversation("initial");
   }, [loadConversation]);
 
@@ -518,7 +527,7 @@ export default function ConversationPage() {
             {conversation.structured?.overview && (
               <p className="text-slate-400">{conversation.structured.overview}</p>
             )}
-            <p className="text-slate-500 text-sm mt-2">
+            <p className="text-slate-400 text-sm mt-2">
               {formatDateTime(conversation.created_at, {
                 weekday: "long", day: "numeric", month: "long", year: "numeric",
                 hour: "2-digit", minute: "2-digit",
@@ -535,7 +544,11 @@ export default function ConversationPage() {
                 role="radio"
                 aria-checked={lens === l}
                 className={`px-4 py-2 min-h-[44px] rounded-md text-sm transition-colors ${
-                  lens === l ? "bg-indigo-600 text-white" : "text-slate-300 hover:text-white"
+                  // False positive below: the scanner pairs the unselected branch's text-slate-300
+                  // with the selected branch's bg-indigo-600, but the two are mutually exclusive.
+                  // Real pairs, both verified: white/indigo-600 (5.17:1) and slate-300/slate-900
+                  // (11.35:1) — the unselected pill has no fill and sits on the toggle's own track.
+                  lens === l ? "bg-indigo-600 text-white" : "text-slate-300 hover:text-white" // impeccable-disable-line gray-on-color
                 }`}
               >
                 {l === "thesis" ? "Thesis" : l === "adhd" ? "ADHD Aid" : "Both"}
@@ -737,7 +750,7 @@ export default function ConversationPage() {
                 <CogIcon className="w-5 h-5 text-slate-400 flex-shrink-0" />
                 <div>
                   <p className="font-semibold text-white">Custom Analysis</p>
-                  <p className="text-slate-500 text-sm">
+                  <p className="text-slate-400 text-sm">
                     {customResult
                       ? `Last: "${customPrompt.length > 50 ? `${customPrompt.substring(0, 50)}…` : customPrompt}"`
                       : "Ask any question about this conversation through the lens of Pioneer Sovereignty"}
@@ -747,7 +760,7 @@ export default function ConversationPage() {
               <div className="flex items-center gap-2">
                 {customResult && <span className="text-xs bg-amber-900/40 text-amber-200 px-2 py-0.5 rounded-full">saved</span>}
                 <svg
-                  className={`w-5 h-5 text-slate-500 transition-transform ${showCustom ? "rotate-180" : ""}`}
+                  className={`w-5 h-5 text-slate-400 transition-transform ${showCustom ? "rotate-180" : ""}`}
                   fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -765,10 +778,10 @@ export default function ConversationPage() {
                     placeholder="e.g., Does the double erasure appear here? Is this public or intimate register? What would Rifkin's 'settler common sense' say?"
                     aria-label="Custom analysis question"
                     maxLength={2000}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-600 focus:border-amber-500 focus:outline-none resize-none"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-400 focus:border-amber-500 focus:outline-none resize-none"
                     rows={3}
                   />
-                  <div className="text-xs text-slate-600 text-right mt-1">{customPrompt.length}/2000</div>
+                  <div className="text-xs text-slate-400 text-right mt-1">{customPrompt.length}/2000</div>
                 </label>
                 <div className="flex flex-wrap gap-2 mb-3" role="group" aria-label="Quick prompt suggestions">
                   {[
@@ -783,7 +796,7 @@ export default function ConversationPage() {
                       key={preset}
                       onClick={() => setCustomPrompt(preset)}
                       aria-label={`Use prompt: ${preset}`}
-                      className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-3 py-2 min-h-[44px] rounded-md transition-colors"
+                      className="text-sm bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white px-3 py-2 min-h-[44px] rounded-md transition-colors"
                     >
                       {preset}
                     </button>
@@ -814,7 +827,7 @@ export default function ConversationPage() {
                     <CogIcon className="w-[1.05em] h-[1.05em] flex-shrink-0" />
                     Custom Analysis
                   </h3>
-                  <p className="text-xs text-slate-500 mb-1">Prompt: &ldquo;{customPrompt}&rdquo;</p>
+                  <p className="text-xs text-slate-400 mb-1">Prompt: &ldquo;{customPrompt}&rdquo;</p>
                   <div className="whitespace-pre-wrap text-sm leading-relaxed mt-3">{customResult}</div>
                 </div>
               </div>
