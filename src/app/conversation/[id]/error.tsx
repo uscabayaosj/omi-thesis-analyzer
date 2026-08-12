@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 import { MessageIcon, ArrowLeftIcon } from "@/components/icons";
 
 export default function ConversationError({
@@ -29,13 +30,13 @@ export default function ConversationError({
           >
             Try again
           </button>
-          <a
+          <Link
             href="/"
-            className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium py-2 px-5 min-h-[44px] rounded-lg text-sm transition-colors inline-flex items-center gap-1.5"
+            className="bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium py-2 px-5 min-h-[44px] rounded-lg text-sm transition-colors inline-flex items-center gap-1.5"
           >
             <ArrowLeftIcon className="w-4 h-4" />
             All conversations
-          </a>
+          </Link>
         </div>
       </div>
     </main>
