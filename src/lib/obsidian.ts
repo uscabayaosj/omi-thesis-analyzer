@@ -1,5 +1,6 @@
 import type { StoredAnalysis } from "./storage";
 import type { StoredAdhdAnalysis, StoredRollup } from "./adhd-storage";
+import { confidenceLabel, type Confidence } from "./adhd";
 
 interface ObsidianExport {
   uri: string;
@@ -130,10 +131,10 @@ export function downloadMarkdown(analysis: StoredAnalysis): void {
 
 // ── ADHD Aid export ──
 
-function fmtCommitment(c: { direction: string; who: string; what: string; deadline: string; confidence: string; quote: string }, done: boolean): string {
+function fmtCommitment(c: { direction: string; who: string; what: string; deadline: string; confidence: Confidence; quote: string }, done: boolean): string {
   const box = done ? "✅" : "⬜";
   const dir = c.direction === "other_to_user" ? `${c.who} → me` : `me → ${c.who}`;
-  return `- ${box} **${dir}** — ${c.what} (**${c.deadline}**, ${c.confidence})\n  > ${c.quote}`;
+  return `- ${box} **${dir}** — ${c.what} (**${c.deadline}**, ${confidenceLabel(c.confidence)})\n  > ${c.quote}`;
 }
 
 export function buildAdhdMarkdown(stored: StoredAdhdAnalysis): { markdown: string; filename: string } {

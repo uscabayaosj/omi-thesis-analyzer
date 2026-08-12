@@ -1,7 +1,7 @@
 "use client";
 
 import type { ComponentType, ReactNode } from "react";
-import type { AdhdAnalysis } from "@/lib/adhd";
+import { confidenceLabel, type AdhdAnalysis } from "@/lib/adhd";
 import {
   ZapIcon, ClipboardIcon, CogIcon, UsersIcon, RefreshIcon,
   CalendarIcon, CheckSquareIcon,
@@ -83,7 +83,7 @@ export function AdhdResults({
                   <div className={`min-w-0 ${isDone ? "opacity-50 line-through" : ""}`}>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-xs font-mono text-slate-400">{dir}</span>
-                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-300">{c.confidence}</span>
+                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-300">{confidenceLabel(c.confidence)}</span>
                     </div>
                     <p className="text-slate-200 mt-0.5">{c.what}</p>
                     <p className="text-xs text-slate-400 mt-0.5">Deadline: <strong className="text-slate-200">{c.deadline}</strong></p>

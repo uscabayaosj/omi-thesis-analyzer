@@ -66,8 +66,8 @@ function TranscriptViewer({ segments }: { segments: TranscriptSegment[] }) {
   return (
     <div className="space-y-2">
       {segments.map((seg, i) => (
-        <div key={i} className="flex gap-3 text-sm">
-          <span className="text-slate-500 font-mono w-20 flex-shrink-0 text-right">
+        <div key={i} className="flex flex-col sm:flex-row gap-0.5 sm:gap-3 text-sm">
+          <span className="text-slate-500 font-mono flex-shrink-0 sm:w-20 sm:text-right">
             {seg.speaker_name || `S${seg.speaker_id ?? 0}`}
           </span>
           <span className="flex-1 min-w-0 break-words whitespace-pre-wrap text-slate-300">
@@ -572,7 +572,7 @@ export default function ConversationPage() {
           {/* Analysis results */}
           {(lens === "thesis" || lens === "both") && analysis && (
             <section className="mb-8" aria-label="Pioneer Sovereignty analysis results">
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2 flex-wrap">
                   <CompassIcon className="w-5 h-5 text-indigo-400 flex-shrink-0" />
                   Pioneer Sovereignty Analysis
@@ -585,12 +585,12 @@ export default function ConversationPage() {
                     </span>
                   )}
                 </h2>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   {viewingVersion && (
                     <button
                       onClick={viewCurrent}
                       aria-label="Return to current analysis"
-                      className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5"
+                      className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5 whitespace-nowrap"
                     >
                       <ArrowLeftIcon className="w-3.5 h-3.5" />
                       Current
@@ -601,7 +601,7 @@ export default function ConversationPage() {
                       <button
                         onClick={handleExportObsidian}
                         aria-label="Export analysis to Obsidian vault"
-                        className="text-sm bg-purple-900/40 hover:bg-purple-800/50 text-purple-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5"
+                        className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5 whitespace-nowrap"
                       >
                         {exported ? (
                           <>
@@ -618,7 +618,7 @@ export default function ConversationPage() {
                       <button
                         onClick={handleDownload}
                         aria-label="Download analysis as markdown file"
-                        className="text-sm bg-amber-900/40 hover:bg-amber-800/50 text-amber-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5"
+                        className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5 whitespace-nowrap"
                       >
                         <DownloadIcon className="w-3.5 h-3.5" />
                         Download .md
@@ -677,8 +677,8 @@ export default function ConversationPage() {
                       <ClipboardIcon className="w-5 h-5 text-indigo-400 flex-shrink-0" />
                       ADHD Aid
                     </h2>
-                    <div className="flex items-center gap-2">
-                      <button onClick={handleAdhdExport} className="text-sm bg-purple-900/40 hover:bg-purple-800/50 text-purple-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button onClick={handleAdhdExport} className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5 whitespace-nowrap">
                         {exported ? (
                           <>
                             <CheckIcon className="w-3.5 h-3.5" />
@@ -691,7 +691,7 @@ export default function ConversationPage() {
                           </>
                         )}
                       </button>
-                      <button onClick={handleAdhdDownload} className="text-sm bg-amber-900/40 hover:bg-amber-800/50 text-amber-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5">
+                      <button onClick={handleAdhdDownload} className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5 whitespace-nowrap">
                         {exported ? (
                           <>
                             <CheckIcon className="w-3.5 h-3.5" />

@@ -26,10 +26,10 @@ interface Conversation {
 }
 
 function LensBadges({ thesis, adhd }: { thesis: boolean; adhd: boolean }) {
-  const dot = (on: boolean, label: string) => (
+  const pill = (on: boolean, label: string) => (
     <span
       title={`${label}: ${on ? "analyzed" : "not analyzed"}`}
-      className={`w-5 h-5 rounded-full border text-[10px] font-semibold flex items-center justify-center ${
+      className={`min-w-[46px] px-1.5 py-0.5 rounded-full border text-[10px] font-semibold leading-none whitespace-nowrap text-center ${
         // False positive below: the scanner pairs the "off" branch's text-slate-400 with the "on"
         // branch's bg-emerald-500 since both live in one ternary string. Real pairs, both verified:
         // emerald-400/emerald-wash (5.93:1) and slate-400/slate-800 (5.71:1).
@@ -41,8 +41,8 @@ function LensBadges({ thesis, adhd }: { thesis: boolean; adhd: boolean }) {
   );
   return (
     <div className="mt-0.5 flex-shrink-0 flex flex-col gap-1" aria-hidden="true">
-      {dot(thesis, "T")}
-      {dot(adhd, "A")}
+      {pill(thesis, "Thesis")}
+      {pill(adhd, "ADHD")}
     </div>
   );
 }
@@ -335,29 +335,29 @@ export default function Home() {
         {selectMode && (
           <div className="mt-3">
             <div
-              className="card p-4 border-indigo-500/30 flex items-center justify-between"
+              className="card p-4 border-indigo-500/30 flex flex-wrap items-center justify-between gap-3"
               role="toolbar"
               aria-label="Group analysis toolbar"
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 <button
                   onClick={selectAll}
                   disabled={filtered.length === 0}
                   aria-label={allFilteredSelected ? "Deselect all conversations" : "Select all conversations"}
-                  className="text-sm min-h-[44px] bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 px-4 py-2 rounded-lg transition-colors"
+                  className="text-sm min-h-[44px] bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
                 >
                   {allFilteredSelected ? "Deselect All" : "Select All"}
                 </button>
-                <span className="text-sm text-slate-400" aria-live="polite">
+                <span className="text-sm text-slate-400 whitespace-nowrap" aria-live="polite">
                   {selected.size} selected
                 </span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={startGroupAnalysis}
                   disabled={selected.size < 2 || batchRunning}
                   aria-label={`Group thesis analysis on ${selected.size} conversations`}
-                  className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 text-white font-medium py-2 px-4 min-h-[44px] rounded-lg text-sm transition-colors"
+                  className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 text-white font-medium py-2 px-4 min-h-[44px] rounded-lg text-sm transition-colors whitespace-nowrap"
                 >
                   <SparklesIcon className="w-4 h-4" />
                   Group Thesis ({selected.size})
@@ -366,7 +366,7 @@ export default function Home() {
                   onClick={runBatchAdhd}
                   disabled={selected.size < 1 || batchRunning}
                   aria-label={`Run ADHD Aid on ${selected.size} conversations`}
-                  className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-100 font-medium py-2 px-4 min-h-[44px] rounded-lg text-sm transition-colors"
+                  className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-100 font-medium py-2 px-4 min-h-[44px] rounded-lg text-sm transition-colors whitespace-nowrap"
                 >
                   <ClipboardIcon className="w-4 h-4" />
                   {batchRunning ? `Running ${batchProgress.done}/${batchProgress.total}…` : `Run ADHD (${selected.size})`}
@@ -466,10 +466,10 @@ export default function Home() {
                     {convo.structured?.overview && (
                       <p className="text-slate-400 text-sm mt-1 line-clamp-1">{convo.structured.overview}</p>
                     )}
-                    <div className="flex items-center gap-3 mt-2 text-xs text-slate-500">
-                      <span>{formatDateTime(convo.created_at)}</span>
+                    <div className="flex items-center gap-3 mt-2 text-xs text-slate-500 flex-wrap">
+                      <span className="whitespace-nowrap">{formatDateTime(convo.created_at)}</span>
                       {convo.structured?.category && (
-                        <span className="bg-slate-800 px-2 py-0.5 rounded-full">{convo.structured.category}</span>
+                        <span className="bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap">{convo.structured.category}</span>
                       )}
                     </div>
                   </div>
@@ -496,13 +496,13 @@ export default function Home() {
                   {convo.structured?.overview && (
                     <p className="text-slate-400 text-sm mt-1 line-clamp-2">{convo.structured.overview}</p>
                   )}
-                  <div className="flex items-center gap-3 mt-2 text-xs text-slate-500">
-                    <span>{formatDateTime(convo.created_at)}</span>
+                  <div className="flex items-center gap-3 mt-2 text-xs text-slate-500 flex-wrap">
+                    <span className="whitespace-nowrap">{formatDateTime(convo.created_at)}</span>
                     {convo.structured?.category && (
-                      <span className="bg-slate-800 px-2 py-0.5 rounded-full">{convo.structured.category}</span>
+                      <span className="bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap">{convo.structured.category}</span>
                     )}
                     {convo.folder_name && (
-                      <span className="flex items-center gap-1 bg-indigo-900/50 text-indigo-300 px-2 py-0.5 rounded-full">
+                      <span className="flex items-center gap-1 bg-indigo-900/50 text-indigo-300 px-2 py-0.5 rounded-full whitespace-nowrap">
                         <FolderIcon className="w-3 h-3" />
                         {convo.folder_name}
                       </span>

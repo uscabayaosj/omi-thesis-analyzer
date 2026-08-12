@@ -198,7 +198,7 @@ Every interactive component shares one behavior contract: `background` and `tran
 - Primary in-page navigation (Daily Rollup, Refresh) sits as icon + label ghost buttons in the header, never a persistent nav bar or tab strip — the app has no chrome beyond what a given screen needs.
 
 ### Lens Badge (signature component)
-A `w-5 h-5` circle pair (T / A) shown beside every conversation list item, each independently lit (emerald fill + border) or dim (flat slate) depending on whether the thesis and/or ADHD Aid lens has run. This is the system's one custom-invented primitive — a two-bit status readout that lets the researcher scan a whole list and know, without opening anything, what's been processed and what hasn't.
+A stacked pair of small rounded-full pills ("Thesis" / "ADHD") shown beside every conversation list item, each independently lit (emerald fill + border) or dim (flat slate) depending on whether that lens has run. Reads as plain words, not a coded glyph — a first-time reader doesn't need a tooltip to know what's been processed. This is the system's one custom-invented primitive — a status readout that lets the researcher scan a whole list at a glance.
 
 ## Do's and Don'ts
 
