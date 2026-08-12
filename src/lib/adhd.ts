@@ -48,6 +48,17 @@ export interface AdhdAheadItem {
   conflict: string;
 }
 
+/** Meta-cognitive reflection pass — interpersonal dynamics, self-regulation,
+ *  and emotional tone, produced alongside the administrative extraction in the
+ *  same analysis call. Bullet observations per section; empty array = nothing
+ *  observed for that dimension. */
+export interface AdhdReflection {
+  social_balance: string[];
+  emotional_check: string[];
+  capacity_check: string[];
+  strategic_takeaway: string[];
+}
+
 export interface AdhdAnalysis {
   do_today: string[];
   commitments: AdhdCommitment[];
@@ -56,6 +67,8 @@ export interface AdhdAnalysis {
   open_loops: string[];
   ahead: AdhdAheadItem[];
   summary: string;
+  /** Optional: analyses stored before the reflection pass existed lack it. */
+  reflection?: AdhdReflection;
 }
 
 /** Daily rollup shape. Prose blocks by design (a 60-second plan, not a table).
@@ -158,6 +171,10 @@ export function toAdhdAnalysis(raw: Record<string, unknown>): AdhdAnalysis {
   const ahead = Array.isArray(raw.ahead)
     ? raw.ahead.map(toAheadItem).filter((a): a is AdhdAheadItem => a !== null)
     : [];
+  const rawReflection =
+    raw.reflection && typeof raw.reflection === "object"
+      ? (raw.reflection as Record<string, unknown>)
+      : {};
   return {
     do_today: asStringArray(raw.do_today).slice(0, 3),
     commitments,
@@ -166,6 +183,12 @@ export function toAdhdAnalysis(raw: Record<string, unknown>): AdhdAnalysis {
     open_loops: asStringArray(raw.open_loops),
     ahead,
     summary: asString(raw.summary, "No summary was returned. Re-run the analysis."),
+    reflection: {
+      social_balance: asStringArray(rawReflection.social_balance),
+      emotional_check: asStringArray(rawReflection.emotional_check),
+      capacity_check: asStringArray(rawReflection.capacity_check),
+      strategic_takeaway: asStringArray(rawReflection.strategic_takeaway),
+    },
   };
 }
 
@@ -194,6 +217,17 @@ The transcript comes from speech-to-text and may have errors, missing punctuatio
 7. Tone rules. Never scold, never mention ADHD, never say "you forgot" or "you failed to". State facts and next actions neutrally.
 
 8. Precision over recall padding. Every extracted item must trace to something actually said. If a section has nothing, return an empty array (or "None." for the summary if truly empty).
+
+## Reflection pass
+
+The administrative details above are tracked elsewhere in this output. Separately, act as an empathetic, objective, insightful reflection partner: analyze the meta-cognition, interpersonal dynamics, self-regulation, and emotional tone of the interaction. Fill the "reflection" object's four sections with brief, non-judgmental bullet observations:
+
+- social_balance (Social Balance & Engagement): Did the user interrupt, talk over, or hijack the conversation by story-matching — relating by pivoting to a similar personal experience? If so, note where, as a gentle observation. Did the user validate the other person's perspective before sharing their own? Did the other person get to finish their main thought?
+- emotional_check (Emotional Check): Fact vs. assumption — were there moments where the user seemed to assume negative intent, annoyance, or judgment from the speaker? Contrast what was literally said vs. potential emotional misinterpretations, quoting the literal text where it helps. How did the user's energy or enthusiasm shift during the conversation, and around which topics? Any moments of masking or people-pleasing — holding back an honest opinion or pretending to understand to keep the flow going?
+- capacity_check (Bandwidth & Overcommitment Realism): Did the user agree to tasks or timelines during a burst of excitement that may be unrealistic for their actual capacity? Highlight any overly optimistic promises (cross-reference the commitments you extracted). Did the user clearly state their needs or ask for clarification when something was vague?
+- strategic_takeaway (Strategic Core Takeaway): In 1–2 bullets, what was the other speaker's main underlying goal, core concern, or emotional state? Does anything in this conversation connect to a broader pattern or the user's longer-term goals?
+
+Reflection rules: constructive, empathetic, direct, and concise. Tone rule 7 applies here with full force — observations, never verdicts; no diagnostic or clinical labels in the output text; describe the behavior, not a condition. Ground every observation in the transcript; when a dimension shows nothing notable, return an empty array rather than manufacturing an insight.
 
 You MUST respond with valid JSON matching this exact schema:
 {
@@ -228,7 +262,13 @@ You MUST respond with valid JSON matching this exact schema:
       "conflict": "flagged scheduling/impossibility issue, or 'None'"
     }
   ],
-  "summary": "a single sentence the user could read in 3 seconds to know what this conversation was"
+  "summary": "a single sentence the user could read in 3 seconds to know what this conversation was",
+  "reflection": {
+    "social_balance": ["gentle observation on interruptions, story-matching, validation, or listening", "..."],
+    "emotional_check": ["fact-vs-assumption contrast, energy shift, or masking observation", "..."],
+    "capacity_check": ["overly optimistic promise or self-advocacy observation", "..."],
+    "strategic_takeaway": ["the speaker's underlying goal/concern/state; big-picture connection"]
+  }
 }
 
 "do_today" holds at most 3 items. Do not manufacture insights. Empty arrays are correct when a section has nothing.`;

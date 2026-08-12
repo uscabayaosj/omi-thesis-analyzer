@@ -773,7 +773,11 @@ export default function ConversationPage() {
           )}
 
           {/* Custom analysis — collapsed by default; auto-collapses after an
-              analysis runs so it tucks away without disappearing. */}
+              analysis runs so it tucks away without disappearing. Thesis lens
+              only (not "both"): the free-prompt card frames every question
+              through Pioneer Sovereignty, which has no business on a page the
+              user opened for executive-function output. */}
+          {lens === "thesis" && (
           <section className="mb-8" aria-label="Custom analysis">
             <button
               onClick={() => setShowCustom(!showCustom)}
@@ -868,6 +872,7 @@ export default function ConversationPage() {
               </div>
             )}
           </section>
+          )}
 
           {/* Transcript — collapsed by default; auto-collapses after an
               analysis runs. Expands to the full, page-scrollable transcript. */}
