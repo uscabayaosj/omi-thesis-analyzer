@@ -8,7 +8,8 @@ colors:
   ink-panel-raised: "#334155"
   indigo-ink: "#6366f1"
   indigo-ink-light: "#818cf8"
-  graphite: "#64748b"
+  graphite: "#94a3b8"
+  graphite-nontext: "#64748b"
   amber-marginalia: "#fbbf24"
   amber-marginalia-wash: "rgba(245, 158, 11, 0.06)"
   verified-green: "#34d399"
@@ -113,10 +114,12 @@ The palette is a narrow, deliberately dark stack: one background, one panel colo
 - **Ink Panel** (`#1e293b`): The card/panel surface, one step lighter than the field. Every card, block, and toolbar sits at this level.
 - **Ink Panel, Raised** (`#334155`): The hover/pressed state for panels, and the default border color for panels at rest. One hex, two roles — border when idle, fill on interaction.
 - **Paper** (`#e2e8f0`): Primary text color, at full opacity for headings and ~90% for analysis body copy.
-- **Graphite** (`#64748b`): Muted/secondary text — timestamps, helper copy, disabled states, badge text.
+- **Graphite** (`#94a3b8`): Muted/secondary text — timestamps, helper copy, placeholders, badge text. This is the single muted-text value; the app previously mixed it with a darker `#64748b`, which measured 3.07:1 on Ink Panel and 3.75:1 on Night Field and so failed WCAG AA for body text. `#94a3b8` clears it at 5.71:1 and 6.96:1 respectively. **Muted never means illegible** — if something needs to recede further, reduce its size or weight, don't darken it past this value. `#64748b` survives only as a non-text tone (the calendar's "has entries" dot, list markers), where the 3:1 non-text threshold applies.
 
 ### Named Rules
 **The One Ink Rule.** Indigo is the only color allowed to mean "primary." If a second element on screen needs to look important, it does not get its own color — it gets weight, size, or position instead.
+
+**The Two Greys Rule.** There are exactly two muted greys, and only one of them is ever allowed to carry text: Graphite (`#94a3b8`) for any text, and `#64748b` for non-text marks only (dots, markers, decorative icons). A third, darker grey is never introduced for "extra quiet" text — quieter is expressed through size and weight. Audit test: every text colour in the app must clear 4.5:1 against both Night Field and Ink Panel; `#64748b` fails both, which is exactly why it is barred from text.
 
 ### Signal Colors (single-purpose, not decorative)
 - **Amber Marginalia** (`#fbbf24`, on a `rgba(245, 158, 11, 0.06)` wash): Reserved entirely for the Custom Analysis lens — its icon, heading, "saved" chip, and active border. Never appears anywhere the custom lens isn't involved.
@@ -201,7 +204,7 @@ Every interactive component shares one behavior contract: `background` and `tran
 A stacked pair of small rounded-full pills ("Thesis" / "ADHD") shown beside every conversation list item, each independently lit (emerald fill + border) or dim (flat slate) depending on whether that lens has run. Reads as plain words, not a coded glyph — a first-time reader doesn't need a tooltip to know what's been processed. This is the system's one custom-invented primitive — a status readout that lets the researcher scan a whole list at a glance.
 
 ### Calendar (month grid)
-The primary day-browsing entry point on the conversations list. A 7-column Monday-first grid inside a `.card`. The selected day reuses the filter pills' solid-fill pattern (Indigo Ink background, white text) — the same "true single-select navigation" rule, not a new one. Today gets an indigo ring (`border-indigo-500/60`) independent of selection, so it stays identifiable even when browsing a different day. Days with conversations get a small graphite dot; days without get none — no shadow, no elevation, just the dot and the two indigo treatments. Future dates render dimmed (`text-slate-600`) but stay clickable rather than disabled — simplicity over guarding an edge case that just resolves to an empty state.
+The primary day-browsing entry point on the conversations list. A 7-column Monday-first grid inside a `.card`. The selected day reuses the filter pills' solid-fill pattern (Indigo Ink background, white text) — the same "true single-select navigation" rule, not a new one. Today gets an indigo ring (`border-indigo-500/60`) independent of selection, so it stays identifiable even when browsing a different day. Days with conversations get a small graphite dot; days without get none — no shadow, no elevation, just the dot and the two indigo treatments. Future dates render dimmed (Graphite, one step below the `text-slate-300` of past days) but stay clickable rather than disabled — simplicity over guarding an edge case that just resolves to an empty state. They are dimmed, not faded out: because they remain real controls, they hold the same AA-legible Graphite as any other muted text.
 
 Collapsed to a one-line summary row by default (icon + selected day's label, chevron affordance) — the full grid would otherwise be the first thing painted on mobile, pushing that day's actual conversations below the fold. Tapping the row expands the grid; picking a day (or "Today") collapses it back automatically, so the grid never lingers once its job is done. The one exception: while group-select mode is active, picking a day does *not* collapse the grid, since batch-selecting across several days means jumping between them repeatedly — closing on every pick would fight that workflow. The month label doubles as a native `<input type="month">` (invisibly overlaid) for jumping distant months without a hand-built year picker.
 

@@ -31,6 +31,12 @@
       "graphite": {
         "role": "neutral",
         "displayName": "Graphite",
+        "canonical": "#94a3b8",
+        "tonalRamp": ["#1e2530", "#2c3644", "#3d4a5c", "#546177", "#64748b", "#8593a8", "#aab5c4", "#dbe1e9"]
+      },
+      "graphite-nontext": {
+        "role": "neutral",
+        "displayName": "Graphite (non-text only)",
         "canonical": "#64748b",
         "tonalRamp": ["#1e2530", "#2c3644", "#3d4a5c", "#546177", "#64748b", "#8593a8", "#aab5c4", "#dbe1e9"]
       },
@@ -159,6 +165,7 @@
     ],
     "rules": [
       { "name": "The One Ink Rule", "body": "Indigo is the only color allowed to mean \"primary.\" If a second element on screen needs to look important, it does not get its own color — it gets weight, size, or position instead.", "section": "colors" },
+      { "name": "The Two Greys Rule", "body": "There are exactly two muted greys, and only one of them is ever allowed to carry text: Graphite (#94a3b8) for any text, and #64748b for non-text marks only (dots, markers, decorative icons). A third, darker grey is never introduced for \"extra quiet\" text — quieter is expressed through size and weight. Audit test: every text colour in the app must clear 4.5:1 against both Night Field and Ink Panel; #64748b fails both, which is exactly why it is barred from text.", "section": "colors" },
       { "name": "The Fluid-Only Rule", "body": "Headings never get a fixed pixel size; every heading level is a clamp() that scales between phone and desktop. There is no separate \"mobile type scale\" to maintain.", "section": "typography" },
       { "name": "The Single Column Rule", "body": "No screen in this app ever splits into side-by-side panels. A researcher reading one thing at a time, in order, is the entire interaction model — resist the urge to add a sidebar or a two-pane layout even on wide viewports.", "section": "layout" },
       { "name": "The Flat Field Rule", "body": "Nothing casts a shadow. If a surface needs to read as \"above\" another, lighten it one tonal step instead.", "section": "elevation" }

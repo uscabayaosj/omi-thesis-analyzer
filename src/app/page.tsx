@@ -130,7 +130,7 @@ function CalendarMonth({
       </div>
       <div className="grid grid-cols-7 gap-1 mb-1">
         {["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map((d) => (
-          <div key={d} className="text-center text-[10px] font-semibold text-slate-500" aria-hidden="true">
+          <div key={d} className="text-center text-[10px] font-semibold text-slate-400" aria-hidden="true">
             {d}
           </div>
         ))}
@@ -155,7 +155,7 @@ function CalendarMonth({
                   : isToday
                   ? "border border-indigo-500/60 text-white hover:bg-slate-700"
                   : isFuture
-                  ? "text-slate-600 hover:bg-slate-700"
+                  ? "text-slate-400 hover:bg-slate-700"
                   : "text-slate-300 hover:bg-slate-700"
               }`}
             >
@@ -217,7 +217,7 @@ function ConversationRow({
             {convo.structured?.overview && (
               <p className="text-slate-400 text-sm mt-1 line-clamp-1">{convo.structured.overview}</p>
             )}
-            <div className="flex items-center gap-3 mt-2 text-xs text-slate-500 flex-wrap">
+            <div className="flex items-center gap-3 mt-2 text-xs text-slate-400 flex-wrap">
               <span className="whitespace-nowrap">{formatDateTime(convo.created_at)}</span>
               {convo.structured?.category && (
                 <span className="bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap">{convo.structured.category}</span>
@@ -246,7 +246,7 @@ function ConversationRow({
           {convo.structured?.overview && (
             <p className="text-slate-400 text-sm mt-1 line-clamp-2">{convo.structured.overview}</p>
           )}
-          <div className="flex items-center gap-3 mt-2 text-xs text-slate-500 flex-wrap">
+          <div className="flex items-center gap-3 mt-2 text-xs text-slate-400 flex-wrap">
             <span className="whitespace-nowrap">{formatDateTime(convo.created_at)}</span>
             {convo.structured?.category && (
               <span className="bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap">{convo.structured.category}</span>
@@ -553,7 +553,7 @@ export default function Home() {
 
         {/* Onboarding: About this framework — a quiet footnote, not a section */}
         <details className="mt-3 group">
-          <summary className="cursor-pointer list-none text-sm text-slate-500 hover:text-slate-300 transition-colors min-h-[44px] flex items-center gap-1.5">
+          <summary className="cursor-pointer list-none text-sm text-slate-400 hover:text-slate-300 transition-colors min-h-[44px] flex items-center gap-1.5">
             <ChevronRightIcon className="w-3.5 h-3.5 flex-shrink-0 transition-transform group-open:rotate-90" />
             What is Pioneer Sovereignty?
           </summary>
@@ -596,7 +596,7 @@ export default function Home() {
                 ))}
               </ul>
             </div>
-            <p className="text-xs text-slate-500 pt-2">
+            <p className="text-xs text-slate-400 pt-2">
               This tool analyzes conversations captured by the Omi DK2 wearable device
               and runs them through an AI model grounded in the thesis&apos;s full theoretical framework.
             </p>
@@ -606,20 +606,20 @@ export default function Home() {
         {/* Search — bypasses day-scoping entirely; the fast path when you know the topic, not the date */}
         {conversations.length > 0 && (
           <div className="relative mt-4">
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search conversations by title or topic…"
               aria-label="Search all conversations"
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-10 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:border-indigo-500 focus:outline-none transition-colors min-h-[44px]"
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-10 py-2.5 text-sm text-slate-200 placeholder-slate-400 focus:border-indigo-500 focus:outline-none transition-colors min-h-[44px]"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
                 aria-label="Clear search"
-                className="absolute right-2 top-1/2 -translate-y-1/2 min-h-[32px] min-w-[32px] flex items-center justify-center text-slate-500 hover:text-white transition-colors"
+                className="absolute right-2 top-1/2 -translate-y-1/2 min-h-[32px] min-w-[32px] flex items-center justify-center text-slate-400 hover:text-white transition-colors"
               >
                 <XIcon className="w-3.5 h-3.5" />
               </button>
@@ -658,10 +658,10 @@ export default function Home() {
                   <CalendarIcon className="w-4 h-4 text-indigo-400 flex-shrink-0" />
                   <span className="truncate">
                     {selectedDateLabel}
-                    {selectedDate === todayStr && <span className="text-slate-500"> · Today</span>}
+                    {selectedDate === todayStr && <span className="text-slate-400"> · Today</span>}
                   </span>
                 </span>
-                <ChevronRightIcon className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                <ChevronRightIcon className="w-4 h-4 text-slate-400 flex-shrink-0" />
               </button>
             )}
           </div>
@@ -843,7 +843,7 @@ export default function Home() {
         {filteredByDay && filteredByDay.length > 1
           ? filteredByDay.map(([day, items]) => (
               <div key={day}>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2 mt-4 first:mt-0">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 mt-4 first:mt-0">
                   {formatDateTime(`${day}T12:00:00`, { weekday: "long", day: "numeric", month: "long" })}
                 </p>
                 <div className="space-y-3">

@@ -30,7 +30,7 @@ function AnalysisSection({
           <Icon className="w-[1.05em] h-[1.05em] flex-shrink-0" />
           {title}
         </h3>
-        <p className="text-xs text-slate-500 mb-3">{subtitle}</p>
+        <p className="text-xs text-slate-400 mb-3">{subtitle}</p>
         <div className="whitespace-pre-wrap text-sm leading-relaxed">{content}</div>
       </div>
     </div>

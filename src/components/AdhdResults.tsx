@@ -28,7 +28,7 @@ function Block({
 }
 
 function Empty() {
-  return <p className="text-slate-500">None.</p>;
+  return <p className="text-slate-400">None.</p>;
 }
 
 export function AdhdResults({
@@ -74,7 +74,7 @@ export function AdhdResults({
                     onClick={() => onToggleDone(c.key)}
                     aria-pressed={isDone}
                     aria-label={isDone ? "Mark commitment not done" : "Mark commitment done"}
-                    className="flex-shrink-0 mt-0.5 min-h-[44px] min-w-[44px] flex items-start justify-center text-slate-500 hover:text-emerald-400 transition-colors"
+                    className="flex-shrink-0 mt-0.5 min-h-[44px] min-w-[44px] flex items-start justify-center text-slate-400 hover:text-emerald-400 transition-colors"
                   >
                     {isDone
                       ? <CheckSquareIcon className="w-5 h-5 text-emerald-400" />
@@ -87,7 +87,7 @@ export function AdhdResults({
                     </div>
                     <p className="text-slate-200 mt-0.5">{c.what}</p>
                     <p className="text-xs text-slate-400 mt-0.5">Deadline: <strong className="text-slate-200">{c.deadline}</strong></p>
-                    {c.quote && <p className="text-xs text-slate-500 italic mt-1">&ldquo;{c.quote}&rdquo;</p>}
+                    {c.quote && <p className="text-xs text-slate-400 italic mt-1">&ldquo;{c.quote}&rdquo;</p>}
                   </div>
                 </li>
               );
@@ -109,7 +109,7 @@ export function AdhdResults({
           <div className="space-y-3">
             {analysis.people.map((p, i) => (
               <div key={i} className="rounded-lg bg-slate-900/60 p-3">
-                <p className="font-medium text-slate-200">{p.name} <span className="text-slate-500 font-normal">— {p.relationship}</span></p>
+                <p className="font-medium text-slate-200">{p.name} <span className="text-slate-400 font-normal">— {p.relationship}</span></p>
                 <p className="text-xs text-slate-400 mt-1">Shared: {p.shared}</p>
                 <p className="text-xs text-slate-400">Tone: {p.tone}</p>
                 <p className="text-xs text-slate-400">Owed: {p.owed}</p>
@@ -132,7 +132,7 @@ export function AdhdResults({
           <div className="space-y-3">
             {analysis.ahead.map((x, i) => (
               <div key={i} className="rounded-lg bg-slate-900/60 p-3">
-                <p className="font-medium text-slate-200">{x.event} <span className="text-slate-500 font-normal">({x.date})</span></p>
+                <p className="font-medium text-slate-200">{x.event} <span className="text-slate-400 font-normal">({x.date})</span></p>
                 <p className="text-xs text-slate-400 mt-1">Prep: {x.prep}</p>
                 <p className="text-xs text-slate-400">Start: {x.start_when}</p>
                 {x.conflict && x.conflict !== "None" && (
