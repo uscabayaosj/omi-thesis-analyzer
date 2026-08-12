@@ -83,7 +83,7 @@ function CalendarMonth({
   }
 
   return (
-    <div className="card p-4">
+    <div className="enter-rise card p-4">
       <div className="flex items-center justify-between mb-3">
         <button
           onClick={onPrevMonth}
@@ -554,7 +554,7 @@ export default function Home() {
         {/* Onboarding: About this framework — a quiet footnote, not a section */}
         <details className="mt-3 group">
           <summary className="cursor-pointer list-none text-sm text-slate-400 hover:text-slate-300 transition-colors min-h-[44px] flex items-center gap-1.5">
-            <ChevronRightIcon className="w-3.5 h-3.5 flex-shrink-0 transition-transform group-open:rotate-90" />
+            <ChevronRightIcon className="w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] group-open:rotate-90" />
             What is Pioneer Sovereignty?
           </summary>
           <div className="pl-5 pt-1 pb-2 text-sm text-slate-300 space-y-3">

@@ -92,27 +92,39 @@ function RegenerateConfirmDialog({
   dayLabel: string;
 }) {
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const [closing, setClosing] = useState(false);
+
+  // Play a fast exit transition instead of vanishing instantly — the dialog
+  // should leave the way it arrived, just quicker, since the decision is
+  // already made. Guarded so a second trigger during the exit is a no-op.
+  const requestClose = useCallback((action: () => void) => {
+    setClosing((already) => {
+      if (already) return already;
+      setTimeout(action, 100);
+      return true;
+    });
+  }, []);
 
   useEffect(() => {
     cancelRef.current?.focus();
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCancel();
+      if (e.key === "Escape") requestClose(onCancel);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onCancel]);
+  }, [onCancel, requestClose]);
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+      className={`overlay-backdrop fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 ${closing ? "overlay-closing" : ""}`}
       role="dialog"
       aria-modal="true"
       aria-label="Confirm regenerate rollup"
       onClick={(e) => {
-        if (e.target === e.currentTarget) onCancel();
+        if (e.target === e.currentTarget) requestClose(onCancel);
       }}
     >
-      <div className="card p-6 max-w-md w-full border-red-500/30">
+      <div className={`overlay-panel card p-6 max-w-md w-full border-red-500/30 ${closing ? "overlay-closing" : ""}`}>
         <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
           <WarningIcon className="w-5 h-5 text-red-400 flex-shrink-0" />
           Replace this day&apos;s rollup?
@@ -125,13 +137,13 @@ function RegenerateConfirmDialog({
         <div className="flex gap-3 justify-end">
           <button
             ref={cancelRef}
-            onClick={onCancel}
+            onClick={() => requestClose(onCancel)}
             className="text-sm bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 min-h-[44px] rounded-lg transition-colors"
           >
             Cancel
           </button>
           <button
-            onClick={onConfirm}
+            onClick={() => requestClose(onConfirm)}
             className="text-sm bg-red-600 hover:bg-red-500 text-white font-medium px-4 py-2 min-h-[44px] rounded-lg transition-colors"
           >
             Replace it
@@ -419,13 +431,15 @@ export default function RollupPage() {
             <section aria-label="Daily rollup">
               <div className="flex items-center justify-end gap-2 mb-4">
                 <button onClick={doExport} className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5">
-                  {exported ? <><CheckIcon className="w-3.5 h-3.5" /> Saved</> : <><ExternalLinkIcon className="w-3.5 h-3.5" /> Send to Obsidian</>}
+                  <span key={exported ? "saved" : "idle"} className="label-swap inline-flex items-center gap-1.5">
+                    {exported ? <><CheckIcon className="w-3.5 h-3.5" /> Saved</> : <><ExternalLinkIcon className="w-3.5 h-3.5" /> Send to Obsidian</>}
+                  </span>
                 </button>
                 <button onClick={doDownload} className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5">
                   <DownloadIcon className="w-3.5 h-3.5" /> Download .md
                 </button>
               </div>
-              <div className="space-y-6">
+              <div className="stagger-in space-y-6">
                 {ROLLUP_SECTIONS.map(({ key, heading, icon }) => (
                   <RollupSectionBlock key={key} icon={icon} heading={heading} content={rollup[key]} />
                 ))}

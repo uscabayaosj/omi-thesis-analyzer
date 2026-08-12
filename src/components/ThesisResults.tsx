@@ -37,7 +37,7 @@ function AnalysisSection({
   );
 }
 
-export function ThesisResults({ analysis }: { analysis: Analysis }) {
+export function ThesisResults({ analysis, animate = true }: { analysis: Analysis; animate?: boolean }) {
   const dim = (text: string | undefined) =>
     text && text.trim() ? text : "No content was recorded for this dimension. Re-run the analysis to fill it in.";
 
@@ -53,7 +53,7 @@ export function ThesisResults({ analysis }: { analysis: Analysis }) {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className={`${animate ? "stagger-in" : ""} space-y-6`}>
       {sections.map((section) => (
         <AnalysisSection key={section.title} {...section} />
       ))}

@@ -35,15 +35,17 @@ export function AdhdResults({
   analysis,
   doneKeys,
   onToggleDone,
+  animate = true,
 }: {
   analysis: AdhdAnalysis;
   doneKeys: string[];
   onToggleDone: (key: string) => void;
+  animate?: boolean;
 }) {
   const done = new Set(doneKeys);
 
   return (
-    <div className="space-y-6">
+    <div className={`${animate ? "stagger-in" : ""} space-y-6`}>
       {/* One-line summary */}
       <div className="card p-5 border-indigo-500/30">
         <p className="text-sm text-slate-200">{analysis.summary}</p>
