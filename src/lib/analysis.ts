@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { Analysis } from "./omi-api";
 
 interface ChatMessage {
@@ -102,16 +103,56 @@ function buildRequestBody(config: ProviderConfig, messages: ChatMessage[], jsonM
     };
   }
 
-  // OpenAI (and OpenRouter's OpenAI-compatible path) cache stable prompt
-  // prefixes >1024 tokens automatically. Keeping the system prompt first and
-  // unchanged (as it is here) is what makes that caching kick in.
-  return {
+  const base = {
     model: config.model,
     messages,
     temperature: 0.7,
     max_tokens: 8192,
     ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
   };
+
+  // Every analysis is a one-off: a stable system prompt followed by a
+  // transcript that never repeats. Left implicit, GPT-5.6 would put its cache
+  // breakpoint on that transcript and bill a 1.25x write for a prefix nothing
+  // ever reads. So pin the breakpoint at the end of the system prompt and turn
+  // the implicit one off. The key is a hash of the system prompt, which makes
+  // it stable per prompt type without threading an id through every caller.
+  // Older OpenAI models and OpenRouter reject these fields, hence the gate.
+  const systemMsg = messages.find((m) => m.role === "system");
+  if (provider !== "openai" || !systemMsg || !supportsCacheBreakpoints(config.model)) {
+    return base;
+  }
+
+  return {
+    ...base,
+    messages: messages.map((m) =>
+      m === systemMsg
+        ? {
+            role: m.role,
+            content: [
+              {
+                type: "text",
+                text: m.content,
+                prompt_cache_breakpoint: { mode: "explicit" },
+              },
+            ],
+          }
+        : m,
+    ),
+    prompt_cache_key: promptCacheKey(systemMsg.content),
+    prompt_cache_options: { mode: "explicit" },
+  };
+}
+
+// Explicit cache breakpoints arrived with GPT-5.6; earlier models 400 on them.
+function supportsCacheBreakpoints(model: string): boolean {
+  const m = /^gpt-(\d+)(?:\.(\d+))?/.exec(model);
+  if (!m) return false;
+  return Number(m[1]) * 100 + Number(m[2] ?? 0) >= 506;
+}
+
+function promptCacheKey(systemPrompt: string): string {
+  return `omi:${createHash("sha256").update(systemPrompt).digest("hex").slice(0, 16)}`;
 }
 
 function extractContent(data: Record<string, unknown>, provider: string): string {
