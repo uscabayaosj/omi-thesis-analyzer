@@ -20,7 +20,7 @@ import {
 } from "@/lib/obsidian";
 import { cacheGet, cacheSet } from "@/lib/cache";
 import { fetchJson } from "@/lib/fetch-json";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, dayOf } from "@/lib/format";
 import { ThesisResults, type Analysis } from "@/components/ThesisResults";
 import { AdhdResults } from "@/components/AdhdResults";
 import type { AdhdAnalysis } from "@/lib/adhd";
@@ -438,10 +438,16 @@ export default function ConversationPage() {
     }
   }, [storedAnalysis]);
 
+  // Carry the day back: a bare "/" resets the list to today, so returning
+  // from a conversation browsed on another day dumped the user on an
+  // unrelated (often empty) view. The conversation's own date is the right
+  // target even when it was reached via cross-day search.
+  const backHref = conversation ? `/?day=${dayOf(conversation.created_at)}` : "/";
+
   return (
     <main className="max-w-3xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
-        <Link href="/" className="text-slate-400 hover:text-white text-sm inline-flex items-center gap-1.5 min-h-[44px] py-2">
+        <Link href={backHref} className="text-slate-400 hover:text-white text-sm inline-flex items-center gap-1.5 min-h-[44px] py-2">
           <ArrowLeftIcon className="w-4 h-4" />
           Back to conversations
         </Link>
