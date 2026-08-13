@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { CompassIcon, ArrowLeftIcon } from "@/components/icons";
+import { BUTTON_PRIMARY } from "@/lib/ui";
 
 export default function GroupAnalysisError({
   error,
@@ -26,7 +27,7 @@ export default function GroupAnalysisError({
         <div className="flex gap-3 justify-center">
           <button
             onClick={reset}
-            className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 px-5 min-h-[44px] rounded-lg text-sm transition-colors"
+            className={`${BUTTON_PRIMARY} py-2 px-5`}
           >
             Try again
           </button>

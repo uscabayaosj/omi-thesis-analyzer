@@ -15,6 +15,7 @@ import {
   ExternalLinkIcon, DownloadIcon, CheckIcon, ZapIcon, ClipboardIcon,
   UsersIcon, FileTextIcon, XCircleIcon,
 } from "@/components/icons";
+import { BUTTON_PRIMARY } from "@/lib/ui";
 
 interface ConvoLite {
   id: string;
@@ -292,7 +293,7 @@ export default function RollupPage() {
 
       <header className="mb-6">
         <h1 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
-          <CalendarIcon className="w-6 h-6 text-indigo-400 flex-shrink-0" />
+          <CalendarIcon className="w-6 h-6 text-cyan-400 flex-shrink-0" />
           Daily Rollup
         </h1>
         <p className="text-slate-400 text-sm">
@@ -325,7 +326,7 @@ export default function RollupPage() {
                 <button
                   onClick={() => selectDay(day)}
                   disabled={running}
-                  className="w-full text-left card p-5 hover:border-indigo-500/50 transition-colors min-h-[44px] flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full text-left card p-5 hover:border-cyan-500/50 transition-colors min-h-[44px] flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div>
                     <p className="font-semibold text-white">{formatDateTime(`${day}T12:00:00`, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
@@ -395,7 +396,7 @@ export default function RollupPage() {
                   else generate(selectedConvos, selectedDay);
                 }}
                 disabled={running || selectedConvos.length === 0}
-                className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 text-white font-medium py-2 px-5 min-h-[44px] rounded-lg text-sm transition-colors inline-flex items-center justify-center gap-2"
+                className={`${BUTTON_PRIMARY} w-full py-2 px-5 inline-flex items-center justify-center gap-2`}
               >
                 {running ? (
                   <>

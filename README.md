@@ -1,6 +1,6 @@
-# Omi Thesis Analyzer
+# TRACE — Personal & Research Assistant
 
-AI-powered conversation analysis for PhD research on Pioneer Sovereignty. Pulls conversations from the Omi Developer API and runs 5-dimension analysis through GPT-4o.
+Turns Omi wearable conversations into two things: thesis evidence for PhD research on Pioneer Sovereignty, and a daily executive-function plan. Pulls conversations from the Omi Developer API and runs analysis through GPT-4o.
 
 ## Setup
 

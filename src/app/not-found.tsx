@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CompassIcon, ArrowLeftIcon } from "@/components/icons";
+import { BUTTON_PRIMARY } from "@/lib/ui";
 
 export default function NotFound() {
   return (
@@ -12,7 +13,7 @@ export default function NotFound() {
         </p>
         <Link
           href="/"
-          className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 px-5 min-h-[44px] rounded-lg text-sm transition-colors inline-flex items-center gap-1.5"
+          className={`${BUTTON_PRIMARY} py-2 px-5 inline-flex items-center gap-1.5`}
         >
           <ArrowLeftIcon className="w-4 h-4" />
           Back to conversations

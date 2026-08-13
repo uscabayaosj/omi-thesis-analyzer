@@ -1,14 +1,20 @@
 {
-  "name": "Omi Thesis Analyzer",
-  "short_name": "Thesis",
-  "description": "AI-powered conversation analysis for PhD research on Pioneer Sovereignty",
+  "name": "TRACE — Personal & Research Assistant",
+  "short_name": "TRACE",
+  "description": "Turns Omi wearable conversations into thesis evidence and daily executive-function structure.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",
-  "theme_color": "#0f172a",
+  "theme_color": "#13294b",
   "orientation": "portrait-primary",
   "categories": ["education", "productivity"],
   "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
     {
       "src": "/icon-192.png",
       "sizes": "192x192",

@@ -1,97 +1,268 @@
 {
   "schemaVersion": 2,
   "generatedAt": "2026-08-12T00:00:00.000Z",
-  "title": "Design System: Omi Thesis Analyzer",
+  "title": "Design System: TRACE",
   "extensions": {
     "colorMeta": {
       "night-field": {
         "role": "neutral",
         "displayName": "Night Field",
         "canonical": "#0f172a",
-        "tonalRamp": ["#04070d", "#0a0f1a", "#0f172a", "#1e293b", "#334155", "#64748b", "#94a3b8", "#e2e8f0"]
+        "tonalRamp": [
+          "#04070d",
+          "#0a0f1a",
+          "#0f172a",
+          "#1e293b",
+          "#334155",
+          "#64748b",
+          "#94a3b8",
+          "#e2e8f0"
+        ]
       },
       "ink-panel": {
         "role": "neutral",
         "displayName": "Ink Panel",
         "canonical": "#1e293b",
-        "tonalRamp": ["#04070d", "#0a0f1a", "#0f172a", "#1e293b", "#334155", "#64748b", "#94a3b8", "#e2e8f0"]
+        "tonalRamp": [
+          "#04070d",
+          "#0a0f1a",
+          "#0f172a",
+          "#1e293b",
+          "#334155",
+          "#64748b",
+          "#94a3b8",
+          "#e2e8f0"
+        ]
       },
       "ink-panel-raised": {
         "role": "neutral",
         "displayName": "Ink Panel, Raised",
         "canonical": "#334155",
-        "tonalRamp": ["#04070d", "#0a0f1a", "#0f172a", "#1e293b", "#334155", "#64748b", "#94a3b8", "#e2e8f0"]
+        "tonalRamp": [
+          "#04070d",
+          "#0a0f1a",
+          "#0f172a",
+          "#1e293b",
+          "#334155",
+          "#64748b",
+          "#94a3b8",
+          "#e2e8f0"
+        ]
       },
       "paper": {
         "role": "neutral",
         "displayName": "Paper",
         "canonical": "#e2e8f0",
-        "tonalRamp": ["#04070d", "#0a0f1a", "#0f172a", "#1e293b", "#334155", "#64748b", "#94a3b8", "#e2e8f0"]
+        "tonalRamp": [
+          "#04070d",
+          "#0a0f1a",
+          "#0f172a",
+          "#1e293b",
+          "#334155",
+          "#64748b",
+          "#94a3b8",
+          "#e2e8f0"
+        ]
       },
       "graphite": {
         "role": "neutral",
         "displayName": "Graphite",
         "canonical": "#94a3b8",
-        "tonalRamp": ["#1e2530", "#2c3644", "#3d4a5c", "#546177", "#64748b", "#8593a8", "#aab5c4", "#dbe1e9"]
+        "tonalRamp": [
+          "#1e2530",
+          "#2c3644",
+          "#3d4a5c",
+          "#546177",
+          "#64748b",
+          "#8593a8",
+          "#aab5c4",
+          "#dbe1e9"
+        ]
       },
       "graphite-nontext": {
         "role": "neutral",
         "displayName": "Graphite (non-text only)",
         "canonical": "#64748b",
-        "tonalRamp": ["#1e2530", "#2c3644", "#3d4a5c", "#546177", "#64748b", "#8593a8", "#aab5c4", "#dbe1e9"]
+        "tonalRamp": [
+          "#1e2530",
+          "#2c3644",
+          "#3d4a5c",
+          "#546177",
+          "#64748b",
+          "#8593a8",
+          "#aab5c4",
+          "#dbe1e9"
+        ]
       },
-      "indigo-ink": {
+      "signal-cyan": {
         "role": "primary",
-        "displayName": "Indigo Ink",
-        "canonical": "#6366f1",
-        "tonalRamp": ["#1e1b4b", "#312e81", "#3730a3", "#4338ca", "#4f46e5", "#6366f1", "#818cf8", "#c7d2fe"]
+        "displayName": "Signal Cyan",
+        "canonical": "#22d3ee",
+        "tonalRamp": [
+          "#083344",
+          "#164e63",
+          "#155e75",
+          "#0e7490",
+          "#0891b2",
+          "#06b6d4",
+          "#22d3ee",
+          "#a5f3fc"
+        ]
       },
-      "indigo-ink-light": {
+      "signal-cyan-light": {
         "role": "primary",
-        "displayName": "Indigo Ink, Light",
-        "canonical": "#818cf8",
-        "tonalRamp": ["#1e1b4b", "#312e81", "#3730a3", "#4338ca", "#4f46e5", "#6366f1", "#818cf8", "#c7d2fe"]
+        "displayName": "Signal Cyan, Light",
+        "canonical": "#67e8f9",
+        "tonalRamp": [
+          "#083344",
+          "#164e63",
+          "#155e75",
+          "#0e7490",
+          "#0891b2",
+          "#06b6d4",
+          "#22d3ee",
+          "#a5f3fc"
+        ]
+      },
+      "brand-navy": {
+        "role": "neutral",
+        "displayName": "Brand Navy",
+        "canonical": "#13294b",
+        "tonalRamp": [
+          "#050b16",
+          "#0a1729",
+          "#13294b",
+          "#1e3a63",
+          "#2c527f",
+          "#43709f",
+          "#6b93bd",
+          "#b3cbe0"
+        ]
       },
       "amber-marginalia": {
         "role": "accent",
         "displayName": "Amber Marginalia",
         "canonical": "#fbbf24",
-        "tonalRamp": ["#451a03", "#78350f", "#92400e", "#b45309", "#d97706", "#f59e0b", "#fbbf24", "#fde68a"]
+        "tonalRamp": [
+          "#451a03",
+          "#78350f",
+          "#92400e",
+          "#b45309",
+          "#d97706",
+          "#f59e0b",
+          "#fbbf24",
+          "#fde68a"
+        ]
       },
       "verified-green": {
         "role": "success",
         "displayName": "Verified Green",
         "canonical": "#34d399",
-        "tonalRamp": ["#022c22", "#064e3b", "#065f46", "#047857", "#059669", "#10b981", "#34d399", "#a7f3d0"]
+        "tonalRamp": [
+          "#022c22",
+          "#064e3b",
+          "#065f46",
+          "#047857",
+          "#059669",
+          "#10b981",
+          "#34d399",
+          "#a7f3d0"
+        ]
       },
       "alert-red": {
         "role": "error",
         "displayName": "Alert Red",
         "canonical": "#f87171",
-        "tonalRamp": ["#450a0a", "#7f1d1d", "#991b1b", "#b91c1c", "#dc2626", "#ef4444", "#f87171", "#fecaca"]
+        "tonalRamp": [
+          "#450a0a",
+          "#7f1d1d",
+          "#991b1b",
+          "#b91c1c",
+          "#dc2626",
+          "#ef4444",
+          "#f87171",
+          "#fecaca"
+        ]
       }
     },
     "typographyMeta": {
-      "display": { "displayName": "Display", "purpose": "Page-level h1 only (\"Thesis Analyzer\", a conversation's title)." },
-      "headline": { "displayName": "Headline", "purpose": "Section-level h2 headings." },
-      "title": { "displayName": "Title", "purpose": "Analysis-block h3 headings (e.g. \"Do today\", \"RQ1 — Documentary Record\")." },
-      "body": { "displayName": "Body", "purpose": "Analysis prose and card copy; tall 1.7 line-height for dense generated text." },
-      "label": { "displayName": "Label", "purpose": "Mono metadata: timestamps, confidence tags, commitment direction." },
-      "micro": { "displayName": "Micro", "purpose": "Single glyph in a compact circular badge (lens dots, numbered dimension markers)." }
+      "display": {
+        "displayName": "Display",
+        "purpose": "Page-level h1 only (the TRACE wordmark, a conversation's title)."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Section-level h2 headings."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Analysis-block h3 headings (e.g. \"Do today\", \"RQ1 — Documentary Record\")."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Analysis prose and card copy; tall 1.7 line-height for dense generated text."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Mono metadata: timestamps, confidence tags, commitment direction."
+      },
+      "micro": {
+        "displayName": "Micro",
+        "purpose": "Single glyph in a compact circular badge (lens dots, numbered dimension markers)."
+      }
     },
     "motion": [
-      { "name": "tokens", "value": "--ease-out: cubic-bezier(0.23, 1, 0.32, 1); --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1); --dur-fast: 100ms; --dur-base: 150ms; --dur-enter: 200ms", "purpose": "Shared easing/duration variables every other motion entry below is built from." },
-      { "name": "state-transition", "value": "var(--dur-base) ease (background/color), var(--dur-fast) var(--ease-out) (transform)", "purpose": "Default hover/press transition on cards and buttons." },
-      { "name": "press-feedback", "value": "scale(0.97) on :active, var(--dur-fast) var(--ease-out)", "purpose": "Every button and [role=\"button\"] confirms it heard the tap/click, on all devices (not just touch)." },
-      { "name": "overlay-enter", "value": "backdrop opacity fade + panel scale(0.95)→1, var(--dur-enter) var(--ease-out), via @starting-style", "purpose": "ConfirmRerunDialog / RegenerateConfirmDialog entrance. Centered transform-origin (modals aren't trigger-anchored)." },
-      { "name": "overlay-exit", "value": "same path in reverse via .overlay-closing, var(--dur-fast) — faster than the entrance", "purpose": "Dialogs leave the way they arrived instead of vanishing instantly; unmount is deferred ~100ms via React state so the transition can play. Confirm and Cancel both trigger it." },
-      { "name": "panel-enter", "value": "opacity + translateY(4px)→0, var(--dur-enter) var(--ease-out), via @starting-style", "purpose": "Conditionally-mounted panels (custom analysis, expanded calendar) so they don't pop in." },
-      { "name": "stagger-cascade", "value": "opacity + translateY(8px)→0, 250ms var(--ease-out), 40ms delay per child up to 5, then 200ms", "purpose": "Analysis result sections cascade in on first reveal only — lens-switch remounts are excluded (see conversation/[id]/page.tsx's thesisSeen/adhdSeen state) so tab switching stays instant." },
-      { "name": "label-crossfade", "value": "opacity + blur(2px)→0, var(--dur-enter) ease, keyed by React key", "purpose": "Export button label swap (e.g. \"Send to Obsidian\" → \"Saved\") — blur masks the two-state overlap." },
-      { "name": "shimmer", "value": "1.5s infinite linear background-position sweep", "purpose": "Skeleton loading placeholders; disabled entirely under prefers-reduced-motion." }
+      {
+        "name": "tokens",
+        "value": "--ease-out: cubic-bezier(0.23, 1, 0.32, 1); --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1); --dur-fast: 100ms; --dur-base: 150ms; --dur-enter: 200ms",
+        "purpose": "Shared easing/duration variables every other motion entry below is built from."
+      },
+      {
+        "name": "state-transition",
+        "value": "var(--dur-base) ease (background/color), var(--dur-fast) var(--ease-out) (transform)",
+        "purpose": "Default hover/press transition on cards and buttons."
+      },
+      {
+        "name": "press-feedback",
+        "value": "scale(0.97) on :active, var(--dur-fast) var(--ease-out)",
+        "purpose": "Every button and [role=\"button\"] confirms it heard the tap/click, on all devices (not just touch)."
+      },
+      {
+        "name": "overlay-enter",
+        "value": "backdrop opacity fade + panel scale(0.95)→1, var(--dur-enter) var(--ease-out), via @starting-style",
+        "purpose": "ConfirmRerunDialog / RegenerateConfirmDialog entrance. Centered transform-origin (modals aren't trigger-anchored)."
+      },
+      {
+        "name": "overlay-exit",
+        "value": "same path in reverse via .overlay-closing, var(--dur-fast) — faster than the entrance",
+        "purpose": "Dialogs leave the way they arrived instead of vanishing instantly; unmount is deferred ~100ms via React state so the transition can play. Confirm and Cancel both trigger it."
+      },
+      {
+        "name": "panel-enter",
+        "value": "opacity + translateY(4px)→0, var(--dur-enter) var(--ease-out), via @starting-style",
+        "purpose": "Conditionally-mounted panels (custom analysis, expanded calendar) so they don't pop in."
+      },
+      {
+        "name": "stagger-cascade",
+        "value": "opacity + translateY(8px)→0, 250ms var(--ease-out), 40ms delay per child up to 5, then 200ms",
+        "purpose": "Analysis result sections cascade in on first reveal only — lens-switch remounts are excluded (see conversation/[id]/page.tsx's thesisSeen/adhdSeen state) so tab switching stays instant."
+      },
+      {
+        "name": "label-crossfade",
+        "value": "opacity + blur(2px)→0, var(--dur-enter) ease, keyed by React key",
+        "purpose": "Export button label swap (e.g. \"Send to Obsidian\" → \"Saved\") — blur masks the two-state overlap."
+      },
+      {
+        "name": "shimmer",
+        "value": "1.5s infinite linear background-position sweep",
+        "purpose": "Skeleton loading placeholders; disabled entirely under prefers-reduced-motion."
+      }
     ],
     "breakpoints": [
-      { "name": "sm", "value": "640px" }
+      {
+        "name": "sm",
+        "value": "640px"
+      }
     ]
   },
   "components": [
@@ -101,7 +272,7 @@
       "refersTo": "button-primary",
       "description": "The one primary action on a screen (Run Custom Analysis, Generate Rollup).",
       "html": "<button class=\"ds-btn-primary\">Run Custom Analysis</button>",
-      "css": ".ds-btn-primary { background: #6366f1; color: #e2e8f0; font-weight: 500; padding: 8px 20px; min-height: 44px; border-radius: 8px; border: none; transition: background 0.15s ease; } .ds-btn-primary:hover { background: #4f46e5; } .ds-btn-primary:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; } .ds-btn-primary:disabled { background: #334155; color: #64748b; cursor: not-allowed; }"
+      "css": ".ds-btn-primary { background: #22d3ee; color: #e2e8f0; font-weight: 500; padding: 8px 20px; min-height: 44px; border-radius: 8px; border: none; transition: background 0.15s ease; } .ds-btn-primary:hover { background: #67e8f9; } .ds-btn-primary:focus-visible { outline: 2px solid #22d3ee; outline-offset: 2px; } .ds-btn-primary:disabled { background: #334155; color: #64748b; cursor: not-allowed; }"
     },
     {
       "name": "Secondary Button",
@@ -115,9 +286,9 @@
       "name": "Parity Action Button",
       "kind": "button",
       "refersTo": null,
-      "description": "For two or more independent, co-equal actions sharing one control (Group Thesis / Run ADHD in the selection toolbar) — different actions on the same selection, not a preference order. Solid-fill indigo is reserved for the one true primary action per screen (see Primary Button), so no parity action claims it at rest; instead all of them share one class across three tiers: flat slate when nothing is selected; an indigo-tinted \"ready\" wash as soon as anything is (reusing the same wash the selected ConversationRow uses: border-indigo-500 + bg-indigo-950/30), even for a button whose own minimum isn't met yet (Group Thesis needs 2, but goes \"ready\" at 1 — its click handler no-ops below 2 rather than the button disabling, since the resting color signals \"a selection exists,\" not \"this specific threshold is met\"); and a solid-fill full-indigo flash on :active, so the moment of an actual tap reads heavier than just having a selection ready. History: a first fix (bg-slate-700 at rest, opacity-50 disabled) never gave Run ADHD an enabled-state color change, so only Group Thesis ever looked \"activated.\" The next fix (both solid-fill indigo) broke the One Ink Rule by declaring two primary actions on one screen. This version fixes both: shared tinted-not-solid ready state, decoupled from each button's own numeric minimum.",
+      "description": "For two or more independent, co-equal actions sharing one control (Group Thesis / Run ADHD in the selection toolbar) — different actions on the same selection, not a preference order. Solid-fill cyan is reserved for the one true primary action per screen (see Primary Button), so no parity action claims it at rest; instead all of them share one class across three tiers: flat slate when nothing is selected; an cyan-tinted \"ready\" wash as soon as anything is (reusing the same wash the selected ConversationRow uses: border-cyan-500 + bg-cyan-950/30), even for a button whose own minimum isn't met yet (Group Thesis needs 2, but goes \"ready\" at 1 — its click handler no-ops below 2 rather than the button disabling, since the resting color signals \"a selection exists,\" not \"this specific threshold is met\"); and a solid-fill full-cyan flash on :active, so the moment of an actual tap reads heavier than just having a selection ready. History: a first fix (bg-slate-700 at rest, opacity-50 disabled) never gave Run ADHD an enabled-state color change, so only Group Thesis ever looked \"activated.\" The next fix (both solid-fill cyan) broke the One Ink Rule by declaring two primary actions on one screen. This version fixes both: shared tinted-not-solid ready state, decoupled from each button's own numeric minimum.",
       "html": "<div class=\"ds-toolbar-actions\"><button class=\"ds-btn-parity\" disabled>Group Thesis (0)</button><button class=\"ds-btn-parity\">Group Thesis (1) — ready, taps no-op below 2</button></div>",
-      "css": ".ds-btn-parity { display: flex; align-items: center; gap: 6px; border-radius: 8px; border: 1px solid rgba(99, 102, 241, 0.5); background: rgba(30, 27, 75, 0.4); color: #c7d2fe; font-weight: 500; padding: 8px 16px; min-height: 44px; transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease; } .ds-btn-parity:hover { border-color: rgba(99, 102, 241, 0.7); background: rgba(30, 27, 75, 0.6); color: #e0e7ff; } .ds-btn-parity:active { border-color: #818cf8; background: #4f46e5; color: #ffffff; } .ds-btn-parity:disabled { border-color: transparent; background: #334155; color: #94a3b8; cursor: not-allowed; }"
+      "css": ".ds-btn-parity { display: flex; align-items: center; gap: 6px; border-radius: 8px; border: 1px solid rgba(34, 211, 238, 0.5); background: rgba(8, 51, 68, 0.4); color: #c7d2fe; font-weight: 500; padding: 8px 16px; min-height: 44px; transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease; } .ds-btn-parity:hover { border-color: rgba(34, 211, 238, 0.7); background: rgba(8, 51, 68, 0.6); color: #e0e7ff; } .ds-btn-parity:active { border-color: #67e8f9; background: #67e8f9; color: #ffffff; } .ds-btn-parity:disabled { border-color: transparent; background: #334155; color: #94a3b8; cursor: not-allowed; }"
     },
     {
       "name": "Card",
@@ -141,7 +312,7 @@
       "refersTo": "badge",
       "description": "The one navigation control that uses solid fill for selection state (All / Analyzed / Unanalyzed).",
       "html": "<div role=\"radiogroup\" class=\"ds-pillgroup\"><button class=\"ds-pill ds-pill-active\">All</button><button class=\"ds-pill\">Analyzed</button></div>",
-      "css": ".ds-pillgroup { display: inline-flex; gap: 4px; } .ds-pill { min-height: 44px; padding: 8px 16px; border-radius: 9999px; font-size: 0.875rem; background: #1e293b; color: #cbd5e1; border: none; transition: background 0.15s ease, color 0.15s ease; } .ds-pill-active { background: #6366f1; color: #ffffff; }"
+      "css": ".ds-pillgroup { display: inline-flex; gap: 4px; } .ds-pill { min-height: 44px; padding: 8px 16px; border-radius: 9999px; font-size: 0.875rem; background: #1e293b; color: #cbd5e1; border: none; transition: background 0.15s ease, color 0.15s ease; } .ds-pill-active { background: #22d3ee; color: #ffffff; }"
     },
     {
       "name": "Text Field",
@@ -163,30 +334,50 @@
       "name": "Calendar (month grid)",
       "kind": "custom",
       "refersTo": null,
-      "description": "Signature component: the primary day-browsing entry point on the conversations list. Collapsed to a one-line summary row by default (shown first) so the grid doesn't push that day's conversations below the fold on mobile; tapping it expands the 7-column Monday-first grid (shown second). Selected day reuses the filter pills' solid-fill pattern; today gets an indigo ring independent of selection; days with entries get a graphite dot. Day-cell hover and the Today button's hover both use #334155 (slate-700), one step up from the grid's own #1e293b card — never #1e293b itself, which would be invisible against the card it's inside.",
+      "description": "Signature component: the primary day-browsing entry point on the conversations list. Collapsed to a one-line summary row by default (shown first) so the grid doesn't push that day's conversations below the fold on mobile; tapping it expands the 7-column Monday-first grid (shown second). Selected day reuses the filter pills' solid-fill pattern; today gets an cyan ring independent of selection; days with entries get a graphite dot. Day-cell hover and the Today button's hover both use #334155 (slate-700), one step up from the grid's own #1e293b card — never #1e293b itself, which would be invisible against the card it's inside.",
       "html": "<button class=\"ds-cal-summary\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"18\" rx=\"2\"/><path d=\"M16 2v4M8 2v4M3 10h18\"/></svg><span>Wednesday, 12 August 2026 · Today</span><svg class=\"ds-cal-chevron\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M9 5l7 7-7 7\"/></svg></button><div class=\"ds-cal-grid\"><button class=\"ds-cal-day\">10</button><button class=\"ds-cal-day ds-cal-day-today\">11</button><button class=\"ds-cal-day ds-cal-day-selected\">12<span class=\"ds-cal-dot ds-cal-dot-on\"></span></button><button class=\"ds-cal-day\">13</button></div>",
-      "css": ".ds-cal-summary { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 12px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #e2e8f0; font-size: 0.875rem; transition: background 0.15s ease; } .ds-cal-summary:hover { background: #334155; } .ds-cal-chevron { color: #64748b; flex-shrink: 0; } .ds-cal-grid { display: flex; gap: 4px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 16px; } .ds-cal-day { aspect-ratio: 1; min-height: 40px; min-width: 40px; border-radius: 8px; border: none; background: transparent; color: #cbd5e1; font-size: 0.875rem; position: relative; transition: background 0.15s ease; } .ds-cal-day:hover { background: #334155; } .ds-cal-day-today { border: 1px solid rgba(99, 102, 241, 0.6); color: #ffffff; } .ds-cal-day-selected { background: #4f39f6; color: #ffffff; font-weight: 600; } .ds-cal-dot { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 9999px; } .ds-cal-dot-on { background: #ffffff; }"
+      "css": ".ds-cal-summary { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 12px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #e2e8f0; font-size: 0.875rem; transition: background 0.15s ease; } .ds-cal-summary:hover { background: #334155; } .ds-cal-chevron { color: #64748b; flex-shrink: 0; } .ds-cal-grid { display: flex; gap: 4px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 16px; } .ds-cal-day { aspect-ratio: 1; min-height: 40px; min-width: 40px; border-radius: 8px; border: none; background: transparent; color: #cbd5e1; font-size: 0.875rem; position: relative; transition: background 0.15s ease; } .ds-cal-day:hover { background: #334155; } .ds-cal-day-today { border: 1px solid rgba(34, 211, 238, 0.6); color: #ffffff; } .ds-cal-day-selected { background: #22d3ee; color: #ffffff; font-weight: 600; } .ds-cal-dot { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 9999px; } .ds-cal-dot-on { background: #ffffff; }"
     }
   ],
   "narrative": {
     "northStar": "The Field Journal",
-    "overview": "This is a researcher's dark notebook, not a product marketing itself. Every screen reads as a page you turn to record, review, or close out — precise, patient, and unhurried, because the two people this journal serves are the same person: a PhD researcher extracting thesis evidence, and someone using the same tool at the end of the day to see what actually needs doing. The indigo accent behaves like ink on night paper: it marks what matters (the primary lens, the active state, the thing to act on) and disappears everywhere else. Amber behaves like a marginal note — the custom-analysis lens and its \"saved\" chip are handwritten asides against the notebook's default page, not a competing brand color.\n\nThe palette stays muted and clinical on purpose: desaturated slate, low-glare, nothing performing for attention. Warmth exists, but only where it's earned — amber for a personal aside, emerald for a thing genuinely done and checked off — never as decoration. This system explicitly rejects three lanes it could easily fall into: a productivity app selling itself (no gamification, no cheerful microcopy, no streaks), a clinical intake form (despite the ADHD framing, nothing reads as diagnostic or sterile), and a busy analytics dashboard (no multi-panel data-viz energy — this is a small set of calm, sequential pages, not a control room).",
+    "overview": "This is a researcher's dark notebook, not a product marketing itself. Every screen reads as a page you turn to record, review, or close out — precise, patient, and unhurried, because the two people this journal serves are the same person: a PhD researcher extracting thesis evidence, and someone using the same tool at the end of the day to see what actually needs doing. The cyan accent behaves like ink on night paper: it marks what matters (the primary lens, the active state, the thing to act on) and disappears everywhere else. Amber behaves like a marginal note — the custom-analysis lens and its \"saved\" chip are handwritten asides against the notebook's default page, not a competing brand color.\n\nThe palette stays muted and clinical on purpose: desaturated slate, low-glare, nothing performing for attention. Warmth exists, but only where it's earned — amber for a personal aside, emerald for a thing genuinely done and checked off — never as decoration. This system explicitly rejects three lanes it could easily fall into: a productivity app selling itself (no gamification, no cheerful microcopy, no streaks), a clinical intake form (despite the ADHD framing, nothing reads as diagnostic or sterile), and a busy analytics dashboard (no multi-panel data-viz energy — this is a small set of calm, sequential pages, not a control room).",
     "keyCharacteristics": [
       "Single dark surface family (night field → ink panel → ink panel raised), no light mode",
-      "One accent color carries all \"this is active / this is primary\" meaning: indigo",
+      "One accent color carries all \"this is active / this is primary\" meaning: cyan",
       "Flat by default — depth comes from tonal layering, not shadows",
       "Every interactive target is at least 44px tall; this is a phone-in-pocket tool as much as a desk tool",
       "Amber and emerald are single-purpose accents (custom lens; done/verified) — never used decoratively"
     ],
     "rules": [
-      { "name": "The One Ink Rule", "body": "Indigo is the only color allowed to mean \"primary.\" If a second element on screen needs to look important, it does not get its own color — it gets weight, size, or position instead.", "section": "colors" },
-      { "name": "The Two Greys Rule", "body": "There are exactly two muted greys, and only one of them is ever allowed to carry text: Graphite (#94a3b8) for any text, and #64748b for non-text marks only (dots, markers, decorative icons). A third, darker grey is never introduced for \"extra quiet\" text — quieter is expressed through size and weight. Audit test: every text colour in the app must clear 4.5:1 against both Night Field and Ink Panel; #64748b fails both, which is exactly why it is barred from text.", "section": "colors" },
-      { "name": "The Fluid-Only Rule", "body": "Headings never get a fixed pixel size; every heading level is a clamp() that scales between phone and desktop. There is no separate \"mobile type scale\" to maintain.", "section": "typography" },
-      { "name": "The Single Column Rule", "body": "No screen in this app ever splits into side-by-side panels. A researcher reading one thing at a time, in order, is the entire interaction model — resist the urge to add a sidebar or a two-pane layout even on wide viewports.", "section": "layout" },
-      { "name": "The Flat Field Rule", "body": "Nothing casts a shadow. If a surface needs to read as \"above\" another, lighten it one tonal step instead.", "section": "elevation" }
+      {
+        "name": "The One Ink Rule",
+        "body": "Signal Cyan is the only color allowed to mean \"primary.\" If a second element on screen needs to look important, it does not get its own color — it gets weight, size, or position instead.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two Greys Rule",
+        "body": "There are exactly two muted greys, and only one of them is ever allowed to carry text: Graphite (#94a3b8) for any text, and #64748b for non-text marks only (dots, markers, decorative icons). A third, darker grey is never introduced for \"extra quiet\" text — quieter is expressed through size and weight. Audit test: every text colour in the app must clear 4.5:1 against both Night Field and Ink Panel; #64748b fails both, which is exactly why it is barred from text.",
+        "section": "colors"
+      },
+      {
+        "name": "The Fluid-Only Rule",
+        "body": "Headings never get a fixed pixel size; every heading level is a clamp() that scales between phone and desktop. There is no separate \"mobile type scale\" to maintain.",
+        "section": "typography"
+      },
+      {
+        "name": "The Single Column Rule",
+        "body": "No screen in this app ever splits into side-by-side panels. A researcher reading one thing at a time, in order, is the entire interaction model — resist the urge to add a sidebar or a two-pane layout even on wide viewports.",
+        "section": "layout"
+      },
+      {
+        "name": "The Flat Field Rule",
+        "body": "Nothing casts a shadow. If a surface needs to read as \"above\" another, lighten it one tonal step instead.",
+        "section": "elevation"
+      }
     ],
     "dos": [
-      "Do keep indigo as the only color that means \"primary\" — see the One Ink Rule.",
+      "Do keep cyan as the only color that means \"primary\" — see the One Ink Rule.",
       "Do convey elevation with tonal steps only, never a shadow — see the Flat Field Rule.",
       "Do keep every screen single-column inside the 768px container — see the Single Column Rule.",
       "Do enforce 44px minimum touch targets on every interactive element; this is used one-handed on a phone as often as on a desk.",
@@ -194,7 +385,7 @@
       "Do respect prefers-reduced-motion on every new animation, matching the existing shimmer/spin/scale-press pattern."
     ],
     "donts": [
-      "Don't introduce a second accent color for \"importance.\" A new primary action reuses Indigo Ink; it does not get its own hue.",
+      "Don't introduce a second accent color for \"importance.\" A new primary action reuses Signal Cyan; it does not get its own hue.",
       "Don't add gamified feedback — no streaks, confetti, progress badges, or celebratory copy. This is a research and executive-function tool, not an engagement product.",
       "Don't let the ADHD Aid surfaces drift toward a clinical/medical register (form-like labels, diagnostic tone, sterile whitespace). It should feel like the same field journal as the thesis lens, just a different page.",
       "Don't add a sidebar, tab bar, or multi-column layout, even on desktop. If a screen feels cramped, that's a signal to add a wizard step or collapse content — not to add a column.",
