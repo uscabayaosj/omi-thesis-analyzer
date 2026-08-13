@@ -1,25 +1,45 @@
-import { Redis } from "@upstash/redis";
+import { neon } from "@neondatabase/serverless";
 
 /**
- * Server-side durable store. Optional by construction: the app is fully
- * functional on localStorage alone, and this layer only adds cross-device
- * durability on top. Every caller must handle `null` — that is the normal
- * state before the Upstash integration is provisioned, not an error.
+ * Server-side durable store, backed by Neon Postgres.
+ *
+ * Optional by construction: the app is fully functional on localStorage alone,
+ * and this layer only adds cross-device durability on top. Every caller must
+ * handle `null` — that is the normal state when DATABASE_URL isn't set (local
+ * dev without a pull, a fork, a preview without the integration), not an error.
+ *
+ * The shape is deliberately key-value rather than a modelled schema: the client
+ * owns the merge and ships whole namespace maps, so Postgres is storing four
+ * JSONB documents. That keeps this swappable — it was Redis before Upstash's
+ * free tier turned out to be unavailable on this account.
  */
-let client: Redis | null | undefined;
+type Sql = ReturnType<typeof neon>;
 
-export function getStore(): Redis | null {
+let client: Sql | null | undefined;
+
+export function getStore(): Sql | null {
   if (client !== undefined) return client;
-  // Upstash's Vercel integration injects the KV_ prefixed pair; the bare
-  // UPSTASH_ names are what a manual/self-hosted setup uses. Accept either.
-  const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
-  client = url && token ? new Redis({ url, token }) : null;
+  // Lazily built, never at module scope: `neon()` throws on a missing URL, and
+  // Next evaluates top-level module code at build time, which would break
+  // `next build` on any deploy that hasn't been given the env var yet.
+  const url = process.env.DATABASE_URL;
+  client = url ? neon(url) : null;
   return client;
 }
 
 export function isStoreConfigured(): boolean {
   return getStore() !== null;
+}
+
+/** Created on first use so there's no migration step to run or forget. */
+export async function ensureSchema(sql: Sql): Promise<void> {
+  await sql`
+    CREATE TABLE IF NOT EXISTS trace_store (
+      namespace   TEXT PRIMARY KEY,
+      data        JSONB NOT NULL,
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
 }
 
 /** The localStorage keys mirrored to the server. Anything outside this list
