@@ -1,6 +1,6 @@
 # TRACE — Personal & Research Assistant
 
-Turns Omi wearable conversations into two things: thesis evidence for PhD research on Pioneer Sovereignty, and a daily executive-function plan. Pulls conversations from the Omi Developer API and runs analysis through GPT-4o.
+Turns Omi wearable conversations into two things: thesis evidence for PhD research on Pioneer Sovereignty, and a daily executive-function plan. Pulls conversations from the Omi Developer API and runs analysis through GPT-5.6-luna.
 
 ## Setup
 
@@ -44,6 +44,6 @@ Both ADHD Aid and Daily Rollup export to Obsidian or download as markdown, same 
 
 - Next.js 15 (App Router)
 - Tailwind CSS
-- OpenAI GPT-4o
+- OpenAI GPT-5.6-luna
 - Omi Developer API
 - PWA (installable on mobile)

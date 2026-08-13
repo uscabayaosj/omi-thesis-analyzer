@@ -21,12 +21,12 @@ Success = real conversations captured throughout the day become both (a) usable 
 
 ## Positioning
 
-Not a general transcription or note-taking tool — a dual-lens instrument purpose-built around one person's actual workflow: an Omi wearable capturing raw conversation, GPT-4o structuring it two different ways for two different jobs (dissertation evidence vs. daily executive function), with Daily Rollup's day-to-day chaining (aging, renegotiation scripts, "what was dropped" logging) as the mechanism a generic to-do or journaling app doesn't have.
+Not a general transcription or note-taking tool — a dual-lens instrument purpose-built around one person's actual workflow: an Omi wearable capturing raw conversation, GPT-5.6-luna structuring it two different ways for two different jobs (dissertation evidence vs. daily executive function), with Daily Rollup's day-to-day chaining (aging, renegotiation scripts, "what was dropped" logging) as the mechanism a generic to-do or journaling app doesn't have.
 
 ## Operating Context
 
 - Conversations are recorded passively via an Omi wearable and pulled through the Omi Developer API.
-- Analysis runs client-orchestrated: pages call Next.js API routes, which call OpenAI GPT-4o; all results persist to `localStorage` only (no server-side database).
+- Analysis runs client-orchestrated: pages call Next.js API routes, which call OpenAI GPT-5.6-luna; all results persist to `localStorage` only (no server-side database).
 - Used as an installed PWA on mobile (dark theme, safe-area insets, touch-target sizing) as well as desktop browser.
 - Daily Rollup is used roughly once daily to close out a day and generate tomorrow's plan; per-conversation passes happen throughout the day as recordings come in.
 - Exports go to Obsidian or plain markdown download, for both the thesis lens and the ADHD Aid lens.

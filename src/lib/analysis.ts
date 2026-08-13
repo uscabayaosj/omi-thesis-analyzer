@@ -21,7 +21,7 @@ function getProviderConfig(): ProviderConfig {
       return {
         baseUrl: "https://api.openai.com/v1/chat/completions",
         apiKey: process.env.OPENAI_API_KEY || "",
-        model: model || "gpt-4o",
+        model: model || "gpt-5.6-luna",
         headers: {
           Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
           "Content-Type": "application/json",
@@ -32,7 +32,7 @@ function getProviderConfig(): ProviderConfig {
       return {
         baseUrl: "https://api.anthropic.com/v1/messages",
         apiKey: process.env.ANTHROPIC_API_KEY || "",
-        model: model || "claude-sonnet-4-20250514",
+        model: model || "claude-haiku-4-5-20251001",
         headers: {
           "x-api-key": process.env.ANTHROPIC_API_KEY || "",
           "anthropic-version": "2023-06-01",
@@ -54,7 +54,7 @@ function getProviderConfig(): ProviderConfig {
       return {
         baseUrl: "https://openrouter.ai/api/v1/chat/completions",
         apiKey: process.env.OPENROUTER_API_KEY || "",
-        model: model || "anthropic/claude-sonnet-4",
+        model: model || "deepseek/deepseek-v4",
         headers: {
           Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
           "Content-Type": "application/json",
