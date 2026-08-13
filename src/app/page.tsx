@@ -10,7 +10,7 @@ import { cacheGet, cacheSet } from "@/lib/cache";
 import { fetchJson } from "@/lib/fetch-json";
 import { formatDateTime, dayOf } from "@/lib/format";
 import {
-  BookIcon, SquareIcon, XIcon, CheckIcon, SparklesIcon, WarningIcon, MicIcon,
+  TraceMark, SquareIcon, XIcon, CheckIcon, SparklesIcon, WarningIcon, MicIcon,
   FolderIcon, RefreshIcon, ClipboardIcon, CalendarIcon, ChevronRightIcon, SearchIcon,
 } from "@/components/icons";
 
@@ -19,21 +19,26 @@ const CONVERSATIONS_CACHE_KEY = "conversations";
 // Shared by every button in the selection toolbar (Group Thesis, Run ADHD):
 // these are parallel choices acting on the same selection, not a primary/
 // secondary pair, so both get the identical class string rather than one
-// claiming the app's solid-fill indigo "one primary action" treatment.
-// Three tiers, not two: flat slate with no selection; an indigo-tinted
+// claiming the app's solid-fill cyan "one primary action" treatment.
+// Three tiers, not two: flat slate with no selection; a cyan-tinted
 // "ready" wash (reusing the same wash ConversationRow uses for a selected
 // item) as soon as *any* conversation is selected, on both buttons at once
 // — even though Group Thesis's own minimum is 2, not 1, that's a business
 // rule enforced inside startGroupAnalysis's own guard clause, not something
-// the resting button color should announce; and a solid-fill "full indigo"
+// the resting button color should announce; and a solid-fill "full cyan"
 // flash on :active, so the moment of an actual tap still reads distinctly
 // from just having a selection ready.
 // disabled:bg-slate-700, not slate-800: this toolbar is itself a .card
 // (Ink Panel, #1e293b === bg-slate-800), so slate-800 here would repeat the
 // exact "invisible against its own container" bug the Secondary Button rule
 // exists to prevent (see DESIGN.md's Buttons section).
+// Detector waiver below: it pairs the disabled/active slate values with the
+// cyan tints in the same string. Real pairs, all measured — cyan-200 on the
+// cyan-950/40 wash 12.20:1, slate-950 on the active cyan-400 fill 11.16:1,
+// and slate-400 on the disabled slate-700 fill 4.04:1 (disabled controls are
+// exempt from 1.4.3, and this matches the app's existing disabled treatment).
 const TOOLBAR_ACTION_CLASS =
-  "flex items-center gap-1.5 rounded-lg border border-indigo-500/50 bg-indigo-950/40 px-4 py-2 min-h-[44px] text-sm font-medium text-indigo-200 transition-colors hover:border-indigo-500/70 hover:bg-indigo-950/60 hover:text-indigo-100 active:border-indigo-400 active:bg-indigo-600 active:text-white disabled:border-transparent disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed whitespace-nowrap";
+  "flex items-center gap-1.5 rounded-lg border border-cyan-500/50 bg-cyan-950/40 px-4 py-2 min-h-[44px] text-sm font-medium text-cyan-200 transition-colors hover:border-cyan-500/70 hover:bg-cyan-950/60 hover:text-cyan-100 active:border-cyan-400 active:bg-cyan-400 active:text-slate-950 disabled:border-transparent disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed whitespace-nowrap"; // impeccable-disable-line gray-on-color
 
 interface Conversation {
   id: string;
@@ -74,7 +79,7 @@ function pad2(n: number): string {
 }
 
 // Month-grid calendar: the primary "browse by day" entry point. Monday-first
-// (matches the app's en-GB date formatting elsewhere). Solid indigo fill for
+// (matches the app's en-GB date formatting elsewhere). Solid cyan fill for
 // the selected day reuses the same "true single-select navigation" pattern
 // the filter pills already use — see DESIGN.md's Navigation section.
 function CalendarMonth({
@@ -134,7 +139,7 @@ function CalendarMonth({
           </div>
           <button
             onClick={onToday}
-            className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors px-2 min-h-[32px] rounded-md hover:bg-slate-700 whitespace-nowrap"
+            className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors px-2 min-h-[32px] rounded-md hover:bg-slate-700 whitespace-nowrap"
           >
             Today
           </button>
@@ -170,9 +175,12 @@ function CalendarMonth({
               aria-pressed={isSelected}
               className={`aspect-square min-h-[40px] rounded-md flex flex-col items-center justify-center gap-0.5 text-sm transition-colors ${
                 isSelected
-                  ? "bg-indigo-600 text-white font-semibold"
+                  // slate-950 is near-black (#020617), not washed-out gray: it
+                  // clears 11.16:1 on cyan-400. Detector cross-pairs the other
+                  // mutually-exclusive branches' slate text with this fill.
+                  ? "bg-cyan-400 text-slate-950 font-semibold" // impeccable-disable-line gray-on-color
                   : isToday
-                  ? "border border-indigo-500/60 text-white hover:bg-slate-700"
+                  ? "border border-cyan-500/60 text-white hover:bg-slate-700"
                   : isFuture
                   ? "text-slate-400 hover:bg-slate-700"
                   : "text-slate-300 hover:bg-slate-700"
@@ -189,7 +197,7 @@ function CalendarMonth({
       </div>
       <button
         onClick={onCollapse}
-        className="text-indigo-400 text-sm hover:underline mt-3 min-h-[44px] px-1"
+        className="text-cyan-400 text-sm hover:underline mt-3 min-h-[44px] px-1"
       >
         Collapse
       </button>
@@ -216,13 +224,13 @@ function ConversationRow({
         aria-selected={isSelected}
         aria-label={`${isSelected ? "Deselect" : "Select"} "${convo.structured?.title || "Untitled"}" for group analysis${isAnalyzedEither ? " (analyzed)" : ""}`}
         className={`w-full text-left card p-5 transition-colors min-h-[44px] ${
-          isSelected ? "border-indigo-500 bg-indigo-950/30" : "hover:border-slate-600"
+          isSelected ? "border-cyan-500 bg-cyan-950/30" : "hover:border-slate-600"
         }`}
       >
         <div className="flex items-start gap-3">
           <div
             className={`w-5 h-5 mt-1 flex-shrink-0 rounded border-2 flex items-center justify-center transition-colors ${
-              isSelected ? "bg-indigo-600 border-indigo-600" : "border-slate-600"
+              isSelected ? "bg-cyan-400 border-cyan-400" : "border-slate-600"
             }`}
             aria-hidden="true"
           >
@@ -253,7 +261,7 @@ function ConversationRow({
       href={`/conversation/${convo.id}`}
       aria-label={`${convo.structured?.title || "Untitled conversation"}${isAnalyzedEither ? " (analyzed)" : ""}`}
       className={`card p-5 block transition-colors min-h-[44px] ${
-        isAnalyzedEither ? "hover:border-emerald-500/50" : "hover:border-indigo-500/50"
+        isAnalyzedEither ? "hover:border-emerald-500/50" : "hover:border-cyan-500/50"
       }`}
     >
       <div className="flex items-start gap-3">
@@ -271,7 +279,7 @@ function ConversationRow({
               <span className="bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap">{convo.structured.category}</span>
             )}
             {convo.folder_name && (
-              <span className="flex items-center gap-1 bg-indigo-900/50 text-indigo-300 px-2 py-0.5 rounded-full whitespace-nowrap">
+              <span className="flex items-center gap-1 bg-cyan-900/50 text-cyan-300 px-2 py-0.5 rounded-full whitespace-nowrap">
                 <FolderIcon className="w-3 h-3" />
                 {convo.folder_name}
               </span>
@@ -531,12 +539,15 @@ export default function Home() {
   return (
     <main className="max-w-3xl mx-auto px-4 py-8">
       <header className="mb-6">
-        <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-2">
-          <BookIcon className="w-7 h-7 text-indigo-400 flex-shrink-0" />
-          Thesis Analyzer
+        {/* Wordmark: the mark carries the brand's navy/cyan two-tone, so it is
+            sized to the cap-height of TRACE and tracked wide to match the logo
+            lockup rather than sitting as a generic leading icon. */}
+        <h1 className="mb-2 flex items-center gap-2.5 text-3xl font-bold text-white">
+          <TraceMark className="w-9 h-9 flex-shrink-0 text-white" />
+          <span className="tracking-[0.18em]">TRACE</span>
         </h1>
         <p className="text-slate-400">
-          AI-powered analysis of your Omi conversations through the lens of Pioneer Sovereignty
+          Personal &amp; research assistant — your Omi conversations as thesis evidence and a daily plan
         </p>
 
         {/* Sync status + refresh — quiet meta row, read once per visit */}
@@ -632,7 +643,7 @@ export default function Home() {
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search conversations by title or topic…"
               aria-label="Search all conversations"
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-10 py-2.5 text-sm text-slate-200 placeholder-slate-400 focus:border-indigo-500 focus:outline-none transition-colors min-h-[44px]"
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-10 py-2.5 text-sm text-slate-200 placeholder-slate-400 focus:border-cyan-500 focus:outline-none transition-colors min-h-[44px]"
             />
             {searchQuery && (
               <button
@@ -674,7 +685,7 @@ export default function Home() {
                 className="w-full card p-3 flex items-center justify-between gap-2 text-left hover:border-slate-600 transition-colors min-h-[44px]"
               >
                 <span className="flex items-center gap-2 text-sm text-slate-200 min-w-0">
-                  <CalendarIcon className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                  <CalendarIcon className="w-4 h-4 text-cyan-400 flex-shrink-0" />
                   <span className="truncate">
                     {selectedDateLabel}
                     {selectedDate === todayStr && <span className="text-slate-400"> · Today</span>}
@@ -712,7 +723,9 @@ export default function Home() {
                     aria-label={`Show ${f} conversations`}
                     className={`px-4 py-2 min-h-[44px] rounded-full text-sm transition-colors ${
                       filter === f
-                        ? "bg-indigo-600 text-white"
+                        // slate-950 on cyan-400 = 11.16:1; slate-300 on
+                        // slate-800 = 8.59:1. Branches are mutually exclusive.
+                        ? "bg-cyan-400 text-slate-950" // impeccable-disable-line gray-on-color
                         : "bg-slate-800 text-slate-300 hover:text-white"
                     }`}
                   >
@@ -747,7 +760,7 @@ export default function Home() {
         {selectMode && (
           <div className="mt-3">
             <div
-              className="card p-4 border-indigo-500/30 flex flex-wrap items-center justify-between gap-3"
+              className="card p-4 border-cyan-500/30 flex flex-wrap items-center justify-between gap-3"
               role="toolbar"
               aria-label="Group analysis toolbar"
             >
@@ -831,7 +844,7 @@ export default function Home() {
         <div className="card p-8 text-center">
           <SearchIcon className="w-8 h-8 mx-auto mb-4 text-slate-600" />
           <p className="text-slate-300">No matches for &ldquo;{searchQuery.trim()}&rdquo;.</p>
-          <button onClick={() => setSearchQuery("")} className="text-indigo-400 text-sm mt-2 hover:underline min-h-[44px] px-2">
+          <button onClick={() => setSearchQuery("")} className="text-cyan-400 text-sm mt-2 hover:underline min-h-[44px] px-2">
             Clear search
           </button>
         </div>
@@ -852,7 +865,7 @@ export default function Home() {
           <p className="text-slate-400">
             {filter === "analyzed" ? "No analyzed conversations here yet." : "Everything here has been analyzed!"}
           </p>
-          <button onClick={() => setFilter("all")} className="text-indigo-400 text-sm mt-2 hover:underline min-h-[44px] px-2">
+          <button onClick={() => setFilter("all")} className="text-cyan-400 text-sm mt-2 hover:underline min-h-[44px] px-2">
             Show all
           </button>
         </div>

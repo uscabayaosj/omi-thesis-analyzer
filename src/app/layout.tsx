@@ -3,13 +3,21 @@ import "./globals.css";
 import ServiceWorkerRegistration from "@/components/sw-register";
 
 export const metadata: Metadata = {
-  title: "Omi Thesis Analyzer",
-  description: "AI-powered conversation analysis for PhD research",
+  title: "TRACE — Personal & Research Assistant",
+  description:
+    "Turns Omi wearable conversations into thesis evidence and daily executive-function structure.",
   manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: "/icon-192.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Thesis Analyzer",
+    title: "TRACE",
   },
 };
 
@@ -17,7 +25,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#0f172a",
+  themeColor: "#13294b",
 };
 
 export default function RootLayout({
@@ -27,9 +35,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <head>
-        <link rel="apple-touch-icon" href="/icon-192.png" />
-      </head>
+      <head />
       <body className="bg-slate-950 text-slate-100 antialiased min-h-screen">
         <ServiceWorkerRegistration />
         {children}

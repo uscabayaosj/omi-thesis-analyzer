@@ -1,5 +1,5 @@
-const CACHE_NAME = "thesis-analyzer-v2";
-const STATIC_ASSETS = ["/", "/manifest.json", "/icon-192.png", "/icon-512.png"];
+const CACHE_NAME = "trace-v3";
+const STATIC_ASSETS = ["/", "/manifest.json", "/icon.svg", "/icon-192.png", "/icon-512.png"];
 
 // Install — cache static shell
 self.addEventListener("install", (event) => {

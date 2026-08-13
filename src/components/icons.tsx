@@ -305,3 +305,39 @@ export function SearchIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+// ── Brand ──
+
+// TRACE mark: a figure standing with arms out, whose head/torso reads as the
+// stem of a "T" and whose arms form its crossbar. Three nodes (head, both
+// hands) sit on the arms like points on a network — the "trace" idea.
+// Two-tone by design: the T takes currentColor so it can sit on any surface,
+// but the three nodes keep the brand's fixed cyan gradient — that pairing is
+// the brand asset and must not recolour with its surroundings.
+export function TraceMark({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 64 64" fill="none" aria-hidden="true">
+      <defs>
+        <linearGradient id="trace-node" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#38bdf8" />
+          <stop offset="100%" stopColor="#22d3ee" />
+        </linearGradient>
+        {/* Cuts the head notch, the spine gap, and the slots the arm traces
+            run through — all as one mask so the mark works on any background
+            instead of faking the gaps with background-coloured shapes. */}
+        <mask id="trace-cut">
+          <rect width="64" height="64" fill="#fff" />
+          <circle cx="32" cy="11.5" r="8.8" fill="#000" />
+          <rect x="30.8" y="27" width="2.4" height="30" fill="#000" />
+          <rect x="0" y="20.6" width="25" height="3.6" fill="#000" />
+          <rect x="39" y="20.6" width="25" height="3.6" fill="#000" />
+        </mask>
+      </defs>
+      <path d="M8 13 H56 V27 H40 V57 H24 V27 H8 Z" fill="currentColor" mask="url(#trace-cut)" />
+      <path d="M8 22.4 H24 M40 22.4 H56" stroke="url(#trace-node)" strokeWidth={3.6} strokeLinecap="round" />
+      <circle cx="32" cy="11.5" r="6.4" fill="url(#trace-node)" />
+      <circle cx="6" cy="22.4" r="5.8" fill="url(#trace-node)" />
+      <circle cx="58" cy="22.4" r="5.8" fill="url(#trace-node)" />
+    </svg>
+  );
+}

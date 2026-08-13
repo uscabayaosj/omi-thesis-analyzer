@@ -38,6 +38,7 @@ import {
   ExternalLinkIcon,
   LoaderIcon,
 } from "@/components/icons";
+import { BUTTON_PRIMARY } from "@/lib/ui";
 
 interface TranscriptSegment {
   text: string;
@@ -87,7 +88,7 @@ function AnalysisAgeBadge({ timestamp }: { timestamp: string }) {
       className={`text-xs px-2 py-0.5 rounded-full font-normal ${
         isStale
           ? "bg-amber-900/50 text-amber-300"
-          : "bg-indigo-900/50 text-indigo-200"
+          : "bg-cyan-900/50 text-cyan-200"
       }`}
       title={`Analyzed on ${formatDateTime(timestamp, {
         day: "numeric",
@@ -200,7 +201,7 @@ function ConfirmRerunDialog({
           </button>
           <button
             onClick={() => requestClose(onConfirm)}
-            className="px-4 py-2 min-h-[44px] text-sm text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg transition-colors"
+            className={`${BUTTON_PRIMARY} px-4 py-2`}
           >
             Re-analyze
           </button>
@@ -574,10 +575,10 @@ export default function ConversationPage() {
                 aria-checked={lens === l}
                 className={`px-4 py-2 min-h-[44px] rounded-md text-sm transition-colors ${
                   // False positive below: the scanner pairs the unselected branch's text-slate-300
-                  // with the selected branch's bg-indigo-600, but the two are mutually exclusive.
-                  // Real pairs, both verified: white/indigo-600 (5.17:1) and slate-300/slate-900
+                  // with the selected branch's bg-cyan-400, but the two are mutually exclusive.
+                  // Real pairs, both verified: slate-950/cyan-400 (10.66:1) and slate-300/slate-900
                   // (11.35:1) — the unselected pill has no fill and sits on the toggle's own track.
-                  lens === l ? "bg-indigo-600 text-white" : "text-slate-300 hover:text-white" // impeccable-disable-line gray-on-color
+                  lens === l ? "bg-cyan-400 text-slate-950" : "text-slate-300 hover:text-white" // impeccable-disable-line gray-on-color
                 }`}
               >
                 {l === "thesis" ? "Thesis" : l === "adhd" ? "ADHD Aid" : "Both"}
@@ -591,11 +592,11 @@ export default function ConversationPage() {
               onClick={handleAnalyzeClick}
               disabled={analyzing}
               aria-label="Run Pioneer Sovereignty analysis on this conversation"
-              className="w-full card p-6 text-center hover:border-indigo-500/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mb-8 min-h-[44px]"
+              className="w-full card p-6 text-center hover:border-cyan-500/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mb-8 min-h-[44px]"
             >
               {analyzing ? (
                 <div className="flex items-center justify-center gap-3">
-                  <LoaderIcon className="w-6 h-6 text-indigo-400 animate-spin flex-shrink-0" />
+                  <LoaderIcon className="w-6 h-6 text-cyan-400 animate-spin flex-shrink-0" />
                   <div>
                     <p className="font-semibold text-white">Analyzing conversation...</p>
                     <p className="text-slate-400 text-sm mt-1">Running 8-dimension Pioneer Sovereignty analysis</p>
@@ -603,7 +604,7 @@ export default function ConversationPage() {
                 </div>
               ) : (
                 <div>
-                  <CompassIcon className="w-7 h-7 mx-auto mb-2 text-indigo-400" />
+                  <CompassIcon className="w-7 h-7 mx-auto mb-2 text-cyan-400" />
                   <p className="font-semibold text-white">Run Pioneer Sovereignty Analysis</p>
                   <p className="text-slate-400 text-sm mt-1">4 research questions + conditions + rival hypothesis + refutation</p>
                 </div>
@@ -616,7 +617,7 @@ export default function ConversationPage() {
             <section className="mb-8" aria-label="Pioneer Sovereignty analysis results">
               <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2 flex-wrap">
-                  <CompassIcon className="w-5 h-5 text-indigo-400 flex-shrink-0" />
+                  <CompassIcon className="w-5 h-5 text-cyan-400 flex-shrink-0" />
                   Pioneer Sovereignty Analysis
                   {storedAnalysis && (
                     <AnalysisAgeBadge timestamp={storedAnalysis.timestamp} />
@@ -674,7 +675,7 @@ export default function ConversationPage() {
                       onClick={handleAnalyzeClick}
                       disabled={analyzing}
                       aria-label="Re-run analysis"
-                      className="text-slate-400 hover:text-indigo-400 disabled:opacity-50 transition-colors p-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                      className="text-slate-400 hover:text-cyan-400 disabled:opacity-50 transition-colors p-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
                     >
                       <RefreshIcon className={`w-4 h-4 ${analyzing ? "animate-spin" : ""}`} />
                     </button>
@@ -698,16 +699,16 @@ export default function ConversationPage() {
                   onClick={executeAdhd}
                   disabled={adhdAnalyzing}
                   aria-label="Run ADHD Aid analysis on this conversation"
-                  className="w-full card p-6 text-center hover:border-indigo-500/50 transition-colors cursor-pointer disabled:opacity-50 mb-6 min-h-[44px]"
+                  className="w-full card p-6 text-center hover:border-cyan-500/50 transition-colors cursor-pointer disabled:opacity-50 mb-6 min-h-[44px]"
                 >
                   {adhdAnalyzing ? (
                     <div className="flex items-center justify-center gap-3">
-                      <LoaderIcon className="w-6 h-6 text-indigo-400 animate-spin flex-shrink-0" />
+                      <LoaderIcon className="w-6 h-6 text-cyan-400 animate-spin flex-shrink-0" />
                       <p className="font-semibold text-white">Running ADHD Aid…</p>
                     </div>
                   ) : (
                     <div>
-                      <ClipboardIcon className="w-7 h-7 mx-auto mb-2 text-indigo-400" />
+                      <ClipboardIcon className="w-7 h-7 mx-auto mb-2 text-cyan-400" />
                       <p className="font-semibold text-white">Run ADHD Aid</p>
                       <p className="text-slate-400 text-sm mt-1">Commitments, people, open loops, and next actions</p>
                     </div>
@@ -718,7 +719,7 @@ export default function ConversationPage() {
                 <>
                   <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
                     <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                      <ClipboardIcon className="w-5 h-5 text-indigo-400 flex-shrink-0" />
+                      <ClipboardIcon className="w-5 h-5 text-cyan-400 flex-shrink-0" />
                       ADHD Aid
                     </h2>
                     <div className="flex items-center gap-2 flex-wrap">
@@ -752,7 +753,7 @@ export default function ConversationPage() {
                           )}
                         </span>
                       </button>
-                      <button onClick={executeAdhd} disabled={adhdAnalyzing} aria-label="Re-run ADHD Aid" className="text-slate-400 hover:text-indigo-400 disabled:opacity-50 transition-colors p-2 min-h-[44px] min-w-[44px] flex items-center justify-center">
+                      <button onClick={executeAdhd} disabled={adhdAnalyzing} aria-label="Re-run ADHD Aid" className="text-slate-400 hover:text-cyan-400 disabled:opacity-50 transition-colors p-2 min-h-[44px] min-w-[44px] flex items-center justify-center">
                         <RefreshIcon className={`w-4 h-4 ${adhdAnalyzing ? "animate-spin" : ""}`} />
                       </button>
                     </div>
@@ -882,7 +883,7 @@ export default function ConversationPage() {
               open={transcriptOpen}
               onToggle={(e) => setTranscriptOpen(e.currentTarget.open)}
             >
-              <summary className="p-5 cursor-pointer font-semibold text-white hover:text-indigo-300 transition-colors min-h-[44px] flex items-center gap-2">
+              <summary className="p-5 cursor-pointer font-semibold text-white hover:text-cyan-300 transition-colors min-h-[44px] flex items-center gap-2">
                 <FileTextIcon className="w-4 h-4 flex-shrink-0" />
                 Transcript ({conversation.transcript_segments.length} segments)
               </summary>

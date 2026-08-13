@@ -48,7 +48,7 @@ export function AdhdResults({
   return (
     <div className={`${animate ? "stagger-in" : ""} space-y-6`}>
       {/* One-line summary */}
-      <div className="card p-5 border-indigo-500/30">
+      <div className="card p-5 border-cyan-500/30">
         <p className="text-sm text-slate-200">{analysis.summary}</p>
       </div>
 
@@ -57,7 +57,7 @@ export function AdhdResults({
           <ul className="space-y-2">
             {analysis.do_today.map((item, i) => (
               <li key={i} className="flex gap-2">
-                <span className="text-indigo-400 flex-shrink-0">→</span>
+                <span className="text-cyan-400 flex-shrink-0">→</span>
                 <span className="min-w-0">{item}</span>
               </li>
             ))}
