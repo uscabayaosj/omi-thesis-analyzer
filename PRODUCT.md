@@ -35,7 +35,7 @@ Not a general transcription or note-taking tool — a dual-lens instrument purpo
 
 - Two independent analysis lenses (Thesis, ADHD Aid) selectable per conversation or per multi-selection; "Both" runs them independently, not merged.
 - ADHD Aid per-conversation output feeds Daily Rollup; Rollup auto-chains to the previous day's stored rollup for commitment aging.
-- No auth and no multi-tenancy — single-user by construction, not just by convention. Analyses are mirrored to a private server-side store (Upstash Redis via the Vercel Marketplace) so the same data is available on phone and desktop; that store is unauthenticated, which is only defensible because the writable surface is a fixed set of four analysis namespaces and the app has exactly one user. A second user would require auth before anything else.
+- No auth and no multi-tenancy — single-user by construction, not just by convention. Analyses are mirrored to a private server-side store (Neon Postgres via the Vercel Marketplace) so the same data is available on phone and desktop; that store is unauthenticated, which is only defensible because the writable surface is a fixed set of four analysis namespaces and the app has exactly one user. A second user would require auth before anything else.
 - ADHD Aid's generated output text stays neutral in tone — no "you forgot," no mention of ADHD inside generated content; the cognitive-aid framing is a UI/product-level concern, not a voice injected into the analysis text.
 - Depends on two external APIs (Omi Developer API, OpenAI) — both keys are the user's own.
 

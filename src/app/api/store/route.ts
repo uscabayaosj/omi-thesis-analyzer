@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getStore, SYNCED_NAMESPACES, isSyncedNamespace } from "@/lib/kv";
+import { getStore, ensureSchema, SYNCED_NAMESPACES, isSyncedNamespace } from "@/lib/kv";
 
 /**
  * Durable mirror of the browser's analysis stores.
@@ -14,30 +14,35 @@ import { getStore, SYNCED_NAMESPACES, isSyncedNamespace } from "@/lib/kv";
 
 // GET /api/store → every synced namespace, for the client to merge on load.
 export async function GET() {
-  const store = getStore();
-  if (!store) {
+  const sql = getStore();
+  if (!sql) {
     // Not provisioned. A 200 with configured:false lets the client stay on
     // localStorage silently rather than surfacing an error for a feature the
     // user may simply not have turned on.
     return NextResponse.json({ configured: false, data: {} });
   }
   try {
-    const values = await store.mget<Record<string, unknown>[]>(...SYNCED_NAMESPACES);
+    await ensureSchema(sql);
+    const rows = (await sql`
+      SELECT namespace, data FROM trace_store
+      WHERE namespace = ANY(${SYNCED_NAMESPACES as unknown as string[]})
+    `) as { namespace: string; data: unknown }[];
+
     const data: Record<string, unknown> = {};
-    SYNCED_NAMESPACES.forEach((ns, i) => {
-      if (values[i]) data[ns] = values[i];
-    });
+    for (const row of rows) data[row.namespace] = row.data;
     return NextResponse.json({ configured: true, data });
   } catch (err) {
     console.error("store GET failed:", err);
+    // Degrade to "not configured" rather than erroring: a store that is down
+    // should cost the user cross-device sync, not the ability to use the app.
     return NextResponse.json({ configured: false, data: {}, error: "read failed" });
   }
 }
 
 // PUT /api/store → replace one namespace with the client's merged map.
 export async function PUT(req: NextRequest) {
-  const store = getStore();
-  if (!store) return NextResponse.json({ configured: false });
+  const sql = getStore();
+  if (!sql) return NextResponse.json({ configured: false });
   try {
     const { namespace, map } = await req.json();
     if (!isSyncedNamespace(namespace)) {
@@ -46,7 +51,15 @@ export async function PUT(req: NextRequest) {
     if (!map || typeof map !== "object" || Array.isArray(map)) {
       return NextResponse.json({ error: "Expected an object map." }, { status: 400 });
     }
-    await store.set(namespace, map);
+    await ensureSchema(sql);
+    // The client sends an already-merged map, so last writer wins per
+    // namespace by design — the per-record reconciliation happens there.
+    await sql`
+      INSERT INTO trace_store (namespace, data, updated_at)
+      VALUES (${namespace}, ${JSON.stringify(map)}::jsonb, now())
+      ON CONFLICT (namespace)
+      DO UPDATE SET data = EXCLUDED.data, updated_at = now()
+    `;
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("store PUT failed:", err);
