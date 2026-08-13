@@ -33,7 +33,7 @@ function getProviderConfig(): ProviderConfig {
       return {
         baseUrl: "https://api.anthropic.com/v1/messages",
         apiKey: process.env.ANTHROPIC_API_KEY || "",
-        model: model || "claude-haiku-4-5-20251001",
+        model: model || "claude-sonnet-5",
         headers: {
           "x-api-key": process.env.ANTHROPIC_API_KEY || "",
           "anthropic-version": "2023-06-01",
@@ -76,9 +76,12 @@ function buildRequestBody(config: ProviderConfig, messages: ChatMessage[], jsonM
     return {
       model: config.model,
       max_tokens: 8192,
-      // Mark the large, stable system prompt for prompt caching. The thesis
-      // framework (~1.8k tokens) is identical on every call, so Anthropic
-      // serves it from cache (~90% cheaper, lower latency) after the first hit.
+      // Mark the stable system prompt for prompt caching: it is identical on
+      // every call, so Anthropic serves it from cache (~90% cheaper, lower
+      // latency) after the first hit. Only prompts that clear the model's
+      // minimum cacheable prefix actually cache — 1024 tokens on Sonnet 5,
+      // which the thesis and ADHD frameworks clear and the shorter rollup and
+      // group prompts do not. Below the minimum this marker is simply inert.
       system: systemMsg?.content
         ? [{ type: "text", text: systemMsg.content, cache_control: { type: "ephemeral" } }]
         : undefined,
