@@ -1,9 +1,20 @@
-const CACHE_NAME = "trace-v4";
+import { NextResponse } from "next/server";
+
+// The service worker, served from a route instead of /public so every
+// deployment changes its bytes. The browser only installs a new worker (and
+// the app only shows its update prompt) when this file's content changes —
+// as a static file it only changed when someone edited it, so app-only
+// deploys shipped silently with no prompt ever appearing. Stamping the cache
+// name with the deploy's commit sha makes each deployment a detectable update
+// and scopes the cache to it.
+const VERSION = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ?? "dev";
+
+const SW_SOURCE = `const CACHE_NAME = "trace-__VERSION__";
 const STATIC_ASSETS = ["/", "/manifest.json", "/icon.svg", "/icon-192.png", "/icon-512.png"];
 
 // Install — cache static shell.
 //
-// Deliberately does NOT call skipWaiting(): a new worker stays in `waiting`
+// Deliberately does NOT call skipWaiting(): a new worker stays in \`waiting\`
 // until the user asks for it. Activating on install would swap the app's code
 // out from under someone mid-task — the reason updates here are opt-in.
 self.addEventListener("install", (event) => {
@@ -97,3 +108,15 @@ self.addEventListener("fetch", (event) => {
     })
   );
 });
+`;
+
+export async function GET() {
+  return new NextResponse(SW_SOURCE.replace("__VERSION__", VERSION), {
+    headers: {
+      "Content-Type": "application/javascript; charset=utf-8",
+      // Browsers cap SW script caching at 24h; no-cache tightens that so an
+      // update check always sees the current deployment.
+      "Cache-Control": "no-cache, no-store, must-revalidate",
+    },
+  });
+}
