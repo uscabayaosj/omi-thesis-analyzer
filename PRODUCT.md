@@ -35,7 +35,7 @@ Not a general transcription or note-taking tool — a dual-lens instrument purpo
 
 - Two independent analysis lenses (Thesis, ADHD Aid) selectable per conversation or per multi-selection; "Both" runs them independently, not merged.
 - ADHD Aid per-conversation output feeds Daily Rollup; Rollup auto-chains to the previous day's stored rollup for commitment aging.
-- No auth, no multi-tenancy, no server-side persistence — single-user by construction, not just by convention.
+- No auth and no multi-tenancy — single-user by construction, not just by convention. Analyses are mirrored to a private server-side store (Upstash Redis via the Vercel Marketplace) so the same data is available on phone and desktop; that store is unauthenticated, which is only defensible because the writable surface is a fixed set of four analysis namespaces and the app has exactly one user. A second user would require auth before anything else.
 - ADHD Aid's generated output text stays neutral in tone — no "you forgot," no mention of ADHD inside generated content; the cognitive-aid framing is a UI/product-level concern, not a voice injected into the analysis text.
 - Depends on two external APIs (Omi Developer API, OpenAI) — both keys are the user's own.
 
@@ -53,7 +53,7 @@ This is a live personal tool already processing real Omi recordings and real the
 2. The two lenses stay independent: thesis-analysis correctness must never be perturbed by ADHD Aid work, and vice versa.
 3. Nothing tracked (a commitment, an open loop) vanishes silently — it's surfaced explicitly or logged as dropped, always.
 4. ADHD Aid surfaces favor low cognitive load: minimal clutter, calm/quiet visual treatment, and scannable structure over dense information display.
-5. Data lives in the browser only — the product's trust model assumes no server-side persistence layer exists.
+5. The browser is the working copy; the server is durability. localStorage stays the synchronous source every screen reads, so the app runs fully offline and unchanged if the store is absent — the server-side mirror only adds cross-device continuity on top. Analyses are the most expensive artifact in the system and were previously the least durable, trapped per-device; that was the reason for adding the mirror.
 
 ## Accessibility & Inclusion
 

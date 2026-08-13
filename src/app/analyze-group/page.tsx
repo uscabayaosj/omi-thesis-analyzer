@@ -20,6 +20,8 @@ import {
   CogIcon,
 } from "@/components/icons";
 import { BUTTON_PRIMARY } from "@/lib/ui";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { schedulePush } from "@/lib/sync";
 
 interface ConvoRef {
   id: string;
@@ -69,6 +71,7 @@ function groupKey(ids: string[]): string {
 function persistGroups(all: StoredGroupAnalysis[]): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+    schedulePush(STORAGE_KEY);
   } catch (e) {
     if (e instanceof DOMException && e.name === "QuotaExceededError") {
       // Keep only the 5 most recent groups and retry once
@@ -228,6 +231,7 @@ function GroupAnalysisContent() {
   const [conversations, setConversations] = useState<ConvoRef[]>([]);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
+  const [showRerunConfirm, setShowRerunConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [customPrompt, setCustomPrompt] = useState("");
   const [showCustom, setShowCustom] = useState(false);
@@ -369,6 +373,26 @@ function GroupAnalysisContent() {
 
   return (
     <main className="max-w-3xl mx-auto px-4 py-8">
+      {/* Group analyses keep no version history, so a re-run is unrecoverable —
+          the same guard the single-conversation lenses carry. */}
+      {showRerunConfirm && (
+        <ConfirmDialog
+          title="Replace this group analysis?"
+          tone="danger"
+          body={
+            <>
+              Group analyses keep no version history, so the current one for these{" "}
+              {conversations.length} conversations will be gone. Any custom analysis saved alongside it is kept.
+            </>
+          }
+          confirmLabel="Replace it"
+          onConfirm={() => {
+            setShowRerunConfirm(false);
+            runAnalysis();
+          }}
+          onCancel={() => setShowRerunConfirm(false)}
+        />
+      )}
       <Link href="/" className="text-slate-400 hover:text-white text-sm mb-6 inline-flex items-center gap-1.5 min-h-[44px] py-2">
         <ArrowLeftIcon className="w-4 h-4" />
         Back to conversations
@@ -487,7 +511,7 @@ function GroupAnalysisContent() {
                 Download .md
               </button>
               <button
-                onClick={runAnalysis}
+                onClick={() => setShowRerunConfirm(true)}
                 disabled={analyzing}
                 aria-label="Re-run group analysis"
                 className="text-slate-400 hover:text-cyan-400 disabled:opacity-50 transition-colors p-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
@@ -569,7 +593,7 @@ function GroupAnalysisContent() {
               onClick={runCustom}
               disabled={customAnalyzing || !customPrompt.trim()}
               aria-label="Run custom group analysis"
-              className="bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-white text-white font-medium py-2 px-5 min-h-[44px] rounded-lg text-sm transition-colors"
+              className={`${BUTTON_PRIMARY} px-5`}
             >
               {customAnalyzing ? (
                 <span className="flex items-center gap-2">

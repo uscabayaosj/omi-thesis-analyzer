@@ -1,5 +1,7 @@
 "use client";
 
+import { schedulePush } from "./sync";
+
 export interface StoredAnalysis {
   id: string;
   conversationId: string;
@@ -77,12 +79,14 @@ function getAll(): StoredConversation[] {
 function saveAll(data: StoredConversation[]): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    schedulePush(STORAGE_KEY);
   } catch (e) {
     if (e instanceof DOMException && e.name === "QuotaExceededError") {
       // Prune oldest versions to free space
       const pruned = data.map((c) => ({ ...c, versions: c.versions.slice(0, 1) }));
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(pruned));
+        schedulePush(STORAGE_KEY);
       } catch {
         console.error("localStorage quota exceeded even after pruning");
       }

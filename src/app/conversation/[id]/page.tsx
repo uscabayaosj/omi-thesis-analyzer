@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -39,6 +39,8 @@ import {
   LoaderIcon,
 } from "@/components/icons";
 import { BUTTON_PRIMARY } from "@/lib/ui";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { pullAndMerge } from "@/lib/sync";
 
 interface TranscriptSegment {
   text: string;
@@ -140,77 +142,6 @@ function VersionHistory({
   );
 }
 
-function ConfirmRerunDialog({
-  onConfirm,
-  onCancel,
-  analyzedLabel,
-}: {
-  onConfirm: () => void;
-  onCancel: () => void;
-  analyzedLabel: string;
-}) {
-  const cancelRef = useRef<HTMLButtonElement>(null);
-  const [closing, setClosing] = useState(false);
-
-  // Play a fast exit transition instead of vanishing instantly — the dialog
-  // should leave the way it arrived, just quicker, since the decision is
-  // already made. Guarded so a second trigger during the exit is a no-op.
-  const requestClose = useCallback((action: () => void) => {
-    setClosing((already) => {
-      if (already) return already;
-      setTimeout(action, 100);
-      return true;
-    });
-  }, []);
-
-  useEffect(() => {
-    cancelRef.current?.focus();
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") requestClose(onCancel);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onCancel, requestClose]);
-
-  return (
-    <div
-      className={`overlay-backdrop fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 ${closing ? "overlay-closing" : ""}`}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Confirm re-run analysis"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) requestClose(onCancel);
-      }}
-    >
-      <div className={`overlay-panel card p-6 max-w-md w-full border-amber-500/30 ${closing ? "overlay-closing" : ""}`}>
-        <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
-          <WarningIcon className="w-5 h-5 text-amber-400 flex-shrink-0" />
-          Replace existing analysis?
-        </h3>
-        <p className="text-sm text-slate-400 mb-4">
-          This conversation was last analyzed <strong className="text-slate-200">{analyzedLabel}</strong>.
-          Re-running will replace the current analysis. A copy will be saved in version history (last 3 versions kept).
-        </p>
-        <div className="flex gap-3 justify-end">
-          <button
-            ref={cancelRef}
-            onClick={() => requestClose(onCancel)}
-            className="px-4 py-2 min-h-[44px] text-sm text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => requestClose(onConfirm)}
-            className={`${BUTTON_PRIMARY} px-4 py-2`}
-          >
-            Re-analyze
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Main Page ──
 
 export default function ConversationPage() {
@@ -229,9 +160,18 @@ export default function ConversationPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [customAnalyzing, setCustomAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [exported, setExported] = useState(false);
+  // Keyed per export target, not one shared flag: Obsidian and the .md
+  // download are separate actions, and a single flag made clicking either one
+  // flip *both* buttons to "Saved" — telling the user they'd done something
+  // they hadn't.
+  const [exported, setExported] = useState<Record<string, boolean>>({});
+  const markExported = useCallback((key: string) => {
+    setExported((prev) => ({ ...prev, [key]: true }));
+    setTimeout(() => setExported((prev) => ({ ...prev, [key]: false })), 2000);
+  }, []);
   const [customResult, setCustomResult] = useState<string | null>(null);
   const [showRerunConfirm, setShowRerunConfirm] = useState(false);
+  const [showAdhdRerunConfirm, setShowAdhdRerunConfirm] = useState(false);
 
   type Lens = "thesis" | "adhd" | "both";
   const [lens, setLens] = useState<Lens>("thesis");
@@ -255,9 +195,17 @@ export default function ConversationPage() {
   // localStorage isn't available during the server-rendered first paint —
   // reading it before mount would cause a hydration mismatch.
   useEffect(() => {
+    // Pull the durable store first: an analysis run on the user's other device
+    // should show up here rather than offering to re-run something already
+    // done. Re-reads local state only if the merge actually changed anything.
+    pullAndMerge().then((changed) => {
+      if (changed) loadStored();
+    });
+    loadStored();
+
+    function loadStored() {
     const stored = getStoredAnalysis(id);
     if (stored) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStoredAnalysis(stored);
       setAnalysis({
         rq1_documentary_record: stored.rq1_documentary_record,
@@ -286,6 +234,7 @@ export default function ConversationPage() {
     const hasAdhd = !!storedAdhd;
     if (hasAdhd && !hasThesis) setLens("adhd");
     else setLens("thesis");
+    }
   }, [id]);
 
   // Load a conversation (with transcript) from Omi.
@@ -411,16 +360,14 @@ export default function ConversationPage() {
     } else {
       window.open(uri, "_blank");
     }
-    setExported(true);
-    setTimeout(() => setExported(false), 2000);
-  }, [storedAnalysis]);
+    markExported("thesis-obsidian");
+  }, [storedAnalysis, markExported]);
 
   const handleDownload = useCallback(() => {
     if (!storedAnalysis) return;
     downloadMarkdown(storedAnalysis);
-    setExported(true);
-    setTimeout(() => setExported(false), 2000);
-  }, [storedAnalysis]);
+    markExported("thesis-download");
+  }, [storedAnalysis, markExported]);
 
   const executeAdhd = useCallback(async () => {
     setAdhdAnalyzing(true);
@@ -460,17 +407,15 @@ export default function ConversationPage() {
     const { uri, uriTooLong } = exportAdhdToObsidian(stored);
     if (uriTooLong) downloadAdhdMarkdown(stored);
     else window.open(uri, "_blank");
-    setExported(true);
-    setTimeout(() => setExported(false), 2000);
-  }, [id]);
+    markExported("adhd-obsidian");
+  }, [id, markExported]);
 
   const handleAdhdDownload = useCallback(() => {
     const stored = getAdhdAnalysis(id);
     if (!stored) return;
     downloadAdhdMarkdown(stored);
-    setExported(true);
-    setTimeout(() => setExported(false), 2000);
-  }, [id]);
+    markExported("adhd-download");
+  }, [id, markExported]);
 
   const viewVersion = useCallback((version: AnalysisVersion) => {
     setViewingVersion(version);
@@ -646,8 +591,8 @@ export default function ConversationPage() {
                         aria-label="Export analysis to Obsidian vault"
                         className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5 whitespace-nowrap"
                       >
-                        <span key={exported ? "saved" : "idle"} className="label-swap inline-flex items-center gap-1.5">
-                          {exported ? (
+                        <span key={exported["thesis-obsidian"] ? "saved" : "idle"} className="label-swap inline-flex items-center gap-1.5">
+                          {exported["thesis-obsidian"] ? (
                             <>
                               <CheckIcon className="w-3.5 h-3.5" />
                               Saved
@@ -665,8 +610,19 @@ export default function ConversationPage() {
                         aria-label="Download analysis as markdown file"
                         className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5 whitespace-nowrap"
                       >
-                        <DownloadIcon className="w-3.5 h-3.5" />
-                        Download .md
+                        <span key={exported["thesis-download"] ? "saved" : "idle"} className="label-swap inline-flex items-center gap-1.5">
+                          {exported["thesis-download"] ? (
+                            <>
+                              <CheckIcon className="w-3.5 h-3.5" />
+                              Saved
+                            </>
+                          ) : (
+                            <>
+                              <DownloadIcon className="w-3.5 h-3.5" />
+                              Download .md
+                            </>
+                          )}
+                        </span>
                       </button>
                     </>
                   )}
@@ -724,8 +680,8 @@ export default function ConversationPage() {
                     </h2>
                     <div className="flex items-center gap-2 flex-wrap">
                       <button onClick={handleAdhdExport} className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5 whitespace-nowrap">
-                        <span key={exported ? "saved" : "idle"} className="label-swap inline-flex items-center gap-1.5">
-                          {exported ? (
+                        <span key={exported["adhd-obsidian"] ? "saved" : "idle"} className="label-swap inline-flex items-center gap-1.5">
+                          {exported["adhd-obsidian"] ? (
                             <>
                               <CheckIcon className="w-3.5 h-3.5" />
                               Saved
@@ -739,8 +695,8 @@ export default function ConversationPage() {
                         </span>
                       </button>
                       <button onClick={handleAdhdDownload} className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5 whitespace-nowrap">
-                        <span key={exported ? "saved" : "idle"} className="label-swap inline-flex items-center gap-1.5">
-                          {exported ? (
+                        <span key={exported["adhd-download"] ? "saved" : "idle"} className="label-swap inline-flex items-center gap-1.5">
+                          {exported["adhd-download"] ? (
                             <>
                               <CheckIcon className="w-3.5 h-3.5" />
                               Saved
@@ -753,7 +709,7 @@ export default function ConversationPage() {
                           )}
                         </span>
                       </button>
-                      <button onClick={executeAdhd} disabled={adhdAnalyzing} aria-label="Re-run ADHD Aid" className="text-slate-400 hover:text-cyan-400 disabled:opacity-50 transition-colors p-2 min-h-[44px] min-w-[44px] flex items-center justify-center">
+                      <button onClick={() => setShowAdhdRerunConfirm(true)} disabled={adhdAnalyzing} aria-label="Re-run ADHD Aid" className="text-slate-400 hover:text-cyan-400 disabled:opacity-50 transition-colors p-2 min-h-[44px] min-w-[44px] flex items-center justify-center">
                         <RefreshIcon className={`w-4 h-4 ${adhdAnalyzing ? "animate-spin" : ""}`} />
                       </button>
                     </div>
@@ -764,12 +720,45 @@ export default function ConversationPage() {
             </section>
           )}
 
-          {/* Re-run confirmation dialog */}
+          {/* Re-run confirmation dialogs. Both lenses are guarded, but they
+              carry different stakes: thesis keeps 3 versions, ADHD keeps none,
+              so the ADHD copy has to say what is actually lost. */}
           {showRerunConfirm && storedAnalysis && (
-            <ConfirmRerunDialog
-              onConfirm={executeAnalysis}
+            <ConfirmDialog
+              title="Replace existing analysis?"
+              body={
+                <>
+                  This conversation was last analyzed{" "}
+                  <strong className="text-slate-200">{getAnalysisAge(storedAnalysis.timestamp).label}</strong>.
+                  Re-running will replace the current analysis. A copy will be saved in version history
+                  (last 3 versions kept).
+                </>
+              }
+              confirmLabel="Re-analyze"
+              onConfirm={() => {
+                setShowRerunConfirm(false);
+                executeAnalysis();
+              }}
               onCancel={() => setShowRerunConfirm(false)}
-              analyzedLabel={getAnalysisAge(storedAnalysis.timestamp).label}
+            />
+          )}
+
+          {showAdhdRerunConfirm && adhd && (
+            <ConfirmDialog
+              title="Replace this ADHD Aid analysis?"
+              tone="danger"
+              body={
+                <>
+                  ADHD Aid analyses keep no version history, so the current one will be gone. Any commitments
+                  you have ticked off will reset to unchecked.
+                </>
+              }
+              confirmLabel="Replace it"
+              onConfirm={() => {
+                setShowAdhdRerunConfirm(false);
+                executeAdhd();
+              }}
+              onCancel={() => setShowAdhdRerunConfirm(false)}
             />
           )}
 
@@ -846,7 +835,7 @@ export default function ConversationPage() {
                   onClick={runCustomAnalysis}
                   disabled={customAnalyzing || !customPrompt.trim()}
                   aria-label="Run custom analysis"
-                  className="bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-white text-white font-medium py-2 px-5 min-h-[44px] rounded-lg text-sm transition-colors"
+                  className={`${BUTTON_PRIMARY} px-5`}
                 >
                   {customAnalyzing ? (
                     <span className="flex items-center gap-2">

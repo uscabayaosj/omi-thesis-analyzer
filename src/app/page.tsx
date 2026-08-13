@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { getAnalyzedIds, getAnalysisAge } from "@/lib/storage";
 import { getAdhdAnalyzedIds, saveAdhdAnalysis } from "@/lib/adhd-storage";
 import type { AdhdAnalysis } from "@/lib/adhd";
@@ -13,6 +13,8 @@ import {
   TraceMark, SquareIcon, XIcon, CheckIcon, SparklesIcon, WarningIcon, MicIcon,
   FolderIcon, RefreshIcon, ClipboardIcon, CalendarIcon, ChevronRightIcon, SearchIcon,
 } from "@/components/icons";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { pullAndMerge } from "@/lib/sync";
 
 const CONVERSATIONS_CACHE_KEY = "conversations";
 
@@ -66,10 +68,19 @@ function LensBadges({ thesis, adhd }: { thesis: boolean; adhd: boolean }) {
       {label}
     </span>
   );
+  // The pills themselves stay aria-hidden (their text alone reads as bare
+  // "Thesis ADHD" with no state), but the per-lens state still has to reach a
+  // screen reader — the row's own label collapses both lenses into a single
+  // "(analyzed)", which can't distinguish thesis-done from ADHD-done.
   return (
-    <div className="mt-0.5 flex-shrink-0 flex flex-col gap-1" aria-hidden="true">
-      {pill(thesis, "Thesis")}
-      {pill(adhd, "ADHD")}
+    <div className="mt-0.5 flex-shrink-0 flex flex-col gap-1">
+      <span className="sr-only">
+        Thesis {thesis ? "analyzed" : "not analyzed"}, ADHD Aid {adhd ? "analyzed" : "not analyzed"}.
+      </span>
+      <span aria-hidden="true" className="contents">
+        {pill(thesis, "Thesis")}
+        {pill(adhd, "ADHD")}
+      </span>
     </div>
   );
 }
@@ -173,7 +184,7 @@ function CalendarMonth({
               onClick={() => onSelectDay(dayStr)}
               aria-label={`${new Date(year, month, day).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}${isToday ? ", today" : ""}${hasEntries ? ", has conversations" : ""}`}
               aria-pressed={isSelected}
-              className={`aspect-square min-h-[40px] rounded-md flex flex-col items-center justify-center gap-0.5 text-sm transition-colors ${
+              className={`aspect-square min-h-[44px] rounded-md flex flex-col items-center justify-center gap-0.5 text-sm transition-colors ${
                 isSelected
                   // slate-950 is near-black (#020617), not washed-out gray: it
                   // clears 11.16:1 on cyan-400. Detector cross-pairs the other
@@ -294,15 +305,21 @@ function ConversationRow({
   );
 }
 
-export default function Home() {
+interface BatchFailure {
+  id: string;
+  title: string;
+}
+
+function HomeInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   // Lazy initializers, not an effect: both reads are synchronous, SSR-safe
   // (guarded on `typeof window`), and side-effect-free — an effect here would
-  // only add a redundant render pass. analyzedIds never changes after mount
-  // (thesis analysis happens on a different page), so no setter is needed;
-  // adhdIds does change, after a batch ADHD run below.
-  const [analyzedIds] = useState<Set<string>>(() => getAnalyzedIds());
+  // only add a redundant render pass. Both need setters: adhdIds changes after
+  // a batch run below, and analyzedIds changes on another page (the conversation
+  // detail view), so this page has to re-read it when it regains focus.
+  const [analyzedIds, setAnalyzedIds] = useState<Set<string>>(() => getAnalyzedIds());
   const [adhdIds, setAdhdIds] = useState<Set<string>>(() => getAdhdAnalyzedIds());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -317,14 +334,22 @@ export default function Home() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState({ done: 0, total: 0, failed: 0 });
+  const [batchFailures, setBatchFailures] = useState<BatchFailure[]>([]);
+  const [pendingBatch, setPendingBatch] = useState<{ ids: string[]; replacing: number } | null>(null);
 
   // Recomputed each render (cheap) so "today" stays correct if the tab is
   // left open past midnight. selectedDate is pinned at mount instead —
   // jumping the view out from under the user mid-session would be jarring.
   const todayStr = dayOf(new Date().toISOString());
-  const [selectedDate, setSelectedDate] = useState(todayStr);
+  // Seeded from ?day= so the chosen day survives a reload, a PWA relaunch, and
+  // a shared link. Anything that isn't a plain YYYY-MM-DD falls back to today
+  // rather than rendering an empty view for a malformed param.
+  const dayParam = searchParams.get("day");
+  const [selectedDate, setSelectedDate] = useState(() =>
+    dayParam && /^\d{4}-\d{2}-\d{2}$/.test(dayParam) ? dayParam : todayStr
+  );
   const [calendarMonth, setCalendarMonth] = useState(() => {
-    const d = new Date();
+    const d = dayParam && /^\d{4}-\d{2}-\d{2}$/.test(dayParam) ? new Date(dayParam) : new Date();
     return { year: d.getFullYear(), month: d.getMonth() };
   });
   // Collapsed by default: the grid would otherwise be the first thing painted
@@ -379,9 +404,57 @@ export default function Home() {
     loadConversations("initial");
   }, [loadConversations]);
 
+  // Re-read the analyzed sets whenever this page regains focus. Both are
+  // written on other pages (the conversation detail view runs either lens), so
+  // a client-side nav back here would otherwise paint stale lens badges — the
+  // conversation you just analyzed still reading "not analyzed".
+  useEffect(() => {
+    const resync = () => {
+      if (document.visibilityState !== "visible") return;
+      setAnalyzedIds(getAnalyzedIds());
+      setAdhdIds(getAdhdAnalyzedIds());
+    };
+    // Merge in anything analyzed on the user's other device before the first
+    // resync, so badges reflect the full picture rather than this device's
+    // history. No-ops when the durable store isn't configured.
+    pullAndMerge().then((changed) => {
+      if (changed) resync();
+    });
+    resync();
+    window.addEventListener("focus", resync);
+    document.addEventListener("visibilitychange", resync);
+    return () => {
+      window.removeEventListener("focus", resync);
+      document.removeEventListener("visibilitychange", resync);
+    };
+  }, []);
+
+  // Mirror the selected day into the URL without adding history entries —
+  // `replace`, so the browser Back button still means "leave this page"
+  // rather than walking back through every day the user browsed.
+  //
+  // Reads window.location rather than the `searchParams` hook, and no-ops when
+  // the URL already matches. Depending on searchParams here is an infinite
+  // loop: replace() hands back a new searchParams object, which re-fires the
+  // effect, which replaces again.
+  useEffect(() => {
+    const current = new URLSearchParams(window.location.search);
+    if (selectedDate === todayStr) current.delete("day");
+    else current.set("day", selectedDate);
+    const qs = current.toString();
+    const next = qs ? `/?${qs}` : "/";
+    if (next === window.location.pathname + window.location.search) return;
+    router.replace(next, { scroll: false });
+  }, [selectedDate, todayStr, router]);
+
   const isAnalyzedEither = useCallback(
     (cid: string) => analyzedIds.has(cid) || adhdIds.has(cid),
     [analyzedIds, adhdIds]
+  );
+
+  const titleOf = useCallback(
+    (cid: string) => conversations.find((c) => c.id === cid)?.structured?.title || "Untitled",
+    [conversations]
   );
 
   // Group once per conversation-list change, not per render — feeds both the
@@ -475,12 +548,15 @@ export default function Home() {
     router.push(`/analyze-group?ids=${ids}`);
   }, [selected, router]);
 
-  const runBatchAdhd = useCallback(async () => {
-    const ids = Array.from(selected);
+  // Runs the batch over an explicit id list rather than reading `selected`, so
+  // "Retry failed" can re-run just the stragglers without disturbing what the
+  // user still has selected.
+  const executeBatchAdhd = useCallback(async (ids: string[]) => {
     if (ids.length === 0) return;
     setBatchRunning(true);
     setBatchProgress({ done: 0, total: ids.length, failed: 0 });
-    let failed = 0;
+    setBatchFailures([]);
+    const failures: BatchFailure[] = [];
     for (let i = 0; i < ids.length; i++) {
       try {
         const data = await fetchJson<{ analysis: AdhdAnalysis; conversation?: { structured?: { title?: string }; created_at?: string } }>(
@@ -499,13 +575,30 @@ export default function Home() {
           analysis: data.analysis,
         });
       } catch {
-        failed++;
+        // Keep the title, not just a tally: "3 of 13 could not be analyzed"
+        // leaves the user to work out which three by hand.
+        failures.push({ id: ids[i], title: titleOf(ids[i]) });
       }
-      setBatchProgress({ done: i + 1, total: ids.length, failed });
+      setBatchProgress({ done: i + 1, total: ids.length, failed: failures.length });
     }
+    setBatchFailures(failures);
     setAdhdIds(getAdhdAnalyzedIds());
     setBatchRunning(false);
-  }, [selected]);
+  }, [titleOf]);
+
+  // Gate the run behind a confirmation when it would overwrite existing ADHD
+  // analyses. Re-running is destructive here — ADHD analyses keep no version
+  // history — and a batch can bury several replacements behind one tap.
+  const requestBatchAdhd = useCallback(() => {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+    const replacing = ids.filter((id) => adhdIds.has(id));
+    if (replacing.length > 0) {
+      setPendingBatch({ ids, replacing: replacing.length });
+      return;
+    }
+    executeBatchAdhd(ids);
+  }, [selected, adhdIds, executeBatchAdhd]);
 
   const exitSelectMode = () => {
     setSelectMode(false);
@@ -788,7 +881,7 @@ export default function Home() {
                   Group Thesis ({selected.size})
                 </button>
                 <button
-                  onClick={runBatchAdhd}
+                  onClick={requestBatchAdhd}
                   disabled={selected.size === 0 || batchRunning}
                   aria-label={`Run ADHD Aid on ${selected.size} conversations`}
                   className={TOOLBAR_ACTION_CLASS}
@@ -798,14 +891,58 @@ export default function Home() {
                 </button>
               </div>
             </div>
-            {!batchRunning && batchProgress.total > 0 && batchProgress.failed > 0 && (
-              <p className="text-amber-300/90 text-sm mt-2" role="status">
-                {batchProgress.failed} of {batchProgress.total} could not be analyzed and {batchProgress.failed === 1 ? "was" : "were"} skipped.
-              </p>
+            {!batchRunning && batchFailures.length > 0 && (
+              <div className="enter-rise card mt-2 p-4 border-amber-500/30" role="status">
+                <p className="text-amber-300/90 text-sm flex items-start gap-2">
+                  <WarningIcon className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>
+                    {batchFailures.length} of {batchProgress.total} could not be analyzed and{" "}
+                    {batchFailures.length === 1 ? "was" : "were"} skipped:
+                  </span>
+                </p>
+                <ul className="mt-2 ml-6 list-disc space-y-1 text-sm text-slate-300 marker:text-slate-600">
+                  {batchFailures.map((f) => <li key={f.id}>{f.title}</li>)}
+                </ul>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => executeBatchAdhd(batchFailures.map((f) => f.id))}
+                    className="text-sm min-h-[44px] bg-slate-700 hover:bg-slate-600 text-slate-100 px-4 py-2 rounded-lg transition-colors"
+                  >
+                    Retry {batchFailures.length === 1 ? "it" : `these ${batchFailures.length}`}
+                  </button>
+                  <button
+                    onClick={() => setBatchFailures([])}
+                    className="text-sm min-h-[44px] text-slate-400 hover:text-white px-3 py-2 rounded-lg transition-colors"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         )}
       </header>
+
+      {pendingBatch && (
+        <ConfirmDialog
+          title={`Replace ${pendingBatch.replacing} existing ${pendingBatch.replacing === 1 ? "analysis" : "analyses"}?`}
+          body={
+            <>
+              {pendingBatch.replacing} of the {pendingBatch.ids.length} selected{" "}
+              {pendingBatch.replacing === 1 ? "conversation has" : "conversations have"} already been analyzed with
+              ADHD Aid. Running again replaces {pendingBatch.replacing === 1 ? "it" : "them"} — ADHD analyses keep no
+              version history, so any commitments you have ticked off will reset.
+            </>
+          }
+          confirmLabel={`Run all ${pendingBatch.ids.length}`}
+          onConfirm={() => {
+            const ids = pendingBatch.ids;
+            setPendingBatch(null);
+            executeBatchAdhd(ids);
+          }}
+          onCancel={() => setPendingBatch(null)}
+        />
+      )}
 
       {loading && (
         <div className="space-y-4" aria-label="Loading conversations" role="status">
@@ -908,5 +1045,24 @@ export default function Home() {
             ))}
       </div>
     </main>
+  );
+}
+
+// useSearchParams (for the ?day= binding) opts this route into client-side
+// rendering, which Next requires a Suspense boundary around. The fallback
+// mirrors the in-component loading skeleton so the two are indistinguishable.
+export default function Home() {
+  return (
+    <Suspense
+      fallback={
+        <main className="max-w-3xl mx-auto px-4 py-8">
+          <div className="space-y-4" aria-label="Loading conversations" role="status">
+            {[1, 2, 3].map((i) => <div key={i} className="skeleton h-24 w-full" />)}
+          </div>
+        </main>
+      }
+    >
+      <HomeInner />
+    </Suspense>
   );
 }

@@ -12,6 +12,9 @@
   --border: #334155;
   --custom-analysis-bg: rgba(245, 158, 11, 0.06);
   --custom-analysis-text: #fbbf24;
+  /* Result-block wash. Survived the TRACE rebrand as indigo (the app's old
+     accent) long after indigo left the palette; re-derived from Signal Cyan. */
+  --analysis-section-bg: rgba(34, 211, 238, 0.05);
 
   /* Motion tokens */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
@@ -96,16 +99,23 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
 
 .analysis-section {
   margin-bottom: 1.5rem;
-  background: rgba(99, 102, 241, 0.06);
+  background: var(--analysis-section-bg);
   border-radius: 8px;
   padding: 1rem 1rem 1rem 1.25rem;
+}
+
+/* The card wrapping these already pads its own bottom edge; without this the
+   last section's margin stacks on that padding into a hollow band. */
+.analysis-section:last-child {
+  margin-bottom: 0;
 }
 
 .analysis-section h3 {
   color: var(--accent-light);
   font-weight: 600;
   margin-bottom: 0.5rem;
-  font-size: 1.1rem;
+  /* Size comes from the h3 ramp above — this is the Title role, not a
+     one-off. Overriding it here is what put 1.1rem off the scale. */
 }
 
 .analysis-section p {
