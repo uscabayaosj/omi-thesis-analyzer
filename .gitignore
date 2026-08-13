@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# agent tooling — vendored skill docs pulled from upstream (e.g. upstash/skills
+# arrived with the @upstash/redis install). Regenerable from the lockfile and
+# not part of the app, so they stay out of the repo rather than adding a few
+# hundred KB of third-party docs to every clone and diff.
+/.agents/
+/.claude/skills/
+skills-lock.json
