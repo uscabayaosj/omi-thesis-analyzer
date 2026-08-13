@@ -1,6 +1,8 @@
 "use client";
 
 import type { AdhdAnalysis, Rollup } from "./adhd";
+import { schedulePush } from "./sync";
+import { isSyncedNamespace } from "./kv";
 
 export interface StoredAdhdAnalysis {
   conversationId: string;
@@ -45,6 +47,9 @@ function readMap<T>(key: string): Record<string, T> {
 function writeMap<T>(key: string, map: Record<string, T>): void {
   try {
     localStorage.setItem(key, JSON.stringify(map));
+    // Mirror to the durable store so the other device sees it. Debounced and
+    // fire-and-forget — localStorage already holds the write.
+    if (isSyncedNamespace(key)) schedulePush(key);
   } catch (e) {
     if (e instanceof DOMException && e.name === "QuotaExceededError") {
       console.error(`localStorage quota exceeded writing ${key}`);

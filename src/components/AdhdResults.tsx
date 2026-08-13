@@ -45,6 +45,38 @@ export function AdhdResults({
 }) {
   const done = new Set(doneKeys);
 
+  // A conversation with nothing actionable in it is a normal outcome (small
+  // talk, a lecture, background noise). Rendering six stacked "None." cards
+  // makes that read as a failure and buries the one line that actually
+  // answers the question — so collapse to the summary instead.
+  const nothingCaptured =
+    analysis.do_today.length === 0 &&
+    analysis.commitments.length === 0 &&
+    analysis.remember.length === 0 &&
+    analysis.people.length === 0 &&
+    analysis.open_loops.length === 0 &&
+    analysis.ahead.length === 0 &&
+    !analysis.reflection?.social_balance?.length &&
+    !analysis.reflection?.emotional_check?.length &&
+    !analysis.reflection?.capacity_check?.length &&
+    !analysis.reflection?.strategic_takeaway?.length;
+
+  if (nothingCaptured) {
+    return (
+      <div className={`${animate ? "stagger-in" : ""} space-y-6`}>
+        <div className="card p-5 border-cyan-500/30">
+          <p className="text-sm text-slate-200">{analysis.summary}</p>
+        </div>
+        <div className="card p-8 text-center">
+          <p className="text-slate-300">Nothing actionable was captured here.</p>
+          <p className="text-slate-400 text-sm mt-1">
+            No commitments, people, or open loops came up — nothing to carry forward from this one.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`${animate ? "stagger-in" : ""} space-y-6`}>
       {/* One-line summary */}

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, type ComponentType } from "react";
+import { useEffect, useState, useCallback, Suspense, type ComponentType } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { fetchJson } from "@/lib/fetch-json";
 import { formatDateTime, dayOf } from "@/lib/format";
 import type { AdhdAnalysis, Rollup } from "@/lib/adhd";
@@ -15,6 +16,7 @@ import {
   ExternalLinkIcon, DownloadIcon, CheckIcon, ZapIcon, ClipboardIcon,
   UsersIcon, FileTextIcon, XCircleIcon,
 } from "@/components/icons";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { BUTTON_PRIMARY } from "@/lib/ui";
 
 interface ConvoLite {
@@ -85,81 +87,17 @@ function RollupSectionBlock({
   );
 }
 
-function RegenerateConfirmDialog({
-  onConfirm, onCancel, dayLabel,
-}: {
-  onConfirm: () => void;
-  onCancel: () => void;
-  dayLabel: string;
-}) {
-  const cancelRef = useRef<HTMLButtonElement>(null);
-  const [closing, setClosing] = useState(false);
 
-  // Play a fast exit transition instead of vanishing instantly — the dialog
-  // should leave the way it arrived, just quicker, since the decision is
-  // already made. Guarded so a second trigger during the exit is a no-op.
-  const requestClose = useCallback((action: () => void) => {
-    setClosing((already) => {
-      if (already) return already;
-      setTimeout(action, 100);
-      return true;
-    });
-  }, []);
-
-  useEffect(() => {
-    cancelRef.current?.focus();
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") requestClose(onCancel);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onCancel, requestClose]);
-
-  return (
-    <div
-      className={`overlay-backdrop fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 ${closing ? "overlay-closing" : ""}`}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Confirm regenerate rollup"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) requestClose(onCancel);
-      }}
-    >
-      <div className={`overlay-panel card p-6 max-w-md w-full border-red-500/30 ${closing ? "overlay-closing" : ""}`}>
-        <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
-          <WarningIcon className="w-5 h-5 text-red-400 flex-shrink-0" />
-          Replace this day&apos;s rollup?
-        </h3>
-        <p className="text-sm text-slate-400 mb-4">
-          <strong className="text-slate-200">{dayLabel}</strong> already has a saved rollup. Regenerating replaces
-          it — rollups keep no version history, so the current one will be gone. If a later day&apos;s rollup
-          already chained off this one, it won&apos;t pick up the change unless you regenerate that day too.
-        </p>
-        <div className="flex gap-3 justify-end">
-          <button
-            ref={cancelRef}
-            onClick={() => requestClose(onCancel)}
-            className="text-sm bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 min-h-[44px] rounded-lg transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => requestClose(onConfirm)}
-            className="text-sm bg-red-600 hover:bg-red-500 text-white font-medium px-4 py-2 min-h-[44px] rounded-lg transition-colors"
-          >
-            Replace it
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export default function RollupPage() {
+function RollupPageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [convos, setConvos] = useState<ConvoLite[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const dayParam = searchParams.get("day");
+  const [selectedDay, setSelectedDay] = useState<string | null>(
+    dayParam && /^\d{4}-\d{2}-\d{2}$/.test(dayParam) ? dayParam : null
+  );
   const [rollup, setRollup] = useState<Rollup | null>(null);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0, failed: 0 });
@@ -194,6 +132,24 @@ export default function RollupPage() {
     const existing = getRollup(day);
     setRollup(existing ? existing.rollup : null);
   }, []);
+
+  // Mirror the open day into the URL so a reload or PWA relaunch returns to
+  // the day being worked on rather than the day picker. `replace`, not `push`:
+  // Back should leave the page, not walk back through each day opened.
+  // No-ops when the URL already matches, so this can't re-fire itself.
+  useEffect(() => {
+    const next = selectedDay ? `/rollup?day=${selectedDay}` : "/rollup";
+    if (next === window.location.pathname + window.location.search) return;
+    router.replace(next, { scroll: false });
+  }, [selectedDay, router]);
+
+  // Restore the saved rollup when the page opens straight into a day via ?day=.
+  useEffect(() => {
+    if (!selectedDay) return;
+    const existing = getRollup(selectedDay);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is unavailable during SSR, so this can't be a lazy initializer
+    setRollup(existing ? existing.rollup : null);
+  }, [selectedDay]);
 
   const generate = useCallback(async (dayConvos: ConvoLite[], day: string) => {
     setRunning(true);
@@ -318,11 +274,11 @@ export default function RollupPage() {
       )}
 
       {!loading && !selectedDay && (
-        <div className="space-y-3" role="list" aria-label="Days with conversations">
+        <ul className="space-y-3 list-none" aria-label="Days with conversations">
           {days.map(([day, list]) => {
             const hasRollup = !!getRollup(day);
             return (
-              <li key={day} className="list-none">
+              <li key={day}>
                 <button
                   onClick={() => selectDay(day)}
                   disabled={running}
@@ -340,11 +296,11 @@ export default function RollupPage() {
             );
           })}
           {days.length === 0 && (
-            <div className="card p-8 text-center">
+            <li className="card p-8 text-center">
               <p className="text-slate-400">No conversations to roll up yet.</p>
-            </div>
+            </li>
           )}
-        </div>
+        </ul>
       )}
 
       {selectedDay && (
@@ -357,14 +313,17 @@ export default function RollupPage() {
             <p className="font-semibold text-white">{formatDateTime(`${selectedDay}T12:00:00`, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
             <p className="text-slate-400 text-sm mt-1">{selectedConvos.length} conversation{selectedConvos.length === 1 ? "" : "s"} this day</p>
 
-            <div className="mt-3 space-y-3" role="list" aria-label="Conversations this day">
+            {/* One list per time-of-day group rather than a single outer list:
+                a role="list" may only own listitems, and the group wrappers in
+                between were breaking that ownership for assistive tech. */}
+            <div className="mt-3 space-y-3">
               {(selectedConvos.length > CHUNK_THRESHOLD
                 ? groupByTimeOfDay(selectedConvos)
                 : ([[null, selectedConvos]] as [string | null, ConvoLite[]][])
               ).map(([label, group]) => (
                 <div key={label ?? "all"}>
                   {label && <p className="text-xs font-semibold text-slate-400 mb-1.5">{label}</p>}
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5" role="list" aria-label={label ? `${label} conversations` : "Conversations this day"}>
                     {group.map((c) => {
                       const analyzed = !!getAdhdAnalysis(c.id);
                       return (
@@ -386,7 +345,7 @@ export default function RollupPage() {
             <div
               className={
                 selectedConvos.length > CHUNK_THRESHOLD
-                  ? "sticky bottom-0 mt-4 pt-3 pb-3 border-t border-slate-700 bg-[#0f172a]"
+                  ? "sticky bottom-0 mt-4 pt-3 pb-3 border-t border-slate-700 bg-[var(--card)]"
                   : "mt-4"
               }
             >
@@ -418,8 +377,20 @@ export default function RollupPage() {
           </div>
 
           {showRegenConfirm && (
-            <RegenerateConfirmDialog
-              dayLabel={formatDateTime(`${selectedDay}T12:00:00`, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+            <ConfirmDialog
+              title="Replace this day's rollup?"
+              tone="danger"
+              body={
+                <>
+                  <strong className="text-slate-200">
+                    {formatDateTime(`${selectedDay}T12:00:00`, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+                  </strong>{" "}
+                  already has a saved rollup. Regenerating replaces it — rollups keep no version history, so the
+                  current one will be gone. If a later day&apos;s rollup already chained off this one, it won&apos;t
+                  pick up the change unless you regenerate that day too.
+                </>
+              }
+              confirmLabel="Replace it"
               onCancel={() => setShowRegenConfirm(false)}
               onConfirm={() => {
                 setShowRegenConfirm(false);
@@ -450,5 +421,23 @@ export default function RollupPage() {
         </>
       )}
     </main>
+  );
+}
+
+// useSearchParams (for the ?day= binding) opts this route into client-side
+// rendering, which Next requires a Suspense boundary around.
+export default function RollupPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="max-w-3xl mx-auto px-4 py-8">
+          <div className="space-y-3" aria-label="Loading rollup" role="status">
+            {[1, 2, 3].map((i) => <div key={i} className="skeleton h-20 w-full" />)}
+          </div>
+        </main>
+      }
+    >
+      <RollupPageInner />
+    </Suspense>
   );
 }
