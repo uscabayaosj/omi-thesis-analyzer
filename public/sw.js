@@ -1,12 +1,21 @@
-const CACHE_NAME = "trace-v3";
+const CACHE_NAME = "trace-v4";
 const STATIC_ASSETS = ["/", "/manifest.json", "/icon.svg", "/icon-192.png", "/icon-512.png"];
 
-// Install — cache static shell
+// Install — cache static shell.
+//
+// Deliberately does NOT call skipWaiting(): a new worker stays in `waiting`
+// until the user asks for it. Activating on install would swap the app's code
+// out from under someone mid-task — the reason updates here are opt-in.
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
   );
-  self.skipWaiting();
+});
+
+// The page asks for activation when the user clicks "Reload now". This is the
+// only path that promotes a waiting worker.
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 // Activate — clean old caches
