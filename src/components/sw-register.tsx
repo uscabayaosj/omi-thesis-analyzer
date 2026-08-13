@@ -42,7 +42,10 @@ export default function ServiceWorkerRegistration() {
     };
 
     navigator.serviceWorker
-      .register("/sw.js")
+      // updateViaCache "none": update checks must always hit the network for
+      // the script — the whole update flow rests on byte-comparing the
+      // deployed worker, and an HTTP-cached copy would hide new deployments.
+      .register("/sw.js", { updateViaCache: "none" })
       .then((reg) => {
         if (cancelled) return;
         registration.current = reg;

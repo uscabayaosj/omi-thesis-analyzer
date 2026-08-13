@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ServiceWorkerRegistration from "@/components/sw-register";
+import AppVersion from "@/components/app-version";
 
 export const metadata: Metadata = {
   title: "TRACE — Personal & Research Assistant",
@@ -39,6 +40,7 @@ export default function RootLayout({
       <body className="bg-slate-950 text-slate-100 antialiased min-h-screen">
         <ServiceWorkerRegistration />
         {children}
+        <AppVersion />
       </body>
     </html>
   );
