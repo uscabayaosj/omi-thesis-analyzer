@@ -116,7 +116,19 @@ function buildRequestBody(config: ProviderConfig, messages: ChatMessage[], jsonM
     model: config.model,
     messages,
     ...(isGpt5Plus
-      ? { max_completion_tokens: 8192 }
+      ? {
+          // On a reasoning model this ceiling covers reasoning tokens as well
+          // as the reply, so 8192 could be spent thinking and leave the JSON
+          // truncated. It is a cap, not a reservation — unused headroom is not
+          // billed — so it is set well clear of what these prompts return.
+          max_completion_tokens: GPT5_OUTPUT_CEILING,
+          // Reasoning tokens bill at the output rate, 6x input, which makes
+          // them the largest controllable cost here. These calls extract
+          // structured fields from a transcript against a fixed rubric, so
+          // they need far less deliberation than the default. Raise this via
+          // the env var if analysis quality suffers.
+          reasoning_effort: process.env.AI_REASONING_EFFORT || "low",
+        }
       : { temperature: 0.7, max_tokens: 8192 }),
     ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
   };
@@ -158,6 +170,10 @@ function buildRequestBody(config: ProviderConfig, messages: ChatMessage[], jsonM
 const GPT_5 = 500; // max_completion_tokens replaces max_tokens; no temperature
 const GPT_5_6 = 506; // explicit prompt cache breakpoints
 
+// Headroom for reasoning tokens plus the JSON reply. Only what the model
+// actually generates is billed, so this buys truncation safety for free.
+const GPT5_OUTPUT_CEILING = 16384;
+
 // Returns null for anything that isn't a "gpt-<major>[.<minor>]-..." model.
 function parseGptVersion(model: string): number | null {
   const m = /^gpt-(\d+)(?:\.(\d+))?/.exec(model);
@@ -167,6 +183,32 @@ function parseGptVersion(model: string): number | null {
 
 function promptCacheKey(systemPrompt: string): string {
   return `omi:${createHash("sha256").update(systemPrompt).digest("hex").slice(0, 16)}`;
+}
+
+// A response cut off at the token ceiling still arrives as HTTP 200 with
+// partial content, which then fails JSON parsing as "did not return valid
+// JSON" — pointing at the model's formatting rather than at the real cause.
+// Name it here instead, so the fix (raise the ceiling, or lower the reasoning
+// effort spending it) is legible from the log line.
+function assertNotTruncated(data: Record<string, unknown>, provider: string): void {
+  let truncated = false;
+
+  if (provider === "anthropic") {
+    truncated = data.stop_reason === "max_tokens";
+  } else if (provider === "google") {
+    const candidates = data.candidates as Array<{ finishReason?: string }> | undefined;
+    truncated = candidates?.[0]?.finishReason === "MAX_TOKENS";
+  } else {
+    const choices = data.choices as Array<{ finish_reason?: string }> | undefined;
+    truncated = choices?.[0]?.finish_reason === "length";
+  }
+
+  if (truncated) {
+    throw new Error(
+      `${provider} response hit the output token ceiling and was truncated. ` +
+        `Raise the ceiling, or lower AI_REASONING_EFFORT so fewer tokens go to reasoning.`,
+    );
+  }
 }
 
 function extractContent(data: Record<string, unknown>, provider: string): string {
@@ -220,6 +262,7 @@ export async function chatCompletion(messages: ChatMessage[], jsonMode = false):
   }
 
   const data = await res.json();
+  assertNotTruncated(data, provider);
   return extractContent(data, provider);
 }
 
