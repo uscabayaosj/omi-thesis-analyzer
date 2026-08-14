@@ -106,11 +106,18 @@ function buildRequestBody(config: ProviderConfig, messages: ChatMessage[], jsonM
     };
   }
 
+  // GPT-5 renamed max_tokens to max_completion_tokens and dropped temperature;
+  // sending either of the old fields is a 400. Everything else — earlier OpenAI
+  // models, and OpenRouter, which normalizes these itself — keeps the old pair.
+  const gptVersion = provider === "openai" ? parseGptVersion(config.model) : null;
+  const isGpt5Plus = gptVersion !== null && gptVersion >= GPT_5;
+
   const base = {
     model: config.model,
     messages,
-    temperature: 0.7,
-    max_tokens: 8192,
+    ...(isGpt5Plus
+      ? { max_completion_tokens: 8192 }
+      : { temperature: 0.7, max_tokens: 8192 }),
     ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
   };
 
@@ -122,7 +129,7 @@ function buildRequestBody(config: ProviderConfig, messages: ChatMessage[], jsonM
   // it stable per prompt type without threading an id through every caller.
   // Older OpenAI models and OpenRouter reject these fields, hence the gate.
   const systemMsg = messages.find((m) => m.role === "system");
-  if (provider !== "openai" || !systemMsg || !supportsCacheBreakpoints(config.model)) {
+  if (!systemMsg || gptVersion === null || gptVersion < GPT_5_6) {
     return base;
   }
 
@@ -147,11 +154,15 @@ function buildRequestBody(config: ProviderConfig, messages: ChatMessage[], jsonM
   };
 }
 
-// Explicit cache breakpoints arrived with GPT-5.6; earlier models 400 on them.
-function supportsCacheBreakpoints(model: string): boolean {
+// Model generations as major*100+minor, so they compare as plain numbers.
+const GPT_5 = 500; // max_completion_tokens replaces max_tokens; no temperature
+const GPT_5_6 = 506; // explicit prompt cache breakpoints
+
+// Returns null for anything that isn't a "gpt-<major>[.<minor>]-..." model.
+function parseGptVersion(model: string): number | null {
   const m = /^gpt-(\d+)(?:\.(\d+))?/.exec(model);
-  if (!m) return false;
-  return Number(m[1]) * 100 + Number(m[2] ?? 0) >= 506;
+  if (!m) return null;
+  return Number(m[1]) * 100 + Number(m[2] ?? 0);
 }
 
 function promptCacheKey(systemPrompt: string): string {
