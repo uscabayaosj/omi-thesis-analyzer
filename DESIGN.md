@@ -1,35 +1,35 @@
 ---
 name: TRACE
-description: A dark field journal for turning Omi wearable recordings into thesis evidence and daily executive-function structure.
+description: A lamplit field journal for turning Omi wearable recordings into thesis evidence and daily executive-function structure.
 colors:
-  night-field: "#0f172a"
-  paper: "#e2e8f0"
-  ink-panel: "#1e293b"
-  ink-panel-raised: "#334155"
-  brand-navy: "#13294b"
-  signal-cyan: "#22d3ee"
-  signal-cyan-light: "#67e8f9"
-  signal-cyan-deep: "#0e7490"
-  graphite: "#94a3b8"
-  graphite-nontext: "#64748b"
+  night-pasture: "#161311"
+  lamp-paper: "#f6f1e7"
+  ink-panel: "#221c17"
+  ink-panel-raised: "#2e261e"
+  brand-leather: "#2a1c10"
+  copper-brand: "#b96d33"
+  copper-brand-light: "#d99a5e"
+  copper-brand-deep: "#a25a26"
+  graphite: "#a89a88"
+  graphite-nontext: "#7a6b58"
   amber-marginalia: "#fbbf24"
   amber-marginalia-wash: "rgba(245, 158, 11, 0.06)"
-  verified-green: "#34d399"
-  alert-red: "#f87171"
+  sage-green: "#a9bd8f"
+  alert-clay: "#e98d72"
 typography:
   display:
-    fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif"
+    fontFamily: "'Source Serif 4', Georgia, serif"
     fontSize: "clamp(1.5rem, 4vw, 2.25rem)"
     fontWeight: 700
     lineHeight: 1.2
     letterSpacing: "normal"
   headline:
-    fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif"
+    fontFamily: "'Source Serif 4', Georgia, serif"
     fontSize: "clamp(1.15rem, 3vw, 1.5rem)"
     fontWeight: 600
     lineHeight: 1.25
   title:
-    fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif"
+    fontFamily: "'Source Serif 4', Georgia, serif"
     fontSize: "clamp(1rem, 2.5vw, 1.25rem)"
     fontWeight: 600
     lineHeight: 1.3
@@ -62,7 +62,7 @@ spacing:
   xl: "32px"
 components:
   button-primary:
-    backgroundColor: "{colors.signal-cyan}"
+    backgroundColor: "{colors.copper-brand}"
     textColor: "#020617"
     rounded: "{rounded.md}"
     padding: "8px 20px"
@@ -92,13 +92,13 @@ components:
 
 **Creative North Star: "The Field Journal"**
 
-This is a researcher's dark notebook, not a product marketing itself. Every screen reads as a page you turn to record, review, or close out — precise, patient, and unhurried, because the two people this journal serves are the same person: a PhD researcher extracting thesis evidence, and someone using the same tool at the end of the day to see what actually needs doing. The cyan accent behaves like ink on night paper: it marks what matters (the primary lens, the active state, the thing to act on) and disappears everywhere else. Amber behaves like a marginal note — the custom-analysis lens and its "saved" chip are handwritten asides against the notebook's default page, not a competing brand color.
+This is a researcher's dark notebook, not a product marketing itself. Every screen reads as a page you turn to record, review, or close out — precise, patient, and unhurried, because the two people this journal serves are the same person: a PhD researcher extracting thesis evidence, and someone using the same tool at the end of the day to see what actually needs doing. The copper accent behaves like a branding iron’s mark on leather: it marks what matters (the primary lens, the active state, the thing to act on) and disappears everywhere else. Amber behaves like a marginal note — the custom-analysis lens and its "saved" chip are handwritten asides against the notebook's default page, not a competing brand color.
 
 The palette stays muted and clinical on purpose: desaturated slate, low-glare, nothing performing for attention. Warmth exists, but only where it's earned — amber for a personal aside, emerald for a thing genuinely done and checked off — never as decoration. This system explicitly rejects three lanes it could easily fall into: a productivity app selling itself (no gamification, no cheerful microcopy, no streaks), a clinical intake form (despite the ADHD framing, nothing reads as diagnostic or sterile), and a busy analytics dashboard (no multi-panel data-viz energy — this is a small set of calm, sequential pages, not a control room).
 
 **Key Characteristics:**
 - Single dark surface family (night field → ink panel → ink panel raised), no light mode
-- One accent color carries all "this is active / this is primary" meaning: signal cyan
+- One accent color carries all "this is active / this is primary" meaning: branding-iron copper
 - Flat by default — depth comes from tonal layering, not shadows
 - Every interactive target is at least 44px tall; this is a phone-in-pocket tool as much as a desk tool
 - Amber and emerald are single-purpose accents (custom lens; done/verified) — never used decoratively
@@ -108,8 +108,8 @@ The palette stays muted and clinical on purpose: desaturated slate, low-glare, n
 The palette is a narrow, deliberately dark stack: one background, one panel color one step lighter, one accent, and two single-purpose signal colors. Nothing else is introduced.
 
 ### Primary
-- **Signal Cyan** (`#22d3ee`): The one color that means "this is primary, active, or mine to act on" — primary buttons, active filter pill, selected-item border, links, the app's own icon accent. Taken straight from the TRACE mark's nodes. Used sparingly against the dark field so it reads as a mark, not a wash. Because cyan is a *light* hue, anything filled with it carries a near-black `slate-950` label, never white: white on cyan-400 measures 3.68:1 and fails AA, while slate-950 on it clears 11.16:1 — and that bright-on-dark pairing is the logo's own contrast relationship.
-- **Signal Cyan — Light** (`#67e8f9`): A lighter step of the same ink, used only for icon/heading accents inside content blocks (e.g. the icon beside an analysis section heading) where full-strength cyan would be too loud against panel text.
+- **Copper Brand** (`#b96d33`): The one color that means "this is primary, active, or mine to act on" — primary buttons, active filter pill, selected-item border, links, the app's own icon accent. Taken straight from the TRACE mark's nodes (now copper). Used sparingly against the dark field so it reads as a mark, not a wash. Because the active fill (`cyan-400` → `#d99a5e`) is a *light* copper, anything filled with it carries a near-black `slate-950` label, never white: warm-white on it fails AA, while slate-950 on it clears 7.7:1 — the bright-on-dark pairing is the logo's own contrast relationship.
+- **Copper Brand — Light** (`#d99a5e`): A lighter step of the same ink, used only for icon/heading accents inside content blocks (e.g. the icon beside an analysis section heading) where full-strength copper would be too loud against panel text.
 - **Brand Navy** (`#13294b`): The logo lockup's ground. It is *not* a UI surface — the app field stays Night Field. Navy appears only where the brand mark needs its own ground: the PWA icon, the manifest `theme_color`, and the browser chrome.
 
 ### Neutral
@@ -120,7 +120,7 @@ The palette is a narrow, deliberately dark stack: one background, one panel colo
 - **Graphite** (`#94a3b8`): Muted/secondary text — timestamps, helper copy, placeholders, badge text. This is the single muted-text value; the app previously mixed it with a darker `#64748b`, which measured 3.07:1 on Ink Panel and 3.75:1 on Night Field and so failed WCAG AA for body text. `#94a3b8` clears it at 5.71:1 and 6.96:1 respectively. **Muted never means illegible** — if something needs to recede further, reduce its size or weight, don't darken it past this value. `#64748b` survives only as a non-text tone (the calendar's "has entries" dot, list markers), where the 3:1 non-text threshold applies.
 
 ### Named Rules
-**The One Ink Rule.** Signal Cyan is the only color allowed to mean "primary." If a second element on screen needs to look important, it does not get its own color — it gets weight, size, or position instead.
+**The One Ink Rule.** Copper Brand is the only color allowed to mean "primary." If a second element on screen needs to look important, it does not get its own color — it gets weight, size, or position instead.
 
 **The Two Greys Rule.** There are exactly two muted greys, and only one of them is ever allowed to carry text: Graphite (`#94a3b8`) for any text, and `#64748b` for non-text marks only (dots, markers, decorative icons). A third, darker grey is never introduced for "extra quiet" text — quieter is expressed through size and weight. Audit test: every text colour in the app must clear 4.5:1 against both Night Field and Ink Panel; `#64748b` fails both, which is exactly why it is barred from text.
 
@@ -179,10 +179,10 @@ Every interactive component shares one behavior contract: `background` and `tran
 
 ### Buttons
 - **Shape:** 8px radius (`rounded-lg`), 44px minimum height always.
-- **Primary:** Signal Cyan background, `slate-950` label (never white — see Colors), `font-medium`, used for the one primary action per screen (Run Custom Analysis, Generate Rollup). Lives as `BUTTON_PRIMARY` in `src/lib/ui.ts` so the brand colour has exactly one definition; call sites append only padding and layout.
+- **Primary:** Copper Brand background, `slate-950` label (never white — see Colors), `font-medium`, used for the one primary action per screen (Run Custom Analysis, Generate Rollup). Lives as `BUTTON_PRIMARY` in `src/lib/ui.ts` so the brand colour has exactly one definition; call sites append only padding and layout.
 - **Secondary:** one tonal step lighter than whatever surface it sits on, lightening one further step on hover — used for every non-primary action (Cancel, Refresh, Deselect All). On the page field this is Ink Panel background (`bg-slate-800`) → Ink Panel Raised on hover; **inside a `.card`, that step must shift down to `bg-slate-700` → `bg-slate-600`**, since a card's own background already *is* Ink Panel — a secondary button using `bg-slate-800` there is invisible at rest (confirmed bug, fixed across the toolbar, both confirm dialogs, and both quick-prompt-preset blocks: same-color-as-container, no shape until hovered). The rule is relative to the immediate surface, never a fixed class.
-- **Parity Action:** for two or more independent, co-equal actions sharing one control (e.g. the selection toolbar's Group Thesis / Run ADHD — different actions, not a preference order), no button claims solid-fill cyan at rest, since only one action per screen is allowed that mark under the One Ink Rule. All of them share one class and three tiers instead: flat slate with nothing selected; a cyan-tinted **ready** wash (`border-cyan-500/50 bg-cyan-950/40 text-cyan-200`, `hover:` one step up) — the same wash `ConversationRow` uses for a selected item, not a new pattern — as soon as *anything* is selected, even if a given button's own minimum (Group Thesis needs 2, not 1) isn't met yet; and a solid-fill **full cyan** flash on `:active`, so an actual tap still reads as a distinct, heavier moment than just having a selection ready. A button whose own minimum isn't met yet stays visually "ready" and tappable rather than disabled — its click handler no-ops instead (`if (selected.size < 2) return;`) — since the resting color's job is "there's a selection to act on," not "this specific action's exact threshold is satisfied"; the live count in the label (`Group Thesis (1)`) carries that nuance instead. Disabled state (nothing selected, or a batch already running) is `bg-slate-700` here, not `bg-slate-800` — this toolbar is itself a `.card` (Ink Panel), so the Secondary Button "shift one step inside a card" rule applies just as much to this variant.
-- **Ghost/ text-link:** No background, `text-cyan-400`, underline on hover — used for low-emphasis actions inline in text ("Show all").
+- **Parity Action:** for two or more independent, co-equal actions sharing one control (e.g. the selection toolbar's Group Thesis / Run ADHD — different actions, not a preference order), no button claims solid-fill copper at rest, since only one action per screen is allowed that mark under the One Ink Rule. All of them share one class and three tiers instead: flat slate with nothing selected; a copper-tinted **ready** wash (`border-cyan-500/50 bg-cyan-950/40 text-cyan-200`, `hover:` one step up) — the same wash `ConversationRow` uses for a selected item, not a new pattern — as soon as *anything* is selected, even if a given button's own minimum (Group Thesis needs 2, not 1) isn't met yet; and a solid-fill **full copper** flash on `:active`, so an actual tap still reads as a distinct, heavier moment than just having a selection ready. A button whose own minimum isn't met yet stays visually "ready" and tappable rather than disabled — its click handler no-ops instead (`if (selected.size < 2) return;`) — since the resting color's job is "there's a selection to act on," not "this specific action's exact threshold is satisfied"; the live count in the label (`Group Thesis (1)`) carries that nuance instead. Disabled state (nothing selected, or a batch already running) is `bg-slate-700` here, not `bg-slate-800` — this toolbar is itself a `.card` (Ink Panel), so the Secondary Button "shift one step inside a card" rule applies just as much to this variant.
+- **Ghost/ text-link:** No background, `text-cyan-400` (remapped to light copper), underline on hover — used for low-emphasis actions inline in text ("Show all").
 - **Disabled:** Background drops to a flat slate; Primary/Parity Action buttons swap to a flat color directly, Secondary/Ghost buttons reduce opacity instead — either way, no hover/press feedback. Which flat slate depends on the immediate surface (page field vs. inside a `.card`) — see the Secondary Button rule.
 
 ### Badges / Chips
@@ -193,7 +193,7 @@ Every interactive component shares one behavior contract: `background` and `tran
 - **Corner Style:** 12px (`.card`).
 - **Background:** Ink Panel at rest, Ink Panel Raised on hover/active.
 - **Shadow Strategy:** None — see Elevation & Depth.
-- **Border:** 1px, Ink Panel Raised color at rest; shifts to a tinted accent border (cyan/amber/emerald/red at ~30–50% opacity) to signal the card's semantic state (selected, custom-lens, error).
+- **Border:** 1px, Ink Panel Raised color at rest; shifts to a tinted accent border (copper/amber/sage/clay at ~30–50% opacity) to signal the card's semantic state (selected, custom-lens, error).
 - **Internal Padding:** 16–24px (`p-4` to `p-6`), 32px for empty states.
 
 ### Inputs / Fields
@@ -201,21 +201,21 @@ Every interactive component shares one behavior contract: `background` and `tran
 - **Focus:** Border shifts to the relevant accent color (amber for the custom-analysis textarea), plus the global 2px accent focus ring — no glow/shadow effect.
 
 ### Navigation
-- Filter pills (All / Analyzed / Unanalyzed) use solid-fill selection: the active pill gets a full Signal Cyan background and a slate-950 label, inactive pills stay Ink Panel with graphite text. This is the one place the system uses fill (not tint) for state, reserved for true single-select navigation.
+- Filter pills (All / Analyzed / Unanalyzed) use solid-fill selection: the active pill gets a full Copper Brand background and a slate-950 label, inactive pills stay Ink Panel with graphite text. This is the one place the system uses fill (not tint) for state, reserved for true single-select navigation.
 - Primary in-page navigation (Daily Rollup, Refresh) sits as icon + label ghost buttons in the header, never a persistent nav bar or tab strip — the app has no chrome beyond what a given screen needs.
 
 ### Lens Badge (signature component)
 A stacked pair of small rounded-full pills ("Thesis" / "ADHD") shown beside every conversation list item, each independently lit (emerald fill + border) or dim (flat slate) depending on whether that lens has run. Reads as plain words, not a coded glyph — a first-time reader doesn't need a tooltip to know what's been processed. This is the system's one custom-invented primitive — a status readout that lets the researcher scan a whole list at a glance.
 
 ### Calendar (month grid)
-The primary day-browsing entry point on the conversations list. A 7-column Monday-first grid inside a `.card`. The selected day reuses the filter pills' solid-fill pattern (Signal Cyan background, slate-950 label) — the same "true single-select navigation" rule, not a new one. Today gets a cyan ring (`border-cyan-500/60`) independent of selection, so it stays identifiable even when browsing a different day. Days with conversations get a small graphite dot; days without get none — no shadow, no elevation, just the dot and the two cyan treatments. Future dates render dimmed (Graphite, one step below the `text-slate-300` of past days) but stay clickable rather than disabled — simplicity over guarding an edge case that just resolves to an empty state. They are dimmed, not faded out: because they remain real controls, they hold the same AA-legible Graphite as any other muted text.
+The primary day-browsing entry point on the conversations list. A 7-column Monday-first grid inside a `.card`. The selected day reuses the filter pills' solid-fill pattern (Copper Brand background, slate-950 label) — the same "true single-select navigation" rule, not a new one. Today gets a copper ring (`border-cyan-500/60`) independent of selection, so it stays identifiable even when browsing a different day. Days with conversations get a small graphite dot; days without get none — no shadow, no elevation, just the dot and the two copper treatments. Future dates render dimmed (Graphite, one step below the `text-slate-300` of past days) but stay clickable rather than disabled — simplicity over guarding an edge case that just resolves to an empty state. They are dimmed, not faded out: because they remain real controls, they hold the same AA-legible Graphite as any other muted text.
 
 Collapsed to a one-line summary row by default (icon + selected day's label, chevron affordance) — the full grid would otherwise be the first thing painted on mobile, pushing that day's actual conversations below the fold. Tapping the row expands the grid; picking a day (or "Today") collapses it back automatically, so the grid never lingers once its job is done. The one exception: while group-select mode is active, picking a day does *not* collapse the grid, since batch-selecting across several days means jumping between them repeatedly — closing on every pick would fight that workflow. The month label doubles as a native `<input type="month">` (invisibly overlaid) for jumping distant months without a hand-built year picker.
 
 ## Do's and Don'ts
 
 ### Do:
-- **Do** keep Signal Cyan as the only color that means "primary" — see the One Ink Rule.
+- **Do** keep Copper Brand as the only color that means "primary" — see the One Ink Rule.
 - **Do** convey elevation with tonal steps only, never a shadow — see the Flat Field Rule.
 - **Do** keep every screen single-column inside the 768px container — see the Single Column Rule.
 - **Do** enforce 44px minimum touch targets on every interactive element; this is used one-handed on a phone as often as on a desk.
@@ -223,7 +223,7 @@ Collapsed to a one-line summary row by default (icon + selected day's label, che
 - **Do** respect `prefers-reduced-motion` on every new animation, matching the existing shimmer/spin/scale-press pattern.
 
 ### Don't:
-- **Don't** introduce a second accent color for "importance." A new primary action reuses Signal Cyan; it does not get its own hue.
+- **Don't** introduce a second accent color for "importance." A new primary action reuses Copper Brand; it does not get its own hue.
 - **Don't** add gamified feedback — no streaks, confetti, progress badges, or celebratory copy. This is a research and executive-function tool, not an engagement product.
 - **Don't** let the ADHD Aid surfaces drift toward a clinical/medical register (form-like labels, diagnostic tone, sterile whitespace). It should feel like the same field journal as the thesis lens, just a different page.
 - **Don't** add a sidebar, tab bar, or multi-column layout, even on desktop. If a screen feels cramped, that's a signal to add a wizard step or collapse content — not to add a column.

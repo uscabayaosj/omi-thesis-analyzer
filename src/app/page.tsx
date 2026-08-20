@@ -674,57 +674,6 @@ function HomeInner() {
           </div>
         </div>
 
-        {/* Onboarding: About this framework — a quiet footnote, not a section */}
-        <details className="mt-3 group">
-          <summary className="cursor-pointer list-none text-sm text-slate-400 hover:text-slate-300 transition-colors min-h-[44px] flex items-center gap-1.5">
-            <ChevronRightIcon className="w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] group-open:rotate-90" />
-            What is Pioneer Sovereignty?
-          </summary>
-          <div className="pl-5 pt-1 pb-2 text-sm text-slate-300 space-y-3">
-            <p>
-              <strong className="text-white">Pioneer Sovereignty</strong> is a concept from a PhD anthropology thesis
-              by Ulysses S. Cabayao, SJ (UCL). It examines how ranching families in Montana&apos;s Flathead Valley
-              produce, assert, and contest authority over land and herd through everyday social practices.
-            </p>
-            <p>
-              The thesis argues that these families received their land, water, and grazing rights through
-              federal instruments (homestead patents, water adjudications) — yet experience that authority
-              as self-made and prior to the state that granted it. At the same time, they deny the prior
-              and ongoing sovereignty of the Confederated Salish and Kootenai Tribes whose territory they occupy.
-            </p>
-            <div className="pt-2">
-              <p className="font-medium text-slate-200 mb-2">The 8 analysis dimensions:</p>
-              <ul className="space-y-1.5 text-slate-400">
-                {[
-                  { label: "RQ1 — Documentary Record", desc: "Historical-legal acts that constituted authority (patents, water rights)" },
-                  { label: "RQ2 — Everyday Practices", desc: "Kinship, inheritance, branding, boundary-maintenance, conflict" },
-                  { label: "RQ3 — CSKT Intersection", desc: "How ranching authority intersects with tribal sovereignty" },
-                  { label: "RQ4 — Wildness Imaginary", desc: "Frontier mythology as double erasure of Indigenous + federal authority" },
-                  { label: "Orienting Conditions", desc: "Which of 5 theoretical conditions are evidenced" },
-                  { label: "Rival Hypothesis Test", desc: "Is frontier framing felt subjectivity or instrumental rhetoric?" },
-                  { label: "Refutation Signals", desc: "What would disconfirm the concept" },
-                  { label: "Forward Thinking", desc: "Research directions and next questions" },
-                ].map((dim, i) => (
-                  <li key={dim.label} className="flex gap-2">
-                    <span
-                      className="flex-shrink-0 mt-0.5 w-5 h-5 rounded-full bg-slate-800 text-slate-400 text-[10px] font-semibold flex items-center justify-center"
-                      aria-hidden="true"
-                    >
-                      {i + 1}
-                    </span>
-                    <span>
-                      <strong className="text-slate-300">{dim.label}</strong>: {dim.desc}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <p className="text-xs text-slate-400 pt-2">
-              This tool analyzes conversations captured by the Omi DK2 wearable device
-              and runs them through an AI model grounded in the thesis&apos;s full theoretical framework.
-            </p>
-          </div>
-        </details>
 
         {/* Search — bypasses day-scoping entirely; the fast path when you know the topic, not the date */}
         {conversations.length > 0 && (
@@ -777,12 +726,15 @@ function HomeInner() {
                 aria-label="Expand calendar to browse a different day"
                 className="w-full card p-3 flex items-center justify-between gap-2 text-left hover:border-slate-600 transition-colors min-h-[44px]"
               >
-                <span className="flex items-center gap-2 text-sm text-slate-200 min-w-0">
+                <span className="flex items-center gap-2.5 text-slate-100 min-w-0">
                   <CalendarIcon className="w-4 h-4 text-cyan-400 flex-shrink-0" />
-                  <span className="truncate">
-                    {selectedDateLabel}
-                    {selectedDate === todayStr && <span className="text-slate-400"> · Today</span>}
-                  </span>
+                  {/* The dateline — the selected day set as a journal entry heading.
+                      "Today" sits outside the truncating span so it never gets clipped
+                      on narrow screens; the year is the part that gives way. */}
+                  <span className="truncate font-serif text-base sm:text-lg">{selectedDateLabel}</span>
+                  {selectedDate === todayStr && (
+                    <span className="text-slate-400 text-sm flex-shrink-0">· Today</span>
+                  )}
                 </span>
                 <ChevronRightIcon className="w-4 h-4 text-slate-400 flex-shrink-0" />
               </button>
@@ -1059,7 +1011,59 @@ export default function Home() {
           <div className="space-y-4" aria-label="Loading conversations" role="status">
             {[1, 2, 3].map((i) => <div key={i} className="skeleton h-24 w-full" />)}
           </div>
-        </main>
+    
+      {/* Onboarding: About this framework — a quiet footnote at the end of the page */}
+      <details className="mt-3 group">
+        <summary className="cursor-pointer list-none text-sm text-slate-400 hover:text-slate-300 transition-colors min-h-[44px] flex items-center gap-1.5">
+          <ChevronRightIcon className="w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] group-open:rotate-90" />
+          What is Pioneer Sovereignty?
+        </summary>
+        <div className="pl-5 pt-1 pb-2 text-sm text-slate-300 space-y-3">
+          <p>
+            <strong className="text-white">Pioneer Sovereignty</strong> is a concept from a PhD anthropology thesis
+            by Ulysses S. Cabayao, SJ (UCL). It examines how ranching families in Montana&apos;s Flathead Valley
+            produce, assert, and contest authority over land and herd through everyday social practices.
+          </p>
+          <p>
+            The thesis argues that these families received their land, water, and grazing rights through
+            federal instruments (homestead patents, water adjudications) — yet experience that authority
+            as self-made and prior to the state that granted it. At the same time, they deny the prior
+            and ongoing sovereignty of the Confederated Salish and Kootenai Tribes whose territory they occupy.
+          </p>
+          <div className="pt-2">
+            <p className="font-medium text-slate-200 mb-2">The 8 analysis dimensions:</p>
+            <ul className="space-y-1.5 text-slate-400">
+              {[
+                { label: "RQ1 — Documentary Record", desc: "Historical-legal acts that constituted authority (patents, water rights)" },
+                { label: "RQ2 — Everyday Practices", desc: "Kinship, inheritance, branding, boundary-maintenance, conflict" },
+                { label: "RQ3 — CSKT Intersection", desc: "How ranching authority intersects with tribal sovereignty" },
+                { label: "RQ4 — Wildness Imaginary", desc: "Frontier mythology as double erasure of Indigenous + federal authority" },
+                { label: "Orienting Conditions", desc: "Which of 5 theoretical conditions are evidenced" },
+                { label: "Rival Hypothesis Test", desc: "Is frontier framing felt subjectivity or instrumental rhetoric?" },
+                { label: "Refutation Signals", desc: "What would disconfirm the concept" },
+                { label: "Forward Thinking", desc: "Research directions and next questions" },
+              ].map((dim, i) => (
+                <li key={dim.label} className="flex gap-2">
+                  <span
+                    className="flex-shrink-0 mt-0.5 w-5 h-5 rounded-full bg-slate-800 text-slate-400 text-[10px] font-semibold flex items-center justify-center"
+                    aria-hidden="true"
+                  >
+                    {i + 1}
+                  </span>
+                  <span>
+                    <strong className="text-slate-300">{dim.label}</strong>: {dim.desc}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <p className="text-xs text-slate-400 pt-2">
+            This tool analyzes conversations captured by the Omi DK2 wearable device
+            and runs them through an AI model grounded in the thesis&apos;s full theoretical framework.
+          </p>
+        </div>
+      </details>
+    </main>
       }
     >
       <HomeInner />

@@ -1,20 +1,58 @@
 @import "tailwindcss";
 
+/* "Lamplit field journal" theme — the app's entire color vocabulary is the
+   slate/cyan/emerald Tailwind scales, so redefining them here rethemes every
+   page coherently: blue slate becomes warm umber ink, TRACE's signal cyan
+   becomes branding-iron copper, emerald becomes sagebrush, red warms to clay.
+   All remapped values re-verified for WCAG AA against the panel surfaces they
+   sit on (including slate-950-on-cyan-400 active fills, 7.7:1). */
+@theme {
+  --color-white: #f6f1e7;
+
+  --color-slate-950: #14100d;
+  --color-slate-900: #1b1613;
+  --color-slate-800: #262019;
+  --color-slate-700: #352c22;
+  --color-slate-600: #4d4133;
+  --color-slate-500: #7a6b58;
+  --color-slate-400: #a89a88;
+  --color-slate-300: #c6b9a5;
+  --color-slate-200: #dcd2bf;
+  --color-slate-100: #eae2d2;
+
+  --color-cyan-950: #2a190d;
+  --color-cyan-900: #402511;
+  --color-cyan-600: #a25a26;
+  --color-cyan-500: #b96d33;
+  --color-cyan-400: #d99a5e;
+  --color-cyan-300: #e6b988;
+  --color-cyan-200: #f0d3ae;
+  --color-cyan-100: #f7e4c9;
+
+  --color-emerald-500: #7e9469;
+  --color-emerald-400: #a9bd8f;
+
+  --color-red-600: #b04a2e;
+  --color-red-500: #cf5c3c;
+  --color-red-400: #e98d72;
+
+  --font-serif: var(--font-source-serif), Georgia, "Times New Roman", serif;
+}
+
 :root {
-  --background: #0f172a;
-  --foreground: #e2e8f0;
-  --card: #1e293b;
-  --card-hover: #334155;
-  --accent: #22d3ee;
-  --accent-light: #67e8f9;
-  --brand-navy: #13294b;
-  --muted: #64748b;
-  --border: #334155;
+  --background: #161311;
+  --foreground: #ede7db;
+  --card: #221c17;
+  --card-hover: #2e261e;
+  --accent: #b96d33;
+  --accent-light: #d99a5e;
+  --brand-navy: #2a1c10;
+  --muted: #7a6b58;
+  --border: #332a21;
   --custom-analysis-bg: rgba(245, 158, 11, 0.06);
   --custom-analysis-text: #fbbf24;
-  /* Result-block wash. Survived the TRACE rebrand as indigo (the app's old
-     accent) long after indigo left the palette; re-derived from Signal Cyan. */
-  --analysis-section-bg: rgba(34, 211, 238, 0.05);
+  /* Result-block wash — re-derived from the copper accent. */
+  --analysis-section-bg: rgba(185, 109, 51, 0.06);
 
   /* Motion tokens */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
@@ -63,7 +101,12 @@ button:not(:disabled):active, [role="button"]:active {
   border-radius: 4px;
 }
 
-/* Fluid typography — scales between mobile and desktop */
+/* Fluid typography — scales between mobile and desktop. Headings are set in
+   the journal serif: this is a scholar's field notebook, not a dashboard. */
+h1, h2, h3 {
+  font-family: var(--font-serif);
+  letter-spacing: -0.01em;
+}
 h1 { font-size: clamp(1.5rem, 4vw, 2.25rem); }
 h2 { font-size: clamp(1.15rem, 3vw, 1.5rem); }
 h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }

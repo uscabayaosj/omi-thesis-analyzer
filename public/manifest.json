@@ -4,8 +4,8 @@
   "description": "Turns Omi wearable conversations into thesis evidence and daily executive-function structure.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#13294b",
+  "background_color": "#161311",
+  "theme_color": "#161311",
   "orientation": "portrait-primary",
   "categories": ["education", "productivity"],
   "icons": [
