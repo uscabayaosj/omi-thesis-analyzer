@@ -1,5 +1,6 @@
 "use client";
 
+import { Prose } from "@/components/Prose";
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -863,7 +864,7 @@ export default function ConversationPage() {
                     Custom Analysis
                   </h3>
                   <p className="text-xs text-slate-400 mb-1">Prompt: &ldquo;{customPrompt}&rdquo;</p>
-                  <div className="whitespace-pre-wrap text-sm leading-relaxed mt-3">{customResult}</div>
+                  <Prose text={customResult} className="text-sm leading-relaxed mt-3" />
                 </div>
               </div>
             )}

@@ -396,7 +396,9 @@ You MUST respond with valid JSON matching this exact schema:
   "forward_thinking": "..."
 }
 
-Each field should be 2-3 paragraphs. Be specific — quote or reference actual content from the conversation. If a conversation does not provide evidence for a dimension, say so explicitly rather than speculating.`;
+Each field should be 2-3 paragraphs. Be specific — quote or reference actual content from the conversation. If a conversation does not provide evidence for a dimension, say so explicitly rather than speculating.
+
+Formatting inside each field: short paragraphs separated by blank lines; use "- " bullets when listing distinct pieces of evidence; **bold** only for key terms or quoted phrases; never use headings. Prefer readable academic prose over analysis-speak — no filler like "it is worth noting" or "this serves to underscore".`;
 
 function buildUserPrompt(transcript: string, title: string): string {
   return `Analyze this conversation titled "${title}" against the thesis on Pioneer Sovereignty.

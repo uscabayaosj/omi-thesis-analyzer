@@ -2,6 +2,7 @@
 
 import type { ComponentType, ReactNode } from "react";
 import { confidenceLabel, type AdhdAnalysis } from "@/lib/adhd";
+import { Inline } from "@/components/Prose";
 import {
   ZapIcon, ClipboardIcon, CogIcon, UsersIcon, RefreshIcon,
   CalendarIcon, CheckSquareIcon, ScaleIcon, FeatherIcon,
@@ -90,14 +91,14 @@ export function AdhdResults({
             {analysis.do_today.map((item, i) => (
               <li key={i} className="flex gap-2">
                 <span className="text-cyan-400 flex-shrink-0">→</span>
-                <span className="min-w-0">{item}</span>
+                <span className="min-w-0"><Inline text={item} /></span>
               </li>
             ))}
           </ul>
         ) : <Empty />}
       </Block>
 
-      <Block icon={ClipboardIcon} title="Commitments">
+      <Block icon={ClipboardIcon} title="Promises">
         {analysis.commitments.length ? (
           <ul className="space-y-3">
             {analysis.commitments.map((c) => {
@@ -131,10 +132,10 @@ export function AdhdResults({
         ) : <Empty />}
       </Block>
 
-      <Block icon={CogIcon} title="Remember">
+      <Block icon={CogIcon} title="Worth remembering">
         {analysis.remember.length ? (
           <ul className="list-disc pl-5 space-y-1.5 marker:text-slate-600">
-            {analysis.remember.map((item, i) => <li key={i}>{item}</li>)}
+            {analysis.remember.map((item, i) => <li key={i}><Inline text={item} /></li>)}
           </ul>
         ) : <Empty />}
       </Block>
@@ -154,15 +155,15 @@ export function AdhdResults({
         ) : <Empty />}
       </Block>
 
-      <Block icon={RefreshIcon} title="Open loops">
+      <Block icon={RefreshIcon} title="Unfinished threads">
         {analysis.open_loops.length ? (
           <ul className="list-disc pl-5 space-y-1.5 marker:text-slate-600">
-            {analysis.open_loops.map((item, i) => <li key={i}>{item}</li>)}
+            {analysis.open_loops.map((item, i) => <li key={i}><Inline text={item} /></li>)}
           </ul>
         ) : <Empty />}
       </Block>
 
-      <Block icon={CalendarIcon} title="Ahead">
+      <Block icon={CalendarIcon} title="Coming up">
         {analysis.ahead.length ? (
           <div className="space-y-3">
             {analysis.ahead.map((x, i) => (
@@ -185,33 +186,33 @@ export function AdhdResults({
           nothing). Sections with no observations are likewise skipped: an
           absent observation is the good outcome, not a gap worth a card. */}
       {analysis.reflection?.social_balance?.length ? (
-        <Block icon={ScaleIcon} title="Social balance & engagement">
+        <Block icon={ScaleIcon} title="How the conversation went">
           <ul className="list-disc pl-5 space-y-1.5 marker:text-slate-600">
-            {analysis.reflection.social_balance.map((item, i) => <li key={i}>{item}</li>)}
+            {analysis.reflection.social_balance.map((item, i) => <li key={i}><Inline text={item} /></li>)}
           </ul>
         </Block>
       ) : null}
 
       {analysis.reflection?.emotional_check?.length ? (
-        <Block icon={FeatherIcon} title="Emotional & RSD check">
+        <Block icon={FeatherIcon} title="Feelings check">
           <ul className="list-disc pl-5 space-y-1.5 marker:text-slate-600">
-            {analysis.reflection.emotional_check.map((item, i) => <li key={i}>{item}</li>)}
+            {analysis.reflection.emotional_check.map((item, i) => <li key={i}><Inline text={item} /></li>)}
           </ul>
         </Block>
       ) : null}
 
       {analysis.reflection?.capacity_check?.length ? (
-        <Block icon={TargetIcon} title="Bandwidth & overcommitment">
+        <Block icon={TargetIcon} title="Promised too much?">
           <ul className="list-disc pl-5 space-y-1.5 marker:text-slate-600">
-            {analysis.reflection.capacity_check.map((item, i) => <li key={i}>{item}</li>)}
+            {analysis.reflection.capacity_check.map((item, i) => <li key={i}><Inline text={item} /></li>)}
           </ul>
         </Block>
       ) : null}
 
       {analysis.reflection?.strategic_takeaway?.length ? (
-        <Block icon={CompassIcon} title="Strategic takeaway">
+        <Block icon={CompassIcon} title="Bigger picture">
           <ul className="list-disc pl-5 space-y-1.5 marker:text-slate-600">
-            {analysis.reflection.strategic_takeaway.map((item, i) => <li key={i}>{item}</li>)}
+            {analysis.reflection.strategic_takeaway.map((item, i) => <li key={i}><Inline text={item} /></li>)}
           </ul>
         </Block>
       ) : null}

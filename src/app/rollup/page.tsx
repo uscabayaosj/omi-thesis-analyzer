@@ -17,6 +17,7 @@ import {
   UsersIcon, FileTextIcon, XCircleIcon,
 } from "@/components/icons";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { Prose } from "@/components/Prose";
 import { BUTTON_PRIMARY } from "@/lib/ui";
 
 interface ConvoLite {
@@ -52,12 +53,12 @@ function groupByTimeOfDay(convos: ConvoLite[]): [string, ConvoLite[]][] {
 
 const ROLLUP_SECTIONS: { key: keyof Rollup; heading: string; icon: ComponentType<{ className?: string }> }[] = [
   { key: "tomorrow_plan", heading: "Tomorrow's plan", icon: ZapIcon },
-  { key: "aging_commitments", heading: "Aging commitments", icon: ClipboardIcon },
-  { key: "conflicts_at_risk", heading: "Conflicts & at-risk", icon: WarningIcon },
-  { key: "social_ledger", heading: "Social ledger", icon: UsersIcon },
-  { key: "tomorrow_events", heading: "Tomorrow's events", icon: CalendarIcon },
+  { key: "aging_commitments", heading: "Still open from before", icon: ClipboardIcon },
+  { key: "conflicts_at_risk", heading: "Needs a decision", icon: WarningIcon },
+  { key: "social_ledger", heading: "People to get back to", icon: UsersIcon },
+  { key: "tomorrow_events", heading: "Tomorrow's schedule", icon: CalendarIcon },
   { key: "today_paragraph", heading: "Today in one paragraph", icon: FileTextIcon },
-  { key: "dropped", heading: "Dropped", icon: XCircleIcon },
+  { key: "dropped", heading: "Let go today", icon: XCircleIcon },
 ];
 
 // A rollup section's model output is a prose string; "None." (or empty) is a
@@ -80,7 +81,7 @@ function RollupSectionBlock({
         {isEmpty ? (
           <p className="text-sm text-slate-400 mt-3">None.</p>
         ) : (
-          <p className="whitespace-pre-wrap text-sm leading-relaxed mt-3">{content}</p>
+          <Prose text={content} className="text-sm leading-relaxed mt-3" />
         )}
       </div>
     </div>
@@ -253,7 +254,7 @@ function RollupPageInner() {
           Daily Rollup
         </h1>
         <p className="text-slate-400 text-sm">
-          Pick a day to merge its conversations into one plan for tomorrow. Aging carries across days automatically.
+          Pick a day to turn its conversations into one short plan for tomorrow. Anything still open carries over on its own.
         </p>
       </header>
 

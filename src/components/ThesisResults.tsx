@@ -1,4 +1,5 @@
 import type { ComponentType } from "react";
+import { Prose } from "@/components/Prose";
 import {
   ScrollIcon, HomeIcon, LinkIcon, MountainsIcon,
   TargetIcon, ScaleIcon, XCircleIcon, TrendingUpIcon,
@@ -31,7 +32,7 @@ function AnalysisSection({
           {title}
         </h3>
         <p className="text-xs text-slate-400 mb-3">{subtitle}</p>
-        <div className="whitespace-pre-wrap text-sm leading-relaxed">{content}</div>
+        <Prose text={content} className="text-sm leading-relaxed" />
       </div>
     </div>
   );

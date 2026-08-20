@@ -161,10 +161,10 @@ export function buildAdhdMarkdown(stored: StoredAdhdAnalysis): { markdown: strin
   const reflectionSection = (heading: string, items?: string[]) =>
     items && items.length ? `\n## ${heading}\n\n${list(items)}\n` : "";
   const reflection =
-    reflectionSection("⚖️ Social balance & engagement", r?.social_balance) +
-    reflectionSection("🪶 Emotional & RSD check", r?.emotional_check) +
-    reflectionSection("🎯 Bandwidth & overcommitment", r?.capacity_check) +
-    reflectionSection("🧭 Strategic takeaway", r?.strategic_takeaway);
+    reflectionSection("⚖️ How the conversation went", r?.social_balance) +
+    reflectionSection("🪶 Feelings check", r?.emotional_check) +
+    reflectionSection("🎯 Promised too much?", r?.capacity_check) +
+    reflectionSection("🧭 Bigger picture", r?.strategic_takeaway);
 
   const markdown = `---
 title: "${(stored.title || "Untitled").replace(/"/g, '\\"')}"
@@ -185,11 +185,11 @@ tags:
 
 ${list(a.do_today)}
 
-## 📌 Commitments
+## 📌 Promises
 
 ${commitments}
 
-## 🧠 Remember
+## 🧠 Worth remembering
 
 ${list(a.remember)}
 
@@ -197,11 +197,11 @@ ${list(a.remember)}
 
 ${people}
 
-## 🔁 Open loops
+## 🔁 Unfinished threads
 
 ${list(a.open_loops)}
 
-## 📅 Ahead
+## 📅 Coming up
 
 ${ahead}
 ${reflection}
@@ -256,19 +256,19 @@ tags:
 
 ${r.tomorrow_plan}
 
-## ⏳ Aging commitments
+## ⏳ Still open from before
 
 ${r.aging_commitments}
 
-## ⚠️ Conflicts & at-risk
+## ⚠️ Needs a decision
 
 ${r.conflicts_at_risk}
 
-## 👥 Social ledger
+## 👥 People to get back to
 
 ${r.social_ledger}
 
-## 📅 Tomorrow's events
+## 📅 Tomorrow's schedule
 
 ${r.tomorrow_events}
 
@@ -276,7 +276,7 @@ ${r.tomorrow_events}
 
 ${r.today_paragraph}
 
-## 🗑 Dropped
+## 🗑 Let go today
 
 ${r.dropped}
 
