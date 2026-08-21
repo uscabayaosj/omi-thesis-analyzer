@@ -29,6 +29,41 @@ self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
 });
 
+// Push — stub for a future Web Push backend. No subscription is created or
+// sent to a server yet, so this never fires today; it exists so that wiring
+// up real push later only means adding a subscribe endpoint, not touching the
+// worker. Payload shape (once there is a sender): { count?: number, title?,
+// body?, url? }.
+self.addEventListener("push", (event) => {
+  const data = (() => {
+    try {
+      return event.data ? event.data.json() : {};
+    } catch {
+      return {};
+    }
+  })();
+
+  if (typeof data.count === "number" && "setAppBadge" in self.navigator) {
+    event.waitUntil(self.navigator.setAppBadge(data.count).catch(() => {}));
+  }
+
+  if (data.title) {
+    event.waitUntil(
+      self.registration.showNotification(data.title, {
+        body: data.body,
+        icon: "/icon-192.png",
+        data: { url: data.url || "/" },
+      })
+    );
+  }
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data && event.notification.data.url;
+  event.waitUntil(self.clients.openWindow(url || "/"));
+});
+
 // Activate — clean old caches
 self.addEventListener("activate", (event) => {
   event.waitUntil(

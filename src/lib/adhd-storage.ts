@@ -3,6 +3,7 @@
 import type { AdhdAnalysis, Rollup } from "./adhd";
 import { schedulePush } from "./sync";
 import { isSyncedNamespace } from "./kv";
+import { syncAppBadge } from "./badge";
 
 export interface StoredAdhdAnalysis {
   conversationId: string;
@@ -50,6 +51,9 @@ function writeMap<T>(key: string, map: Record<string, T>): void {
     // Mirror to the durable store so the other device sees it. Debounced and
     // fire-and-forget — localStorage already holds the write.
     if (isSyncedNamespace(key)) schedulePush(key);
+    // Keep the PWA icon badge in step with unacknowledged commitments the
+    // moment they change, not just on next app open.
+    if (key === ANALYSES_KEY) syncAppBadge(Object.values(map) as StoredAdhdAnalysis[]);
   } catch (e) {
     if (e instanceof DOMException && e.name === "QuotaExceededError") {
       console.error(`localStorage quota exceeded writing ${key}`);

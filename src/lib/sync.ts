@@ -1,6 +1,9 @@
 "use client";
 
 import { SYNCED_NAMESPACES, type SyncedNamespace } from "@/lib/kv";
+import { notifyAnalysesChanged } from "@/lib/badge";
+
+const ANALYSES_NS = "omi-adhd-analyses";
 
 /**
  * Cross-device sync for the analysis stores.
@@ -129,6 +132,9 @@ export async function pullAndMerge(): Promise<boolean> {
       if (JSON.stringify(merged) !== JSON.stringify(local)) {
         writeLocal(ns, merged);
         changed = true;
+        // This write bypasses adhd-storage's writeMap, so the badge listener
+        // needs an explicit nudge to recompute from the merged commitments.
+        if (ns === ANALYSES_NS) notifyAnalysesChanged();
       }
       // Push back whenever the local copy held anything the server lacked, so
       // the first device to run this seeds the server with its history.
