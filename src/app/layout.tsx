@@ -10,6 +10,7 @@ const sourceSerif = Source_Serif_4({
 });
 import ServiceWorkerRegistration from "@/components/sw-register";
 import AppVersion from "@/components/app-version";
+import AppBadgeSync from "@/components/app-badge-sync";
 
 export const metadata: Metadata = {
   title: "TRACE — Personal & Research Assistant",
@@ -47,6 +48,7 @@ export default function RootLayout({
       <head />
       <body className="bg-slate-950 text-slate-100 antialiased min-h-screen">
         <ServiceWorkerRegistration />
+        <AppBadgeSync />
         {children}
         <AppVersion />
       </body>
