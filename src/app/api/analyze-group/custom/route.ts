@@ -5,6 +5,8 @@ import { friendlyError } from "@/lib/api-error";
 
 const MAX_GROUP_SIZE = 20;
 const PER_CONVO_CHARS = 60_000;
+// See analyze-group/route.ts — caps the combined prompt across a large group.
+const MAX_GROUP_CHARS = 200_000;
 
 export async function POST(req: NextRequest) {
   try {
@@ -52,11 +54,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const perConvoBudget = Math.min(
+      PER_CONVO_CHARS,
+      Math.floor(MAX_GROUP_CHARS / Math.max(1, convos.length))
+    );
     const convoBlocks = convos
       .map((c, i) => {
         const title = c.structured?.title || "Untitled";
         const date = typeof c.created_at === "string" ? c.created_at.split("T")[0] : "unknown date";
-        const transcript = clampTranscript(segmentsToText(c.transcript_segments!), PER_CONVO_CHARS);
+        const transcript = clampTranscript(segmentsToText(c.transcript_segments!), perConvoBudget);
         return `--- CONVERSATION ${i + 1}: ${title} (${date}) ---\n${transcript}`;
       })
       .join("\n\n");

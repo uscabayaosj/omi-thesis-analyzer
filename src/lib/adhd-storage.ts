@@ -45,18 +45,35 @@ function readMap<T>(key: string): Record<string, T> {
   }
 }
 
+function writeMapOnce<T>(key: string, map: Record<string, T>): void {
+  localStorage.setItem(key, JSON.stringify(map));
+  // Mirror to the durable store so the other device sees it. Debounced and
+  // fire-and-forget — localStorage already holds the write.
+  if (isSyncedNamespace(key)) schedulePush(key);
+  // Keep the PWA icon badge in step with unacknowledged commitments the
+  // moment they change, not just on next app open.
+  if (key === ANALYSES_KEY) syncAppBadge(Object.values(map) as StoredAdhdAnalysis[]);
+}
+
 function writeMap<T>(key: string, map: Record<string, T>): void {
   try {
-    localStorage.setItem(key, JSON.stringify(map));
-    // Mirror to the durable store so the other device sees it. Debounced and
-    // fire-and-forget — localStorage already holds the write.
-    if (isSyncedNamespace(key)) schedulePush(key);
-    // Keep the PWA icon badge in step with unacknowledged commitments the
-    // moment they change, not just on next app open.
-    if (key === ANALYSES_KEY) syncAppBadge(Object.values(map) as StoredAdhdAnalysis[]);
+    writeMapOnce(key, map);
   } catch (e) {
     if (e instanceof DOMException && e.name === "QuotaExceededError") {
-      console.error(`localStorage quota exceeded writing ${key}`);
+      // Drop the oldest half of entries (by timestamp) and retry once, rather
+      // than silently losing the analysis/rollup the user just ran.
+      const entries = Object.entries(map) as [string, T & { timestamp?: string }][];
+      entries.sort((a, b) => (a[1].timestamp ?? "").localeCompare(b[1].timestamp ?? ""));
+      const keep = entries.slice(Math.ceil(entries.length / 2));
+      const pruned = Object.fromEntries(keep) as Record<string, T>;
+      try {
+        writeMapOnce(key, pruned);
+        console.error(`localStorage quota exceeded writing ${key}; pruned oldest entries to fit`);
+      } catch {
+        console.error(`localStorage quota exceeded writing ${key} even after pruning — write lost`);
+      }
+    } else {
+      console.error(`localStorage write failed for ${key}`, e);
     }
   }
 }

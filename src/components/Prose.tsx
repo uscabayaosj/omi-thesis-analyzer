@@ -27,9 +27,17 @@ type Chunk =
   | { kind: "ul"; items: string[] }
   | { kind: "ol"; items: string[] };
 
+// A guard against a runaway/duplicated model response (seen in practice as a
+// repeated-output failure mode) rendering as one uninterrupted, tab-freezing
+// DOM tree. Real analysis fields run a few thousand characters; this is a
+// generous multiple of that, not a normal-case limit.
+const MAX_PROSE_CHARS = 50_000;
+
 function parseChunks(text: string): Chunk[] {
   const chunks: Chunk[] = [];
-  for (const rawLine of text.split("\n")) {
+  const truncated = text.length > MAX_PROSE_CHARS;
+  const body = truncated ? text.slice(0, MAX_PROSE_CHARS) : text;
+  for (const rawLine of body.split("\n")) {
     const line = rawLine.trim();
     if (!line) {
       continue;
@@ -54,6 +62,9 @@ function parseChunks(text: string): Chunk[] {
     } else {
       chunks.push({ kind: "p", lines: [line] });
     }
+  }
+  if (truncated) {
+    chunks.push({ kind: "p", lines: ["(Response truncated — unusually long output from the model.)"] });
   }
   return chunks;
 }

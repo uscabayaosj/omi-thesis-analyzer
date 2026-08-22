@@ -107,7 +107,7 @@ export async function pullAndMerge(): Promise<boolean> {
   if (typeof window === "undefined" || pulled) return false;
   pulled = true;
   try {
-    const res = await fetch("/api/store");
+    const res = await fetch("/api/store", { signal: AbortSignal.timeout(12_000) });
     if (!res.ok) return false;
     const { configured, data } = await res.json();
     if (!configured || !data) return false;

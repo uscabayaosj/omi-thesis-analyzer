@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getStore, ensureSchema, SYNCED_NAMESPACES, isSyncedNamespace } from "@/lib/kv";
+import { getStore, ensureSchema, withTimeout, SYNCED_NAMESPACES, isSyncedNamespace } from "@/lib/kv";
 
 /**
  * Durable mirror of the browser's analysis stores.
@@ -23,10 +23,10 @@ export async function GET() {
   }
   try {
     await ensureSchema(sql);
-    const rows = (await sql`
+    const rows = (await withTimeout(sql`
       SELECT namespace, data FROM trace_store
       WHERE namespace = ANY(${SYNCED_NAMESPACES as unknown as string[]})
-    `) as { namespace: string; data: unknown }[];
+    `)) as { namespace: string; data: unknown }[];
 
     const data: Record<string, unknown> = {};
     for (const row of rows) data[row.namespace] = row.data;
@@ -54,12 +54,12 @@ export async function PUT(req: NextRequest) {
     await ensureSchema(sql);
     // The client sends an already-merged map, so last writer wins per
     // namespace by design — the per-record reconciliation happens there.
-    await sql`
+    await withTimeout(sql`
       INSERT INTO trace_store (namespace, data, updated_at)
       VALUES (${namespace}, ${JSON.stringify(map)}::jsonb, now())
       ON CONFLICT (namespace)
       DO UPDATE SET data = EXCLUDED.data, updated_at = now()
-    `;
+    `);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("store PUT failed:", err);

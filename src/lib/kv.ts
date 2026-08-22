@@ -23,8 +23,36 @@ export function getStore(): Sql | null {
   // Next evaluates top-level module code at build time, which would break
   // `next build` on any deploy that hasn't been given the env var yet.
   const url = process.env.DATABASE_URL;
-  client = url ? neon(url) : null;
+  try {
+    client = url ? neon(url) : null;
+  } catch (e) {
+    // A malformed connection string throws from `neon()` itself. Degrade to
+    // "not configured" — same as no DATABASE_URL — rather than letting a bad
+    // env var crash every route that touches the store.
+    console.error("Failed to construct Neon client; treating store as unconfigured", e);
+    client = null;
+  }
   return client;
+}
+
+/**
+ * Runs a Neon query with a hard deadline. `fetchOptions.signal` is fixed at
+ * client-construction time (so it can't just be set once on the client — a
+ * one-shot `AbortSignal.timeout()` there would abort every query after the
+ * first `timeoutMs` on a warm serverless instance), so we race the promise
+ * instead: a slow/unreachable endpoint fails fast rather than hanging the
+ * calling route for the platform's full function timeout.
+ */
+export async function withTimeout<T>(promise: Promise<T>, timeoutMs = 10_000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Neon query timed out after ${timeoutMs}ms`)), timeoutMs);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timer!);
+  }
 }
 
 export function isStoreConfigured(): boolean {
@@ -33,13 +61,15 @@ export function isStoreConfigured(): boolean {
 
 /** Created on first use so there's no migration step to run or forget. */
 export async function ensureSchema(sql: Sql): Promise<void> {
-  await sql`
-    CREATE TABLE IF NOT EXISTS trace_store (
-      namespace   TEXT PRIMARY KEY,
-      data        JSONB NOT NULL,
-      updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `;
+  await withTimeout(
+    sql`
+      CREATE TABLE IF NOT EXISTS trace_store (
+        namespace   TEXT PRIMARY KEY,
+        data        JSONB NOT NULL,
+        updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `
+  );
 }
 
 /** The localStorage keys mirrored to the server. Anything outside this list

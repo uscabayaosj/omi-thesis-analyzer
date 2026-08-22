@@ -6,6 +6,11 @@ import { friendlyError } from "@/lib/api-error";
 const MAX_GROUP_SIZE = 20;
 // Per-conversation budget so a large group still fits the model context.
 const PER_CONVO_CHARS = 60_000;
+// Aggregate budget across the whole group: PER_CONVO_CHARS * MAX_GROUP_SIZE
+// alone can reach ~1.2M chars, far past any provider's context window. When a
+// large group of long conversations pushes the combined prompt past this, the
+// per-conversation budget is scaled down further so the request stays sane.
+const MAX_GROUP_CHARS = 200_000;
 
 const GROUP_SYSTEM_PROMPT = `You are an academic research assistant helping a PhD anthropology student analyze multiple fieldwork conversations together.
 
@@ -96,14 +101,21 @@ export async function POST(req: NextRequest) {
       .map((r) => r.value);
     const failedCount = results.length - convos.length;
 
-    const conversationData = convos
-      .filter((c) => c.transcript_segments && c.transcript_segments.length > 0)
-      .map((c) => ({
-        id: c.id,
-        title: c.structured?.title || "Untitled",
-        date: c.created_at,
-        transcript: clampTranscript(segmentsToText(c.transcript_segments!), PER_CONVO_CHARS),
-      }));
+    const withTranscripts = convos.filter(
+      (c) => c.transcript_segments && c.transcript_segments.length > 0
+    );
+    // Reduce the per-conversation budget further if PER_CONVO_CHARS times the
+    // group size would blow past the aggregate cap.
+    const perConvoBudget = Math.min(
+      PER_CONVO_CHARS,
+      Math.floor(MAX_GROUP_CHARS / Math.max(1, withTranscripts.length))
+    );
+    const conversationData = withTranscripts.map((c) => ({
+      id: c.id,
+      title: c.structured?.title || "Untitled",
+      date: c.created_at,
+      transcript: clampTranscript(segmentsToText(c.transcript_segments!), perConvoBudget),
+    }));
 
     if (conversationData.length < 2) {
       const reason = failedCount > 0

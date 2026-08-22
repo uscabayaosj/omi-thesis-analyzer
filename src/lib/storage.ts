@@ -90,6 +90,10 @@ function saveAll(data: StoredConversation[]): void {
       } catch {
         console.error("localStorage quota exceeded even after pruning");
       }
+    } else {
+      // localStorage unavailable entirely (private-browsing SecurityError, etc.) —
+      // degrade to in-memory-only rather than throwing out of the save flow.
+      console.error("localStorage write failed", e);
     }
   }
 }

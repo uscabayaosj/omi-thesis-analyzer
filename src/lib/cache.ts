@@ -107,7 +107,11 @@ export function cacheSet<T>(key: string, data: T): void {
       return;
     }
   }
-  enforceLimit();
+  try {
+    enforceLimit();
+  } catch {
+    /* eviction is best-effort; a failure here shouldn't fail the write above */
+  }
 }
 
 export function cacheRemove(key: string): void {
