@@ -357,7 +357,7 @@ function GroupAnalysisContent() {
         </Link>
         <div className="card p-8 text-center">
           <CompassIcon className="w-8 h-8 mx-auto mb-3 text-slate-400" />
-          <h1 className="text-xl font-bold text-white mb-2">Group analysis needs at least 2 conversations</h1>
+          <h1 className="font-bold text-white mb-2">Group analysis needs at least 2 conversations</h1>
           <p className="text-slate-400 text-sm mb-6">
             Use &ldquo;Select &amp; Analyze Group&rdquo; on the conversations list to pick two or more, then come back here.
           </p>
@@ -400,7 +400,7 @@ function GroupAnalysisContent() {
       </Link>
 
       <header className="mb-6">
-        <h1 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
+        <h1 className="font-bold text-white mb-2 flex items-center gap-2">
           <CompassIcon className="w-6 h-6 text-cyan-400 flex-shrink-0" />
           Group Analysis
         </h1>
@@ -478,7 +478,7 @@ function GroupAnalysisContent() {
       {sections.length > 0 && (
         <section className="mb-8" aria-label="Cross-conversation analysis results">
           <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
-            <h2 className="text-xl font-bold text-white flex items-center gap-2 flex-wrap">
+            <h2 className="font-bold text-white flex items-center gap-2 flex-wrap">
               <CompassIcon className="w-5 h-5 text-cyan-400 flex-shrink-0" />
               Cross-Conversation Analysis
               <span className="text-xs bg-cyan-900/50 text-cyan-200 px-2 py-0.5 rounded-full font-normal">saved</span>
@@ -611,7 +611,7 @@ function GroupAnalysisContent() {
         {customResult && (
           <div className="enter-rise card mt-2 p-6 border-amber-500/30">
             <div className="analysis-section" style={{ background: "var(--custom-analysis-bg, rgba(245, 158, 11, 0.06))" }}>
-              <h3 className="flex items-center gap-2" style={{ color: "var(--custom-analysis-text, #fbbf24)" }}>
+              <h3 className="flex items-center gap-2" style={{ color: "var(--custom-analysis-text)" }}>
                 <CogIcon className="w-[1.05em] h-[1.05em] flex-shrink-0" />
                 Custom Group Analysis
               </h3>

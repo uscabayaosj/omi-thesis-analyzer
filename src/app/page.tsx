@@ -996,22 +996,7 @@ function HomeInner() {
               />
             ))}
       </div>
-    </main>
-  );
-}
 
-// useSearchParams (for the ?day= binding) opts this route into client-side
-// rendering, which Next requires a Suspense boundary around. The fallback
-// mirrors the in-component loading skeleton so the two are indistinguishable.
-export default function Home() {
-  return (
-    <Suspense
-      fallback={
-        <main className="max-w-3xl mx-auto px-4 py-8">
-          <div className="space-y-4" aria-label="Loading conversations" role="status">
-            {[1, 2, 3].map((i) => <div key={i} className="skeleton h-24 w-full" />)}
-          </div>
-    
       {/* Onboarding: About this framework — a quiet footnote at the end of the page */}
       <details className="mt-3 group">
         <summary className="cursor-pointer list-none text-sm text-slate-400 hover:text-slate-300 transition-colors min-h-[44px] flex items-center gap-1.5">
@@ -1064,6 +1049,21 @@ export default function Home() {
         </div>
       </details>
     </main>
+  );
+}
+
+// useSearchParams (for the ?day= binding) opts this route into client-side
+// rendering, which Next requires a Suspense boundary around. The fallback
+// mirrors the in-component loading skeleton so the two are indistinguishable.
+export default function Home() {
+  return (
+    <Suspense
+      fallback={
+        <main className="max-w-3xl mx-auto px-4 py-8">
+          <div className="space-y-4" aria-label="Loading conversations" role="status">
+            {[1, 2, 3].map((i) => <div key={i} className="skeleton h-24 w-full" />)}
+          </div>
+        </main>
       }
     >
       <HomeInner />

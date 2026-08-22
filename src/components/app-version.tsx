@@ -41,14 +41,14 @@ export default function AppVersion() {
   }, []);
 
   return (
-    <footer className="max-w-3xl mx-auto px-4 pb-6 flex items-center justify-center gap-1 text-xs text-slate-500">
+    <footer className="max-w-3xl mx-auto px-4 pb-6 flex items-center justify-center gap-1 text-xs text-slate-400">
       <span aria-label={`Running version ${VERSION}`}>TRACE {VERSION}</span>
       <span aria-hidden="true">·</span>
       <button
         onClick={reload}
         disabled={reloading}
         aria-label="Reload the app to pick up the latest version"
-        className="min-h-[44px] px-2 inline-flex items-center gap-1 text-slate-500 hover:text-slate-300 disabled:opacity-50 transition-colors"
+        className="min-h-[44px] px-2 inline-flex items-center gap-1 text-slate-400 hover:text-slate-300 disabled:opacity-50 transition-colors"
       >
         <RefreshIcon className={`w-3 h-3 ${reloading ? "animate-spin" : ""}`} />
         {reloading ? "Reloading…" : "Reload"}

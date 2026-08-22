@@ -97,7 +97,7 @@ This is a researcher's dark notebook, not a product marketing itself. Every scre
 The palette stays muted and clinical on purpose: desaturated slate, low-glare, nothing performing for attention. Warmth exists, but only where it's earned — amber for a personal aside, emerald for a thing genuinely done and checked off — never as decoration. This system explicitly rejects three lanes it could easily fall into: a productivity app selling itself (no gamification, no cheerful microcopy, no streaks), a clinical intake form (despite the ADHD framing, nothing reads as diagnostic or sterile), and a busy analytics dashboard (no multi-panel data-viz energy — this is a small set of calm, sequential pages, not a control room).
 
 **Key Characteristics:**
-- Single dark surface family (night field → ink panel → ink panel raised), no light mode
+- Single dark surface family (night pasture → ink panel → ink panel raised), no light mode
 - One accent color carries all "this is active / this is primary" meaning: branding-iron copper
 - Flat by default — depth comes from tonal layering, not shadows
 - Every interactive target is at least 44px tall; this is a phone-in-pocket tool as much as a desk tool
@@ -108,26 +108,26 @@ The palette stays muted and clinical on purpose: desaturated slate, low-glare, n
 The palette is a narrow, deliberately dark stack: one background, one panel color one step lighter, one accent, and two single-purpose signal colors. Nothing else is introduced.
 
 ### Primary
-- **Copper Brand** (`#b96d33`): The one color that means "this is primary, active, or mine to act on" — primary buttons, active filter pill, selected-item border, links, the app's own icon accent. Taken straight from the TRACE mark's nodes (now copper). Used sparingly against the dark field so it reads as a mark, not a wash. Because the active fill (`cyan-400` → `#d99a5e`) is a *light* copper, anything filled with it carries a near-black `slate-950` label, never white: warm-white on it fails AA, while slate-950 on it clears 7.7:1 — the bright-on-dark pairing is the logo's own contrast relationship.
+- **Copper Brand** (`#b96d33`): The one color that means "this is primary, active, or mine to act on" — primary buttons, active filter pill, selected-item border, links, the app's own icon accent. Taken straight from the TRACE mark's nodes (now copper). Used sparingly against the dark field so it reads as a mark, not a wash. Because the active fill (Tailwind's `cyan-400` token, remapped to `#d99a5e`, a light copper) is a *light* copper, anything filled with it carries a near-black label, never white: warm-white on it fails AA, while the near-black label clears contrast comfortably — the bright-on-dark pairing is the logo's own contrast relationship.
 - **Copper Brand — Light** (`#d99a5e`): A lighter step of the same ink, used only for icon/heading accents inside content blocks (e.g. the icon beside an analysis section heading) where full-strength copper would be too loud against panel text.
-- **Brand Navy** (`#13294b`): The logo lockup's ground. It is *not* a UI surface — the app field stays Night Field. Navy appears only where the brand mark needs its own ground: the PWA icon, the manifest `theme_color`, and the browser chrome.
+- **Brand Leather** (`#2a1c10`): The logo lockup's ground. It is *not* a UI surface — the app field stays Night Pasture. Brand Leather appears only where the brand mark needs its own ground: the PWA icon, the manifest `theme_color`, and the browser chrome.
 
 ### Neutral
-- **Night Field** (`#0f172a`): The base page background, and — reused deliberately — the recessed color for form inputs (textarea, "try again" button), so inputs read as sunken *below* the panel surface rather than floating on it.
-- **Ink Panel** (`#1e293b`): The card/panel surface, one step lighter than the field. Every card, block, and toolbar sits at this level.
-- **Ink Panel, Raised** (`#334155`): The hover/pressed state for panels, and the default border color for panels at rest. One hex, two roles — border when idle, fill on interaction.
-- **Paper** (`#e2e8f0`): Primary text color, at full opacity for headings and ~90% for analysis body copy.
-- **Graphite** (`#94a3b8`): Muted/secondary text — timestamps, helper copy, placeholders, badge text. This is the single muted-text value; the app previously mixed it with a darker `#64748b`, which measured 3.07:1 on Ink Panel and 3.75:1 on Night Field and so failed WCAG AA for body text. `#94a3b8` clears it at 5.71:1 and 6.96:1 respectively. **Muted never means illegible** — if something needs to recede further, reduce its size or weight, don't darken it past this value. `#64748b` survives only as a non-text tone (the calendar's "has entries" dot, list markers), where the 3:1 non-text threshold applies.
+- **Night Pasture** (`#161311`): The base page background, and — reused deliberately — the recessed color for form inputs (textarea, "try again" button), so inputs read as sunken *below* the panel surface rather than floating on it.
+- **Ink Panel** (`#221c17`): The card/panel surface, one step lighter than the field. Every card, block, and toolbar sits at this level.
+- **Ink Panel, Raised** (`#2e261e`): The hover/pressed state for panels, and the default border color for panels at rest. One hex, two roles — border when idle, fill on interaction.
+- **Lamp Paper** (`#f6f1e7`): Primary text color, at full opacity for headings and ~90% for analysis body copy.
+- **Graphite** (`#a89a88`): Muted/secondary text — timestamps, helper copy, placeholders, badge text. This is the single muted-text value; the app previously mixed it with a darker non-text tone (`#7a6b58`), which failed WCAG AA for body text. Graphite clears the 4.5:1 text threshold against both Night Pasture and Ink Panel. **Muted never means illegible** — if something needs to recede further, reduce its size or weight, don't darken it past this value. `#7a6b58` (Graphite, Non-Text) survives only as a non-text tone (the calendar's "has entries" dot, list markers), where the 3:1 non-text threshold applies.
 
 ### Named Rules
 **The One Ink Rule.** Copper Brand is the only color allowed to mean "primary." If a second element on screen needs to look important, it does not get its own color — it gets weight, size, or position instead.
 
-**The Two Greys Rule.** There are exactly two muted greys, and only one of them is ever allowed to carry text: Graphite (`#94a3b8`) for any text, and `#64748b` for non-text marks only (dots, markers, decorative icons). A third, darker grey is never introduced for "extra quiet" text — quieter is expressed through size and weight. Audit test: every text colour in the app must clear 4.5:1 against both Night Field and Ink Panel; `#64748b` fails both, which is exactly why it is barred from text.
+**The Two Greys Rule.** There are exactly two muted greys, and only one of them is ever allowed to carry text: Graphite (`#a89a88`) for any text, and Graphite, Non-Text (`#7a6b58`) for non-text marks only (dots, markers, decorative icons). A third, darker grey is never introduced for "extra quiet" text — quieter is expressed through size and weight. Audit test: every text colour in the app must clear 4.5:1 against both Night Pasture and Ink Panel; `#7a6b58` fails both, which is exactly why it is barred from text.
 
 ### Signal Colors (single-purpose, not decorative)
 - **Amber Marginalia** (`#fbbf24`, on a `rgba(245, 158, 11, 0.06)` wash): Reserved entirely for the Custom Analysis lens — its icon, heading, "saved" chip, and active border. Never appears anywhere the custom lens isn't involved.
-- **Verified Green** (`#34d399`): Reserved for "done" and "verified" states only — a completed commitment, an analyzed badge, a saved rollup. Always paired with a checkmark or explicit status text, never color alone.
-- **Alert Red** (`#f87171`): Errors only — failed fetch, failed analysis. Always paired with a warning icon and explanatory text.
+- **Sage Green** (`#a9bd8f`, Tailwind's `emerald` scale): Reserved for "done" and "verified" states only — a completed commitment, an analyzed badge, a saved rollup. Always paired with a checkmark or explicit status text, never color alone.
+- **Alert Clay** (`#e98d72`, Tailwind's `red` scale): Errors only — failed fetch, failed analysis. Always paired with a warning icon and explanatory text.
 
 ## Typography
 
@@ -197,7 +197,7 @@ Every interactive component shares one behavior contract: `background` and `tran
 - **Internal Padding:** 16–24px (`p-4` to `p-6`), 32px for empty states.
 
 ### Inputs / Fields
-- **Style:** Night Field background (recessed below the panel it sits in), 1px Ink Panel Raised border, 8px radius, placeholder in a dim graphite tone.
+- **Style:** Night Pasture background (recessed below the panel it sits in), 1px Ink Panel Raised border, 8px radius, placeholder in a dim graphite tone.
 - **Focus:** Border shifts to the relevant accent color (amber for the custom-analysis textarea), plus the global 2px accent focus ring — no glow/shadow effect.
 
 ### Navigation

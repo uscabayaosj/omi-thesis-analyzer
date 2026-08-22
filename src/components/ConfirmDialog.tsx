@@ -50,6 +50,7 @@ export default function ConfirmDialog({
   onCancel: () => void;
 }) {
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const [closing, setClosing] = useState(false);
   const styles = TONE[tone];
 
@@ -67,7 +68,29 @@ export default function ConfirmDialog({
   useEffect(() => {
     cancelRef.current?.focus();
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") requestClose(onCancel);
+      if (e.key === "Escape") {
+        requestClose(onCancel);
+        return;
+      }
+      if (e.key === "Tab") {
+        const panel = panelRef.current;
+        if (!panel) return;
+        const focusable = Array.from(
+          panel.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          )
+        ).filter((el) => !el.hasAttribute("disabled"));
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -83,7 +106,10 @@ export default function ConfirmDialog({
         if (e.target === e.currentTarget) requestClose(onCancel);
       }}
     >
-      <div className={`overlay-panel card p-6 max-w-md w-full ${styles.border} ${closing ? "overlay-closing" : ""}`}>
+      <div
+        ref={panelRef}
+        className={`overlay-panel card p-6 max-w-md w-full ${styles.border} ${closing ? "overlay-closing" : ""}`}
+      >
         <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
           <WarningIcon className={`w-5 h-5 flex-shrink-0 ${styles.icon}`} />
           {title}

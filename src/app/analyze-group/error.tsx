@@ -20,7 +20,7 @@ export default function GroupAnalysisError({
     <main className="max-w-3xl mx-auto px-4 py-16 text-center">
       <div className="card p-8 border-red-500/30">
         <CompassIcon className="w-10 h-10 mx-auto mb-4 text-red-400" />
-        <h1 className="text-xl font-bold text-white mb-2">Group analysis failed</h1>
+        <h1 className="font-bold text-white mb-2">Group analysis failed</h1>
         <p className="text-slate-400 mb-6 text-sm">
           {error.message || "The group analysis could not be loaded. Try selecting conversations again."}
         </p>

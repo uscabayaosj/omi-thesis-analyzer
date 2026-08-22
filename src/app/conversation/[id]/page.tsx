@@ -495,7 +495,7 @@ export default function ConversationPage() {
       {conversation && (
         <>
           <header className="mb-6">
-            <h1 className="text-2xl font-bold text-white mb-2">
+            <h1 className="font-bold text-white mb-2">
               <span aria-hidden="true">{conversation.structured?.emoji || "💬"}</span>{" "}
               {conversation.structured?.title || "Untitled"}
             </h1>
@@ -568,7 +568,7 @@ export default function ConversationPage() {
           {(lens === "thesis" || lens === "both") && analysis && (
             <section className="mb-8" aria-label="Pioneer Sovereignty analysis results">
               <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
-                <h2 className="text-xl font-bold text-white flex items-center gap-2 flex-wrap">
+                <h2 className="font-bold text-white flex items-center gap-2 flex-wrap">
                   <CompassIcon className="w-5 h-5 text-cyan-400 flex-shrink-0" />
                   Pioneer Sovereignty Analysis
                   {storedAnalysis && (
@@ -681,7 +681,7 @@ export default function ConversationPage() {
               {adhd && (
                 <>
                   <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
-                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <h2 className="font-bold text-white flex items-center gap-2">
                       <ClipboardIcon className="w-5 h-5 text-cyan-400 flex-shrink-0" />
                       ADHD Aid
                     </h2>
@@ -859,7 +859,7 @@ export default function ConversationPage() {
             {customResult && (
               <div className="card mt-2 p-6 border-amber-500/30">
                 <div className="analysis-section" style={{ background: "var(--custom-analysis-bg, rgba(245, 158, 11, 0.06))" }}>
-                  <h3 className="flex items-center gap-2" style={{ color: "var(--custom-analysis-text, #fbbf24)" }}>
+                  <h3 className="flex items-center gap-2" style={{ color: "var(--custom-analysis-text)" }}>
                     <CogIcon className="w-[1.05em] h-[1.05em] flex-shrink-0" />
                     Custom Analysis
                   </h3>

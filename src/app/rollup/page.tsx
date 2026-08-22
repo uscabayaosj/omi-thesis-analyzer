@@ -249,7 +249,7 @@ function RollupPageInner() {
       </Link>
 
       <header className="mb-6">
-        <h1 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
+        <h1 className="font-bold text-white mb-2 flex items-center gap-2">
           <CalendarIcon className="w-6 h-6 text-cyan-400 flex-shrink-0" />
           Daily Rollup
         </h1>
