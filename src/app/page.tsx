@@ -58,7 +58,7 @@ function LensBadges({ thesis, adhd }: { thesis: boolean; adhd: boolean }) {
   const pill = (on: boolean, label: string) => (
     <span
       title={`${label}: ${on ? "analyzed" : "not analyzed"}`}
-      className={`min-w-[46px] px-1.5 py-0.5 rounded-full border text-[10px] font-semibold leading-none whitespace-nowrap text-center ${
+      className={`min-w-[40px] px-1.5 py-0.5 rounded-full border text-[10px] font-semibold leading-none whitespace-nowrap text-center ${
         // False positive below: the scanner pairs the "off" branch's text-slate-400 with the "on"
         // branch's bg-emerald-500 since both live in one ternary string. Real pairs, both verified:
         // emerald-400/emerald-wash (5.93:1) and slate-400/slate-800 (5.71:1).
@@ -73,7 +73,7 @@ function LensBadges({ thesis, adhd }: { thesis: boolean; adhd: boolean }) {
   // screen reader — the row's own label collapses both lenses into a single
   // "(analyzed)", which can't distinguish thesis-done from ADHD-done.
   return (
-    <div className="mt-0.5 flex-shrink-0 flex flex-col gap-1">
+    <div className="mt-0.5 flex-shrink-0 flex flex-col gap-0.5">
       <span className="sr-only">
         Thesis {thesis ? "analyzed" : "not analyzed"}, ADHD Aid {adhd ? "analyzed" : "not analyzed"}.
       </span>
@@ -94,13 +94,14 @@ function pad2(n: number): string {
 // the selected day reuses the same "true single-select navigation" pattern
 // the filter pills already use — see DESIGN.md's Navigation section.
 function CalendarMonth({
-  year, month, todayStr, selectedDate, daysWithEntries, onSelectDay, onPrevMonth, onNextMonth, onToday, onJumpToMonth, onCollapse,
+  year, month, todayStr, selectedDate, daysWithEntries, daysNeedingAttention, onSelectDay, onPrevMonth, onNextMonth, onToday, onJumpToMonth, onCollapse,
 }: {
   year: number;
   month: number; // 0-indexed
   todayStr: string;
   selectedDate: string;
   daysWithEntries: Set<string>;
+  daysNeedingAttention: Set<string>;
   onSelectDay: (day: string) => void;
   onPrevMonth: () => void;
   onNextMonth: () => void;
@@ -177,12 +178,13 @@ function CalendarMonth({
           const isToday = dayStr === todayStr;
           const isSelected = dayStr === selectedDate;
           const hasEntries = daysWithEntries.has(dayStr);
+          const needsAttention = daysNeedingAttention.has(dayStr);
           const isFuture = dayStr > todayStr;
           return (
             <button
               key={dayStr}
               onClick={() => onSelectDay(dayStr)}
-              aria-label={`${new Date(year, month, day).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}${isToday ? ", today" : ""}${hasEntries ? ", has conversations" : ""}`}
+              aria-label={`${new Date(year, month, day).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}${isToday ? ", today" : ""}${hasEntries ? (needsAttention ? ", has unanalyzed conversations" : ", fully analyzed") : ""}`}
               aria-pressed={isSelected}
               className={`aspect-square min-h-[44px] rounded-md flex flex-col items-center justify-center gap-0.5 text-sm transition-colors ${
                 isSelected
@@ -199,7 +201,15 @@ function CalendarMonth({
             >
               {day}
               <span
-                className={`w-1 h-1 rounded-full ${hasEntries ? (isSelected ? "bg-white" : "bg-slate-500") : "bg-transparent"}`}
+                className={`w-1 h-1 rounded-full ${
+                  !hasEntries
+                    ? "bg-transparent"
+                    : isSelected
+                    ? "bg-white"
+                    : needsAttention
+                    ? "bg-slate-500"
+                    : "bg-emerald-500"
+                }`}
                 aria-hidden="true"
               />
             </button>
@@ -332,6 +342,7 @@ function HomeInner() {
   // several different days for one Group Thesis / ADHD batch run works.
   // Session-only by design — a reload clears it, same as before this feature.
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selectionListOpen, setSelectionListOpen] = useState(false);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState({ done: 0, total: 0, failed: 0 });
   const [batchFailures, setBatchFailures] = useState<BatchFailure[]>([]);
@@ -470,6 +481,17 @@ function HomeInner() {
 
   const daysWithEntries = useMemo(() => new Set(conversationsByDay.keys()), [conversationsByDay]);
 
+  // Which of those days still have at least one unanalyzed conversation — lets
+  // the calendar dot distinguish "has entries" from "has entries, done" so the
+  // researcher doesn't have to open every day to see which ones still need work.
+  const daysNeedingAttention = useMemo(() => {
+    const set = new Set<string>();
+    for (const [day, list] of conversationsByDay) {
+      if (list.some((c) => !isAnalyzedEither(c.id))) set.add(day);
+    }
+    return set;
+  }, [conversationsByDay, isAnalyzedEither]);
+
   const isSearching = searchQuery.trim().length > 0;
 
   // Search deliberately bypasses day-scoping entirely — the whole point is
@@ -603,6 +625,7 @@ function HomeInner() {
   const exitSelectMode = () => {
     setSelectMode(false);
     setSelected(new Set());
+    setSelectionListOpen(false);
   };
 
   const goToPrevMonth = () => {
@@ -712,6 +735,7 @@ function HomeInner() {
                 todayStr={todayStr}
                 selectedDate={selectedDate}
                 daysWithEntries={daysWithEntries}
+                daysNeedingAttention={daysNeedingAttention}
                 onSelectDay={selectDay}
                 onPrevMonth={goToPrevMonth}
                 onNextMonth={goToNextMonth}
@@ -752,13 +776,25 @@ function HomeInner() {
         {/* Scan row: count + filter + group-select entry — tight to the list it governs */}
         {visibleConversations.length > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-3 mt-3">
-            {/* Wraps: at 375px the count + all three pills need ~360px against
-                343px of available width, which clipped "Unanalyzed" off-screen. */}
+            {/* At 375px the count + all three pills need ~360px against 343px of
+                available width, which used to clip "Unanalyzed" off-screen (wrapping
+                fixed the clipping but still broke the single-row scan). Below `sm`,
+                a native select replaces the pill row entirely instead. */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
               <span className="text-slate-400 whitespace-nowrap">
                 {visibleAnalyzedCount}/{visibleConversations.length} analyzed
               </span>
-              <div className="flex gap-1" role="radiogroup" aria-label="Filter conversations by analysis status">
+              <select
+                value={filter}
+                onChange={(e) => setFilter(e.target.value as "all" | "analyzed" | "unanalyzed")}
+                aria-label="Filter conversations by analysis status"
+                className="sm:hidden min-h-[44px] rounded-full bg-slate-800 text-slate-200 px-4 pr-8 text-sm border-none focus-visible:outline-2"
+              >
+                <option value="all">All</option>
+                <option value="analyzed">Analyzed</option>
+                <option value="unanalyzed">Unanalyzed</option>
+              </select>
+              <div className="hidden sm:flex gap-1" role="radiogroup" aria-label="Filter conversations by analysis status">
                 {(["all", "analyzed", "unanalyzed"] as const).map((f) => (
                   <button
                     key={f}
@@ -818,31 +854,66 @@ function HomeInner() {
                 >
                   {allFilteredSelected ? "Deselect All" : "Select All"}
                 </button>
-                <span className="text-sm text-slate-400 whitespace-nowrap" aria-live="polite">
-                  {selected.size} selected{selectedDaySpan > 1 ? " (across all days)" : ""}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
                 <button
-                  onClick={startGroupAnalysis}
-                  disabled={selected.size === 0 || batchRunning}
-                  aria-label={`Group thesis analysis on ${selected.size} conversations${selected.size === 1 ? " (select at least 2)" : ""}`}
-                  className={TOOLBAR_ACTION_CLASS}
+                  onClick={() => selected.size > 0 && setSelectionListOpen((v) => !v)}
+                  disabled={selected.size === 0}
+                  aria-expanded={selectionListOpen}
+                  aria-label={selected.size > 0 ? "Review selected conversations" : undefined}
+                  className="text-sm text-slate-400 whitespace-nowrap enabled:hover:text-white enabled:hover:underline transition-colors disabled:cursor-default"
                 >
-                  <SparklesIcon className="w-4 h-4" />
-                  Group Thesis ({selected.size})
-                </button>
-                <button
-                  onClick={requestBatchAdhd}
-                  disabled={selected.size === 0 || batchRunning}
-                  aria-label={`Run ADHD Aid on ${selected.size} conversations`}
-                  className={TOOLBAR_ACTION_CLASS}
-                >
-                  <ClipboardIcon className="w-4 h-4" />
-                  {batchRunning ? `Running ${batchProgress.done}/${batchProgress.total}…` : `Run ADHD (${selected.size})`}
+                  <span aria-live="polite">
+                    {selected.size} selected{selectedDaySpan > 1 ? " (across all days)" : ""}
+                  </span>
+                  {selected.size > 0 && (selectionListOpen ? " ▴" : " ▾")}
                 </button>
               </div>
+              {/* Replaces the action buttons rather than stacking beneath them — the
+                  toolbar and the failure review are two different moments, and
+                  showing both at once (up to 4 controls plus 2 more) blew past the
+                  app's own low-cognitive-load principle. */}
+              {!(batchFailures.length > 0 && !batchRunning) && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={startGroupAnalysis}
+                    disabled={selected.size === 0 || batchRunning}
+                    aria-label={`Group thesis analysis on ${selected.size} conversations${selected.size === 1 ? " (select at least 2)" : ""}`}
+                    className={TOOLBAR_ACTION_CLASS}
+                  >
+                    <SparklesIcon className="w-4 h-4" />
+                    Group Thesis ({selected.size})
+                  </button>
+                  <button
+                    onClick={requestBatchAdhd}
+                    disabled={selected.size === 0 || batchRunning}
+                    aria-label={`Run ADHD Aid on ${selected.size} conversations`}
+                    className={TOOLBAR_ACTION_CLASS}
+                  >
+                    <ClipboardIcon className="w-4 h-4" />
+                    {batchRunning ? `Running ${batchProgress.done}/${batchProgress.total}…` : `Run ADHD (${selected.size})`}
+                  </button>
+                </div>
+              )}
             </div>
+            {/* Selection review — opened from the count above so a cross-day, cross-search
+                batch run is never a leap of faith. Each row can deselect individually. */}
+            {selectionListOpen && selected.size > 0 && (
+              <div className="enter-rise card mt-2 p-4" role="group" aria-label="Selected conversations">
+                <ul className="space-y-1 text-sm">
+                  {Array.from(selected).map((id) => (
+                    <li key={id} className="flex items-center justify-between gap-2">
+                      <span className="text-slate-300 truncate">{titleOf(id)}</span>
+                      <button
+                        onClick={() => toggleSelect(id)}
+                        aria-label={`Deselect "${titleOf(id)}"`}
+                        className="text-slate-400 hover:text-white min-h-[32px] min-w-[32px] flex items-center justify-center flex-shrink-0 rounded-md hover:bg-slate-700 transition-colors"
+                      >
+                        <XIcon className="w-3.5 h-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {!batchRunning && batchFailures.length > 0 && (
               <div className="enter-rise card mt-2 p-4 border-amber-500/30" role="status">
                 <p className="text-amber-300/90 text-sm flex items-start gap-2">
