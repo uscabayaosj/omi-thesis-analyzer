@@ -42,6 +42,7 @@ import {
 import { BUTTON_PRIMARY } from "@/lib/ui";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { pullAndMerge } from "@/lib/sync";
+import { runExtraction } from "@/lib/people-pipeline";
 
 interface TranscriptSegment {
   text: string;
@@ -173,6 +174,12 @@ export default function ConversationPage() {
   const [customResult, setCustomResult] = useState<string | null>(null);
   const [showRerunConfirm, setShowRerunConfirm] = useState(false);
   const [showAdhdRerunConfirm, setShowAdhdRerunConfirm] = useState(false);
+  const [scanState, setScanState] = useState<"idle" | "scanning" | "done" | "error">("idle");
+  const scanForPeople = useCallback(async () => {
+    setScanState("scanning");
+    const res = await runExtraction(id, { force: true });
+    setScanState("error" in res ? "error" : "done");
+  }, [id]);
 
   type Lens = "thesis" | "adhd" | "both";
   const [lens, setLens] = useState<Lens>("thesis");
@@ -309,6 +316,7 @@ export default function ConversationPage() {
       });
       setStoredAnalysis(stored);
       setVersions(getAnalysisVersions(id));
+      void runExtraction(id).catch(() => {});
       // Tuck the verification/custom cards away now that results are up.
       setTranscriptOpen(false);
       setShowCustom(false);
@@ -391,6 +399,7 @@ export default function ConversationPage() {
         analysis: data.analysis,
       });
       setAdhdDoneKeys(stored.doneKeys);
+      void runExtraction(id).catch(() => {});
     } catch (e) {
       setError(e instanceof Error ? e.message : "ADHD analysis failed");
     } finally {
@@ -465,6 +474,30 @@ export default function ConversationPage() {
             <RefreshIcon className={`w-4 h-4 flex-shrink-0 ${refreshing ? "animate-spin" : ""}`} />
             {refreshing ? "Refreshing…" : "Refresh"}
           </button>
+          {scanState === "done" ? (
+            <Link
+              href="/people"
+              className="text-sm min-h-[44px] px-3 py-2 rounded-lg text-cyan-300 hover:text-cyan-200 hover:bg-slate-800 transition-colors flex items-center"
+            >
+              Review suggestions →
+            </Link>
+          ) : scanState === "error" ? (
+            <button
+              onClick={scanForPeople}
+              className="text-sm min-h-[44px] px-3 py-2 rounded-lg text-amber-300 hover:text-amber-200 hover:bg-slate-800 transition-colors"
+            >
+              Scan failed — tap to retry
+            </button>
+          ) : (
+            <button
+              onClick={scanForPeople}
+              disabled={scanState === "scanning"}
+              aria-label="Scan this conversation for people"
+              className="text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {scanState === "scanning" ? "Scanning…" : "Scan for people"}
+            </button>
+          )}
         </div>
       </div>
 
