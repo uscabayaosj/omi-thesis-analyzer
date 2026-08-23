@@ -66,17 +66,47 @@ function readMap<T>(ns: string): Record<string, T> {
   }
 }
 
-function writeMap<T>(ns: "omi-people" | "omi-people-pending", map: Record<string, T>): void {
+/**
+ * Returns false when the write did not land. Callers must propagate that as a
+ * failed operation rather than swallowing it: photos put this namespace within
+ * reach of the quota, and the whole map re-serializes on every write, so a
+ * dropped write is silent data loss on an edit the user watched "succeed".
+ * The mutators below turn a false here into the same `null` they already
+ * return for a missing person, so every existing null-check covers quota too.
+ */
+function writeMap<T>(ns: "omi-people" | "omi-people-pending", map: Record<string, T>): boolean {
   try {
     localStorage.setItem(ns, JSON.stringify(map));
     schedulePush(ns);
+    return true;
   } catch (e) {
     if (e instanceof DOMException && e.name === "QuotaExceededError") {
       console.error(`${ns}: localStorage quota exceeded; write dropped`);
     } else {
       console.error(`${ns} write failed`, e);
     }
+    return false;
   }
+}
+
+// ── Field bounds ──
+//
+// Every string below originates either from an LLM (which can return a whole
+// sentence where the schema said "name") or from a free-text field. Capping at
+// the point of storage keeps one malformed value from blowing out a card's
+// layout, a map popup, or the namespace's quota — and means no renderer has to
+// defend itself against a 50KB "name".
+const MAX_NAME = 120;
+const MAX_ROLE = 160;
+const MAX_PLACE = 160;
+const MAX_FACT = 500;
+const MAX_NOTES = 5_000;
+const MAX_FACTS_PER_PERSON = 200;
+const MAX_ALIASES = 25;
+
+function clip(value: string | undefined, max: number): string {
+  const v = (value ?? "").trim();
+  return v.length <= max ? v : `${v.slice(0, max - 1).trimEnd()}…`;
 }
 
 // The people map holds two meta records alongside Person records, keyed with a
@@ -107,17 +137,42 @@ export function getPerson(id: string): Person | null {
   return isPersonRecord(rec) ? rec : null;
 }
 
-function putPerson(person: Person): void {
+function putPerson(person: Person): boolean {
   const map = readMap<unknown>(PEOPLE_NS);
   map[person.id] = person;
-  writeMap(PEOPLE_NS, map);
+  return writeMap(PEOPLE_NS, map);
 }
 
-export function createPerson(init: { name: string; role?: string; notes?: string }): Person {
+/** Bring every user- or LLM-supplied field within its bound before storage. */
+function bound(person: Person): Person {
+  return {
+    ...person,
+    name: clip(person.name, MAX_NAME),
+    role: person.role ? clip(person.role, MAX_ROLE) : person.role,
+    notes: clip(person.notes, MAX_NOTES),
+    aliases: person.aliases
+      .map((a) => clip(a, MAX_NAME))
+      .filter(Boolean)
+      .slice(0, MAX_ALIASES),
+    // Oldest facts are the ones already read and absorbed; a runaway extraction
+    // should cost the tail, not the newest thing learned about someone.
+    facts: person.facts
+      .slice(-MAX_FACTS_PER_PERSON)
+      .map((f) => ({ ...f, text: clip(f.text, MAX_FACT) })),
+    meetings: person.meetings.map((m) =>
+      m.placeName ? { ...m, placeName: clip(m.placeName, MAX_PLACE) } : m
+    ),
+  };
+}
+
+/** Returns null if the name is empty once trimmed, or if the write failed. */
+export function createPerson(init: { name: string; role?: string; notes?: string }): Person | null {
+  const name = clip(init.name, MAX_NAME);
+  if (!name) return null;
   const now = new Date().toISOString();
-  const person: Person = {
+  const person: Person = bound({
     id: crypto.randomUUID(),
-    name: init.name.trim(),
+    name,
     aliases: [],
     role: init.role,
     notes: init.notes ?? "",
@@ -125,20 +180,21 @@ export function createPerson(init: { name: string; role?: string; notes?: string
     meetings: [],
     createdAt: now,
     timestamp: now,
-  };
-  putPerson(person);
-  return person;
+  });
+  return putPerson(person) ? person : null;
 }
 
+/** Returns null if the person is gone, the edit empties their name, or the
+ *  write failed — callers treat all three the same way: the edit did not land. */
 export function updatePerson(
   id: string,
   patch: Partial<Omit<Person, "id" | "timestamp" | "createdAt">>
 ): Person | null {
   const existing = getPerson(id);
   if (!existing) return null;
-  const updated: Person = { ...existing, ...patch, id, timestamp: new Date().toISOString() };
-  putPerson(updated);
-  return updated;
+  const updated = bound({ ...existing, ...patch, id, timestamp: new Date().toISOString() });
+  if (!updated.name) return null;
+  return putPerson(updated) ? updated : null;
 }
 
 export function deletePerson(id: string): void {
@@ -199,15 +255,33 @@ export function getPending(): PendingSuggestion[] {
   );
 }
 
+/** Ceiling on the queue itself: a backfill over a long history could otherwise
+ *  enqueue thousands of cards, which is neither reviewable nor worth the quota. */
+const MAX_PENDING = 300;
+const MAX_DETAILS_PER_SUGGESTION = 8;
+
 export function addPending(s: Omit<PendingSuggestion, "id" | "timestamp">): void {
+  const name = clip(s.extractedName, MAX_NAME);
+  if (!name) return;
   const map = readMap<PendingSuggestion>(PENDING_NS);
   // Collapse duplicates: same conversation + same normalized name.
   const dup = Object.values(map).some(
-    (p) => p.conversationId === s.conversationId && normalize(p.extractedName) === normalize(s.extractedName)
+    (p) => p.conversationId === s.conversationId && normalize(p.extractedName) === normalize(name)
   );
   if (dup) return;
+  if (Object.keys(map).length >= MAX_PENDING) return;
   const id = crypto.randomUUID();
-  map[id] = { ...s, id, timestamp: new Date().toISOString() };
+  map[id] = {
+    ...s,
+    extractedName: name,
+    details: s.details
+      .map((d) => clip(d, MAX_FACT))
+      .filter(Boolean)
+      .slice(0, MAX_DETAILS_PER_SUGGESTION),
+    placeName: s.placeName ? clip(s.placeName, MAX_PLACE) : undefined,
+    id,
+    timestamp: new Date().toISOString(),
+  };
   writeMap(PENDING_NS, map);
 }
 

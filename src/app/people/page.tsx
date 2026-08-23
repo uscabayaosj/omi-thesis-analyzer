@@ -55,6 +55,11 @@ function initials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+/** Native option text can't wrap or ellipsize, so clip it before it renders. */
+function optionLabel(name: string): string {
+  return name.length > 48 ? `${name.slice(0, 47)}…` : name;
+}
+
 function lastMeeting(p: Person): Meeting | undefined {
   if (p.meetings.length === 0) return undefined;
   return [...p.meetings].sort((a, b) => b.date.localeCompare(a.date))[0];
@@ -71,6 +76,7 @@ export default function PeoplePage() {
   const [view, setView] = useState<ViewMode>("grid");
   const [addingPerson, setAddingPerson] = useState(false);
   const [newName, setNewName] = useState("");
+  const [addError, setAddError] = useState<string | null>(null);
   const [reassigning, setReassigning] = useState<string | null>(null); // pending suggestion id
   const [acceptErrorId, setAcceptErrorId] = useState<string | null>(null); // pending suggestion id
 
@@ -152,6 +158,9 @@ export default function PeoplePage() {
   const acceptAsNew = (s: PendingSuggestion) => {
     resolveAccept(s, () => {
       const p = createPerson({ name: s.extractedName });
+      // A null here means the write didn't land (quota) or the name was empty.
+      // Returning it keeps the suggestion queued rather than losing it.
+      if (!p) return null;
       return appendToPerson(p.id, factsFrom(s), meetingFrom(s));
     });
   };
@@ -166,10 +175,25 @@ export default function PeoplePage() {
 
   // ── add person ──
 
+  const creatingRef = useRef(false);
+
   const submitNewPerson = () => {
+    // A double-tap on Create would otherwise make two people: the navigation
+    // that closes this form is async, so the second tap lands before it.
+    if (creatingRef.current) return;
     const name = newName.trim();
-    if (!name) return;
+    if (!name) {
+      setAddError("Enter a name first.");
+      return;
+    }
+    creatingRef.current = true;
     const p = createPerson({ name });
+    if (!p) {
+      creatingRef.current = false;
+      setAddError("Couldn’t save — storage may be full.");
+      return;
+    }
+    setAddError(null);
     setAddingPerson(false);
     setNewName("");
     router.push(`/people/${p.id}`);
@@ -303,7 +327,11 @@ export default function PeoplePage() {
             Scan past conversations
           </button>
         ) : (
-          <div className="flex items-center gap-2 text-sm text-slate-400 flex-shrink-0">
+          <div
+            className="flex items-center gap-2 text-sm text-slate-400 flex-shrink-0"
+            role="status"
+            aria-live="polite"
+          >
             <RefreshIcon className="w-4 h-4 animate-spin" />
             Scanning {backfillDone} of {backfillTotal}…
             <button
@@ -324,33 +352,49 @@ export default function PeoplePage() {
       )}
 
       {addingPerson && (
-        <div className="card p-4 mb-6 flex items-center gap-2">
-          <input
-            autoFocus
-            type="text"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") submitNewPerson();
-              if (e.key === "Escape") setAddingPerson(false);
-            }}
-            placeholder="Full name"
-            aria-label="New person's name"
-            className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 min-h-[44px] text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-400"
-          />
-          <button onClick={submitNewPerson} className={`${BUTTON_PRIMARY} px-4`}>
-            Create
-          </button>
-          <button
-            onClick={() => {
-              setAddingPerson(false);
-              setNewName("");
-            }}
-            aria-label="Cancel"
-            className="p-2 min-h-[44px] min-w-[44px] rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-          >
-            <XIcon className="w-4 h-4" />
-          </button>
+        <div className="card p-4 mb-6">
+          <div className="flex items-center gap-2">
+            <input
+              autoFocus
+              type="text"
+              value={newName}
+              maxLength={120}
+              onChange={(e) => {
+                setNewName(e.target.value);
+                if (addError) setAddError(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submitNewPerson();
+                if (e.key === "Escape") {
+                  setAddingPerson(false);
+                  setAddError(null);
+                }
+              }}
+              placeholder="Full name"
+              aria-label="New person's name"
+              aria-invalid={addError ? true : undefined}
+              className="flex-1 min-w-0 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 min-h-[44px] text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-400"
+            />
+            <button onClick={submitNewPerson} className={`${BUTTON_PRIMARY} px-4 flex-shrink-0`}>
+              Create
+            </button>
+            <button
+              onClick={() => {
+                setAddingPerson(false);
+                setNewName("");
+                setAddError(null);
+              }}
+              aria-label="Cancel"
+              className="p-2 min-h-[44px] min-w-[44px] flex-shrink-0 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            >
+              <XIcon className="w-4 h-4" />
+            </button>
+          </div>
+          {addError && (
+            <p className="text-red-400 text-xs mt-2" role="alert">
+              {addError}
+            </p>
+          )}
         </div>
       )}
 
@@ -446,17 +490,22 @@ function PendingCard({
   return (
     <div className="card p-4">
       <div className="flex items-start justify-between gap-3 mb-2">
-        <div>
-          <div className="text-white font-medium">{s.extractedName}</div>
-          <div className="text-slate-500 text-xs">
+        <div className="min-w-0">
+          {/* Every string here is raw model output: a name can arrive as a
+              sentence and a place as a paragraph, so both wrap rather than
+              stretching the card. */}
+          <div className="text-white font-medium break-words">{s.extractedName}</div>
+          <div className="text-slate-500 text-xs break-words">
             {[s.placeName, getAnalysisAge(s.date).label].filter(Boolean).join(" · ")}
           </div>
         </div>
       </div>
       {s.details.length > 0 && (
-        <ul className="text-sm text-slate-300 list-disc list-inside mb-3 space-y-0.5">
+        <ul className="text-sm text-slate-300 list-disc list-outside pl-5 mb-3 space-y-0.5">
           {s.details.map((d, i) => (
-            <li key={i}>{d}</li>
+            <li key={i} className="break-words">
+              {d}
+            </li>
           ))}
         </ul>
       )}
@@ -470,8 +519,13 @@ function PendingCard({
       <div className="flex flex-wrap gap-2">
         {matched ? (
           <>
-            <button onClick={() => onAcceptMatched(matched.id)} className={`${BUTTON_PRIMARY} px-3`}>
-              Add to {matched.name}
+            <button
+              onClick={() => onAcceptMatched(matched.id)}
+              title={`Add to ${matched.name}`}
+              className={`${BUTTON_PRIMARY} px-3 max-w-full inline-flex items-center gap-1 overflow-hidden`}
+            >
+              <span className="flex-shrink-0">Add to</span>
+              <span className="truncate">{matched.name}</span>
             </button>
             <button
               onClick={onOpenReassign}
@@ -486,9 +540,13 @@ function PendingCard({
               <button
                 key={c.id}
                 onClick={() => onAcceptCandidate(c.id)}
-                className="text-sm min-h-[44px] px-3 py-2 rounded-lg bg-slate-800 text-slate-200 hover:bg-slate-700 transition-colors"
+                title={`Same as ${c.name} — ${disambiguator(c)}`}
+                className="text-sm min-h-[44px] px-3 py-2 rounded-lg bg-slate-800 text-slate-200 hover:bg-slate-700 transition-colors max-w-full inline-flex items-center gap-1 overflow-hidden text-left"
               >
-                Same as {c.name} ({disambiguator(c)})
+                <span className="flex-shrink-0">Same as</span>
+                <span className="truncate">
+                  {c.name} ({disambiguator(c)})
+                </span>
               </button>
             ))}
             <button
@@ -520,21 +578,23 @@ function PendingCard({
       </div>
 
       {reassignOpen && (
-        <div className="mt-3 flex items-center gap-2">
+        <div className="mt-3 flex items-center gap-2 min-w-0">
+          {/* min-w-0 + clipped labels: a select otherwise sizes to its widest
+              option and pushes the page into horizontal scroll on a phone. */}
           <select
             defaultValue=""
             onChange={(e) => {
               if (e.target.value) onAcceptExisting(e.target.value);
             }}
             aria-label="Select person"
-            className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 min-h-[44px] text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-400"
+            className="flex-1 min-w-0 max-w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 min-h-[44px] text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-400"
           >
             <option value="" disabled>
               Select a person…
             </option>
             {people.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name}
+                {optionLabel(p.name)}
               </option>
             ))}
           </select>

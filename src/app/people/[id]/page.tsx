@@ -43,6 +43,11 @@ function initials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+/** Native option text can't wrap or ellipsize, so clip it before it renders. */
+function optionLabel(name: string): string {
+  return name.length > 48 ? `${name.slice(0, 47)}…` : name;
+}
+
 function formatDate(d: string): string {
   const t = new Date(d);
   if (Number.isNaN(t.getTime())) return d;
@@ -59,6 +64,8 @@ export default function PersonDetailPage() {
   const [notFound, setNotFound] = useState(false);
 
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [mergeError, setMergeError] = useState<string | null>(null);
@@ -127,31 +134,49 @@ export default function PersonDetailPage() {
       setPhotoError("That file isn't an image.");
       return;
     }
+    setPhotoBusy(true);
     try {
       const url = URL.createObjectURL(file);
       const img = new Image();
-      await new Promise<void>((res, rej) => {
-        img.onload = () => res();
-        img.onerror = () => rej(new Error("unreadable"));
-        img.src = url;
-      });
-      URL.revokeObjectURL(url);
+      try {
+        await new Promise<void>((res, rej) => {
+          img.onload = () => res();
+          img.onerror = () => rej(new Error("unreadable"));
+          img.src = url;
+        });
+      } finally {
+        // Revoke on the failure path too — a rejected decode would otherwise
+        // leak the blob for the life of the document.
+        URL.revokeObjectURL(url);
+      }
       const scale = Math.min(1, 256 / Math.max(img.width, img.height));
       const canvas = document.createElement("canvas");
       canvas.width = Math.round(img.width * scale);
       canvas.height = Math.round(img.height * scale);
       canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
-      updatePerson(id, { photo: dataUrl });
+      // Photos are the one field big enough to hit the storage ceiling, and
+      // the whole namespace re-serializes on every write — so a rejected write
+      // here is the difference between "saved" and silently losing it.
+      if (!updatePerson(id, { photo: dataUrl })) {
+        setPhotoError("Couldn’t save that photo — storage is full. Remove a photo and try again.");
+        return;
+      }
       setPhotoError(null);
       refresh();
     } catch {
       setPhotoError("Couldn't read that photo — try a different one.");
+    } finally {
+      setPhotoBusy(false);
     }
   }
 
   const removePhoto = () => {
-    updatePerson(id, { photo: undefined });
+    if (!updatePerson(id, { photo: undefined })) {
+      setPhotoError("Couldn’t remove that photo — the change didn’t save.");
+      return;
+    }
+    setPhotoError(null);
     refresh();
   };
 
@@ -162,11 +187,23 @@ export default function PersonDetailPage() {
     setNameDraft(person.name);
     setEditingName(true);
   };
+  /** Every inline edit runs through here so a rejected write (storage full,
+   *  person deleted in another tab) surfaces instead of looking like it saved. */
+  const commit = (patch: Parameters<typeof updatePerson>[1]): boolean => {
+    if (!updatePerson(id, patch)) {
+      setSaveError("That change didn’t save — storage may be full.");
+      refresh();
+      return false;
+    }
+    setSaveError(null);
+    refresh();
+    return true;
+  };
+
   const saveName = () => {
     const name = nameDraft.trim();
-    if (name) updatePerson(id, { name });
+    if (name) commit({ name });
     setEditingName(false);
-    refresh();
   };
 
   const startEditRole = () => {
@@ -174,9 +211,8 @@ export default function PersonDetailPage() {
     setEditingRole(true);
   };
   const saveRole = () => {
-    updatePerson(id, { role: roleDraft.trim() || undefined });
+    commit({ role: roleDraft.trim() || undefined });
     setEditingRole(false);
-    refresh();
   };
 
   const startEditNotes = () => {
@@ -184,9 +220,8 @@ export default function PersonDetailPage() {
     setEditingNotes(true);
   };
   const saveNotes = () => {
-    updatePerson(id, { notes: notesDraft.trim() });
+    commit({ notes: notesDraft.trim() });
     setEditingNotes(false);
-    refresh();
   };
 
   const addAlias = () => {
@@ -196,25 +231,22 @@ export default function PersonDetailPage() {
       setAliasDraft("");
       return;
     }
-    updatePerson(id, { aliases: [...person.aliases, alias] });
+    commit({ aliases: [...person.aliases, alias] });
     setAliasDraft("");
-    refresh();
   };
 
   const removeAlias = (alias: string) => {
     if (!person) return;
-    updatePerson(id, { aliases: person.aliases.filter((a) => a !== alias) });
-    refresh();
+    commit({ aliases: person.aliases.filter((a) => a !== alias) });
   };
 
   const removeFact = (fact: PersonFact) => {
     if (!person) return;
-    updatePerson(id, {
+    commit({
       facts: person.facts.filter(
         (f) => !(f.text === fact.text && f.conversationId === fact.conversationId && f.date === fact.date)
       ),
     });
-    refresh();
   };
 
   // ── danger zone ──
@@ -302,10 +334,12 @@ export default function PersonDetailPage() {
             )}
             <button
               onClick={() => fileInputRef.current?.click()}
-              aria-label="Change photo"
-              className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-slate-700 hover:bg-slate-600 text-slate-200 flex items-center justify-center border-2 border-slate-900 transition-colors"
+              disabled={photoBusy}
+              aria-label={photoBusy ? "Processing photo" : "Change photo"}
+              aria-busy={photoBusy || undefined}
+              className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-slate-700 hover:bg-slate-600 disabled:opacity-60 disabled:hover:bg-slate-700 text-slate-200 flex items-center justify-center border-2 border-slate-900 transition-colors"
             >
-              <CameraIcon className="w-3.5 h-3.5" />
+              <CameraIcon className={`w-3.5 h-3.5 ${photoBusy ? "animate-pulse" : ""}`} />
             </button>
             <input
               ref={fileInputRef}
@@ -327,13 +361,14 @@ export default function PersonDetailPage() {
                   autoFocus
                   type="text"
                   value={nameDraft}
+                  maxLength={120}
                   onChange={(e) => setNameDraft(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") saveName();
                     if (e.key === "Escape") setEditingName(false);
                   }}
                   aria-label="Name"
-                  className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 min-h-[40px] text-lg font-bold text-white focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                  className="flex-1 min-w-0 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 min-h-[40px] text-lg font-bold text-white focus:outline-none focus:ring-2 focus:ring-cyan-400"
                 />
                 <button onClick={saveName} aria-label="Save name" className="p-2 min-h-[40px] min-w-[40px] rounded-lg text-cyan-400 hover:bg-slate-800">
                   <CheckIcon className="w-4 h-4" />
@@ -356,6 +391,11 @@ export default function PersonDetailPage() {
                 {photoError}
               </p>
             )}
+            {saveError && (
+              <p className="text-red-400 text-xs mb-1" role="alert">
+                {saveError}
+              </p>
+            )}
             {person.photo && !editingName && (
               <button
                 onClick={removePhoto}
@@ -373,6 +413,7 @@ export default function PersonDetailPage() {
                     autoFocus
                     type="text"
                     value={roleDraft}
+                    maxLength={160}
                     onChange={(e) => setRoleDraft(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") saveRole();
@@ -406,13 +447,15 @@ export default function PersonDetailPage() {
           {person.aliases.map((a) => (
             <span
               key={a}
-              className="inline-flex items-center gap-1 bg-slate-800 text-slate-300 text-xs px-2.5 py-1 rounded-full"
+              className="inline-flex items-center gap-1 max-w-full bg-slate-800 text-slate-300 text-xs px-2.5 py-1 rounded-full"
             >
-              {a}
+              <span className="truncate" title={a}>
+                {a}
+              </span>
               <button
                 onClick={() => removeAlias(a)}
                 aria-label={`Remove alias ${a}`}
-                className="hover:text-red-400 transition-colors"
+                className="hover:text-red-400 transition-colors flex-shrink-0"
               >
                 <XIcon className="w-3 h-3" />
               </button>
@@ -421,6 +464,7 @@ export default function PersonDetailPage() {
           <input
             type="text"
             value={aliasDraft}
+            maxLength={120}
             onChange={(e) => setAliasDraft(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") addAlias();
@@ -439,6 +483,7 @@ export default function PersonDetailPage() {
               <textarea
                 autoFocus
                 value={notesDraft}
+                maxLength={5000}
                 onChange={(e) => setNotesDraft(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Escape") setEditingNotes(false);
@@ -462,7 +507,7 @@ export default function PersonDetailPage() {
           ) : (
             <button
               onClick={startEditNotes}
-              className="text-sm text-slate-300 hover:text-white transition-colors text-left whitespace-pre-wrap"
+              className="text-sm text-slate-300 hover:text-white transition-colors text-left whitespace-pre-wrap break-words max-w-full"
             >
               {person.notes || "+ Add notes"}
             </button>
@@ -482,7 +527,7 @@ export default function PersonDetailPage() {
             {person.facts.map((f, i) => (
               <li key={`${f.conversationId}-${i}`} className="card p-3 flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm text-slate-200">{f.text}</p>
+                  <p className="text-sm text-slate-200 break-words">{f.text}</p>
                   <Link
                     href={`/conversation/${f.conversationId}`}
                     className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
@@ -542,8 +587,12 @@ export default function PersonDetailPage() {
           Danger zone
         </h2>
         <div className="flex flex-wrap gap-3">
-          <div className="flex flex-col gap-2 flex-1">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-2 flex-1 min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
+              {/* A select sizes itself to its widest option, so one long name
+                  would otherwise push the whole page into horizontal scroll on
+                  a phone. min-w-0 lets it shrink; the label is clipped to keep
+                  the collapsed control readable. */}
               <select
                 value={mergeTargetId}
                 onChange={(e) => {
@@ -552,12 +601,12 @@ export default function PersonDetailPage() {
                 }}
                 aria-label="Merge target"
                 disabled={otherPeople.length === 0}
-                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 min-h-[44px] text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 disabled:opacity-50"
+                className="flex-1 min-w-0 max-w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 min-h-[44px] text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 disabled:opacity-50"
               >
                 <option value="">Select person…</option>
                 {otherPeople.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name}
+                    {optionLabel(p.name)}
                   </option>
                 ))}
               </select>
