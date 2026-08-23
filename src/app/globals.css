@@ -118,6 +118,14 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
   transition: background var(--dur-base) ease, transform var(--dur-fast) var(--ease-out);
 }
 
+/* Skip layout/paint for rows scrolled out of view, so a long conversation
+   list doesn't cost full-page work on every scroll frame. The intrinsic
+   size estimate keeps scrollbar height stable before a row's first paint. */
+.conversation-list .card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 96px;
+}
+
 .card:active {
   background: var(--card-hover);
   transform: scale(0.98);

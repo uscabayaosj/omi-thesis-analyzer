@@ -13,7 +13,7 @@ import { neon } from "@neondatabase/serverless";
  * JSONB documents. That keeps this swappable — it was Redis before Upstash's
  * free tier turned out to be unavailable on this account.
  */
-type Sql = ReturnType<typeof neon>;
+export type Sql = ReturnType<typeof neon>;
 
 let client: Sql | null | undefined;
 
@@ -57,6 +57,24 @@ export async function withTimeout<T>(promise: Promise<T>, timeoutMs = 10_000): P
 
 export function isStoreConfigured(): boolean {
   return getStore() !== null;
+}
+
+/** Read one namespace's raw JSONB document, or null if the row doesn't exist. */
+export async function getNamespaceData(sql: Sql, namespace: string): Promise<unknown | null> {
+  const rows = (await withTimeout(sql`
+    SELECT data FROM trace_store WHERE namespace = ${namespace}
+  `)) as { data: unknown }[];
+  return rows[0]?.data ?? null;
+}
+
+/** Replace one namespace's document wholesale. */
+export async function putNamespaceData(sql: Sql, namespace: string, data: unknown): Promise<void> {
+  await withTimeout(sql`
+    INSERT INTO trace_store (namespace, data, updated_at)
+    VALUES (${namespace}, ${JSON.stringify(data)}::jsonb, now())
+    ON CONFLICT (namespace)
+    DO UPDATE SET data = EXCLUDED.data, updated_at = now()
+  `);
 }
 
 /** Created on first use so there's no migration step to run or forget. */

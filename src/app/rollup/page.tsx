@@ -7,9 +7,11 @@ import { fetchJson } from "@/lib/fetch-json";
 import { formatDateTime, dayOf } from "@/lib/format";
 import type { AdhdAnalysis, Rollup } from "@/lib/adhd";
 import type { DayConvoOutput } from "@/lib/rollup";
+import type { RollupJobState } from "@/lib/rollup-job";
 import {
   getAdhdAnalysis, saveAdhdAnalysis, getRollup, saveRollup, getPreviousRollup,
 } from "@/lib/adhd-storage";
+import { pullAndMerge } from "@/lib/sync";
 import { exportRollupToObsidian, downloadRollupMarkdown } from "@/lib/obsidian";
 import {
   ArrowLeftIcon, CalendarIcon, WarningIcon, LoaderIcon, RefreshIcon,
@@ -101,6 +103,10 @@ function RollupPageInner() {
   );
   const [rollup, setRollup] = useState<Rollup | null>(null);
   const [running, setRunning] = useState(false);
+  // Whether the in-flight run is a server-side job (survives closing the
+  // tab) or the tab-bound fallback loop (only used when no durable store is
+  // configured). Only the fallback needs the close-tab warning below.
+  const [viaServer, setViaServer] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0, failed: 0 });
   const [exported, setExported] = useState(false);
   const [showRegenConfirm, setShowRegenConfirm] = useState(false);
@@ -130,6 +136,8 @@ function RollupPageInner() {
   const selectDay = useCallback((day: string) => {
     setSelectedDay(day);
     setProgress({ done: 0, total: 0, failed: 0 });
+    setRunning(false);
+    setViaServer(false);
     const existing = getRollup(day);
     setRollup(existing ? existing.rollup : null);
   }, []);
@@ -144,16 +152,79 @@ function RollupPageInner() {
     router.replace(next, { scroll: false });
   }, [selectedDay, router]);
 
-  // Restore the saved rollup when the page opens straight into a day via ?day=.
+  // Warn before an accidental close/reload mid-run — but only for the
+  // tab-bound fallback loop. A server-side job keeps running after the tab
+  // closes, so there's nothing to lose there.
+  useEffect(() => {
+    if (!running || viaServer) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [running, viaServer]);
+
+  // Restore the saved rollup when the page opens straight into a day via ?day=,
+  // and pick up a server job left running from an earlier visit (this tab or
+  // another device) rather than only noticing it once one is started here.
   useEffect(() => {
     if (!selectedDay) return;
     const existing = getRollup(selectedDay);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is unavailable during SSR, so this can't be a lazy initializer
     setRollup(existing ? existing.rollup : null);
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const { job } = await fetchJson<{ job: RollupJobState | null }>(`/api/rollup/job?day=${selectedDay}`);
+        if (cancelled || !job || job.status !== "running") return;
+        setProgress({ done: job.done, total: job.total, failed: job.failed });
+        setRunning(true);
+        setViaServer(true);
+      } catch {
+        // No durable store, or a transient error — nothing in flight to resume.
+      }
+    })();
+    return () => { cancelled = true; };
   }, [selectedDay]);
 
-  const generate = useCallback(async (dayConvos: ConvoLite[], day: string) => {
-    setRunning(true);
+  // While a server job is running, poll its status instead of driving the
+  // batch from this tab — the job keeps going on the server even if this
+  // effect never gets to see it finish (tab closed, phone locked, etc.).
+  useEffect(() => {
+    if (!running || !viaServer || !selectedDay) return;
+    const day = selectedDay;
+    let cancelled = false;
+
+    const poll = async () => {
+      try {
+        const { job } = await fetchJson<{ job: RollupJobState | null }>(`/api/rollup/job?day=${day}`);
+        if (cancelled || !job) return;
+        setProgress({ done: job.done, total: job.total, failed: job.failed });
+        if (job.status === "done") {
+          if (job.rollup) setRollup(job.rollup);
+          await pullAndMerge(true);
+          if (!cancelled) { setRunning(false); setViaServer(false); }
+        } else if (job.status === "error") {
+          setError(job.error || "Rollup failed.");
+          if (!cancelled) { setRunning(false); setViaServer(false); }
+        }
+      } catch {
+        // Transient network hiccup — the job is server-side, so just retry
+        // on the next tick instead of giving up on it.
+      }
+    };
+
+    poll();
+    const id = setInterval(poll, 2000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [running, viaServer, selectedDay]);
+
+  // Runs the whole batch in this tab: only used when no durable store is
+  // configured server-side (so /api/rollup/job can't run anything past this
+  // request), i.e. local dev without DATABASE_URL, or a fork without it set.
+  const generateLocally = useCallback(async (dayConvos: ConvoLite[], day: string) => {
     setError(null);
 
     // 1. Ensure each conversation has an ADHD analysis. A single conversation
@@ -221,6 +292,50 @@ function RollupPageInner() {
       setRunning(false);
     }
   }, []);
+
+  // Entry point: hand the whole batch to a server-side job so it survives
+  // this tab closing, and only fall back to running it here if no durable
+  // store is configured to back that job (POST responds 501).
+  const generate = useCallback(async (dayConvos: ConvoLite[], day: string) => {
+    setError(null);
+    setRunning(true);
+    setProgress({ done: 0, total: dayConvos.length, failed: 0 });
+
+    let res: Response;
+    try {
+      res = await fetch("/api/rollup/job", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ day, conversations: dayConvos }),
+      });
+    } catch {
+      setError("Network error — check your connection and try again.");
+      setRunning(false);
+      return;
+    }
+
+    if (res.status === 501) {
+      await generateLocally(dayConvos, day);
+      return;
+    }
+
+    if (!res.ok) {
+      setError(`Rollup job failed to start (error ${res.status}).`);
+      setRunning(false);
+      return;
+    }
+
+    let job: RollupJobState | undefined;
+    try {
+      ({ job } = (await res.json()) as { job?: RollupJobState });
+    } catch {
+      // Started successfully (2xx) but the body was unreadable — the polling
+      // effect below will still find and follow the job by day, so this
+      // isn't fatal, just missing the immediate progress snapshot.
+    }
+    if (job) setProgress({ done: job.done, total: job.total, failed: job.failed });
+    setViaServer(true); // hands control to the polling effect above
+  }, [generateLocally]);
 
   const doExport = useCallback(() => {
     if (!selectedDay) return;

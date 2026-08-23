@@ -103,8 +103,8 @@ let pulled = false;
  * Pull the server's copy once per page load and merge it into localStorage.
  * Returns true if anything changed locally, so the caller can re-read.
  */
-export async function pullAndMerge(): Promise<boolean> {
-  if (typeof window === "undefined" || pulled) return false;
+export async function pullAndMerge(force = false): Promise<boolean> {
+  if (typeof window === "undefined" || (pulled && !force)) return false;
   pulled = true;
   try {
     const res = await fetch("/api/store", { signal: AbortSignal.timeout(12_000) });

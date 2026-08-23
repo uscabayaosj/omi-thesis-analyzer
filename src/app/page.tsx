@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo, Suspense } from "react";
+import { useEffect, useState, useCallback, useMemo, memo, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getAnalyzedIds, getAnalysisAge } from "@/lib/storage";
@@ -226,7 +226,7 @@ function CalendarMonth({
   );
 }
 
-function ConversationRow({
+const ConversationRow = memo(function ConversationRow({
   convo, selectMode, isSelected, isAnalyzed, isAnalyzedEither, isAdhd, onToggleSelect,
 }: {
   convo: Conversation;
@@ -313,7 +313,7 @@ function ConversationRow({
       </div>
     </Link>
   );
-}
+});
 
 interface BatchFailure {
   id: string;
@@ -531,14 +531,14 @@ function HomeInner() {
       ).sort((a, b) => (a[0] < b[0] ? 1 : -1))
     : null;
 
-  const toggleSelect = (id: string) => {
+  const toggleSelect = useCallback((id: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-  };
+  }, []);
 
   // "All selected" must check membership, not just counts — the selection can
   // contain conversations hidden by the current filter (or on other days).
