@@ -400,7 +400,8 @@ export default function ConversationPage() {
         analysis: data.analysis,
       });
       setAdhdDoneKeys(stored.doneKeys);
-      void runExtraction(id).catch(() => {});
+      // People come from this lens's own output — no second transcript pass.
+      // See suggestFromAdhdPeople for why runExtraction isn't called here.
       const adhdDate = data.conversation?.created_at || conversation?.created_at;
       if (adhdDate) {
         const geo = (data.conversation as { geolocation?: OmiGeolocation } | undefined)?.geolocation;

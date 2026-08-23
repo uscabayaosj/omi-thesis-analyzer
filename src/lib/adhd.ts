@@ -38,6 +38,10 @@ export interface AdhdPerson {
   shared: string;
   tone: string;
   owed: string;
+  /** Where the user encountered them, when the transcript says so; "None" otherwise.
+   *  Carried here so the People directory can source a meeting's place from this
+   *  lens's output instead of paying for a second full-transcript pass. */
+  place: string;
 }
 
 export interface AdhdAheadItem {
@@ -144,6 +148,7 @@ function toPerson(raw: unknown): AdhdPerson | null {
     shared: asString(r.shared, "None"),
     tone: asString(r.tone, "Neutral"),
     owed: asString(r.owed, "None"),
+    place: asString(r.place, "None"),
   };
 }
 
@@ -251,7 +256,8 @@ You MUST respond with valid JSON matching this exact schema:
       "relationship": "how they relate to the user",
       "shared": "personal details worth mentioning next time, or 'None'",
       "tone": "emotional read",
-      "owed": "social debt (reply/thank-you/favor), or 'None'"
+      "owed": "social debt (reply/thank-you/favor), or 'None'",
+      "place": "where the user encountered them, if the conversation says so, or 'None'"
     }
   ],
   "open_loops": ["unresolved question phrased so the user can act on it", "..."],

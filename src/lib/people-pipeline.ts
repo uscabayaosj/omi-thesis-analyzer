@@ -63,14 +63,28 @@ export async function runExtraction(
   return { suggested };
 }
 
+/** An LLM "None" is the schema's way of saying absent — treat it as empty. */
+function meaningful(value: string | undefined): string | undefined {
+  const v = value?.trim();
+  if (!v || v.toLowerCase() === "none") return undefined;
+  return v;
+}
+
 /**
  * Route the ADHD lens's own `people` output through the same matcher/pending
- * pipeline as the LLM extraction pass. Meant to be called alongside
- * `runExtraction` for the same conversation — `addPending`'s existing
- * per-conversation + normalized-name dedup collapses any overlap between the
- * two sources. Never throws: this runs fire-and-forget inside the ADHD lens's
- * own success handler and touches localStorage synchronously (which can in
- * principle throw on quota), so failures are swallowed and logged.
+ * pipeline as the LLM extraction pass.
+ *
+ * This is the *whole* people pass for an ADHD-lens conversation, not a
+ * supplement to one: that lens already names everyone in the transcript, so
+ * calling `runExtraction` here too would re-send the entire transcript — the
+ * ~97% of a request's tokens that isn't prompt — to learn what we were just
+ * told. The ADHD schema carries `place` for exactly this reason, so the
+ * cheaper source loses nothing. `runExtraction` still owns thesis-only
+ * conversations, whose output has no people in it.
+ *
+ * Never throws: this runs fire-and-forget inside the ADHD lens's own success
+ * handler and touches localStorage synchronously (which can throw on quota),
+ * so failures are swallowed and logged rather than surfacing in that lens.
  */
 export function suggestFromAdhdPeople(
   conversationId: string,
@@ -83,8 +97,8 @@ export function suggestFromAdhdPeople(
     const existing = getPeople();
     for (const ap of people) {
       if (!ap.name || ignored.has(normalize(ap.name))) continue;
-      const details = [ap.shared, ap.owed].filter(
-        (d): d is string => !!d && d.trim().length > 0 && d.trim().toLowerCase() !== "none"
+      const details = [meaningful(ap.shared), meaningful(ap.owed)].filter(
+        (d): d is string => d !== undefined
       );
       const match = matchPerson(ap.name, existing);
       addPending({
@@ -92,13 +106,17 @@ export function suggestFromAdhdPeople(
         date,
         extractedName: ap.name,
         details,
-        placeName: geo?.location_name ?? geo?.address ?? undefined,
+        placeName:
+          meaningful(ap.place) ?? geo?.location_name ?? geo?.address ?? undefined,
         lat: geo?.latitude,
         lng: geo?.longitude,
         matchedPersonId: match.kind === "confident" ? match.personId : undefined,
         candidateIds: match.kind === "ambiguous" ? match.candidateIds : undefined,
       });
     }
+    // Claim the conversation so a later backfill doesn't pay for the
+    // transcript pass this call just made unnecessary.
+    markConversationExtracted(conversationId);
   } catch (e) {
     console.error("suggestFromAdhdPeople failed", e);
   }
