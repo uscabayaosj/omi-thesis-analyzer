@@ -61,6 +61,8 @@ export default function PersonDetailPage() {
   const [photoError, setPhotoError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [mergeError, setMergeError] = useState<string | null>(null);
+
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
 
@@ -219,7 +221,12 @@ export default function PersonDetailPage() {
 
   const confirmMerge = () => {
     if (!mergeTargetId) return;
-    mergePeople(id, mergeTargetId);
+    const result = mergePeople(id, mergeTargetId);
+    if (!result) {
+      setMergeError("Merge failed. Please make sure both people still exist and try again.");
+      return;
+    }
+    setMergeError(null);
     router.push(`/people/${mergeTargetId}`);
   };
 
@@ -533,28 +540,38 @@ export default function PersonDetailPage() {
           Danger zone
         </h2>
         <div className="flex flex-wrap gap-3">
-          <div className="flex items-center gap-2">
-            <select
-              value={mergeTargetId}
-              onChange={(e) => setMergeTargetId(e.target.value)}
-              aria-label="Merge target"
-              disabled={otherPeople.length === 0}
-              className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 min-h-[44px] text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 disabled:opacity-50"
-            >
-              <option value="">Select person…</option>
-              {otherPeople.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={() => setShowMergeDialog(true)}
-              disabled={!mergeTargetId}
-              className="text-sm min-h-[44px] px-3 py-2 rounded-lg bg-amber-900/30 text-amber-300 hover:bg-amber-900/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Merge into…
-            </button>
+          <div className="flex flex-col gap-2 flex-1">
+            <div className="flex items-center gap-2">
+              <select
+                value={mergeTargetId}
+                onChange={(e) => {
+                  setMergeTargetId(e.target.value);
+                  setMergeError(null);
+                }}
+                aria-label="Merge target"
+                disabled={otherPeople.length === 0}
+                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 min-h-[44px] text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 disabled:opacity-50"
+              >
+                <option value="">Select person…</option>
+                {otherPeople.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => setShowMergeDialog(true)}
+                disabled={!mergeTargetId}
+                className="text-sm min-h-[44px] px-3 py-2 rounded-lg bg-amber-900/30 text-amber-300 hover:bg-amber-900/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Merge into…
+              </button>
+            </div>
+            {mergeError && (
+              <p className="text-red-400 text-xs" role="alert">
+                {mergeError}
+              </p>
+            )}
           </div>
           <button
             onClick={() => setShowDeleteDialog(true)}
