@@ -265,7 +265,11 @@ export default function PersonDetailPage() {
   };
 
   const confirmDelete = () => {
-    deletePerson(id);
+    setShowDeleteDialog(false);
+    if (!deletePerson(id)) {
+      setSaveError("Couldn’t delete — the change didn’t save. Try again.");
+      return;
+    }
     router.push("/people");
   };
 

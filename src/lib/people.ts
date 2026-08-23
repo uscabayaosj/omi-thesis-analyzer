@@ -119,6 +119,37 @@ interface MetaRecord {
   values: string[];
 }
 
+// ── Tombstones ──
+//
+// Deleting by removing a key doesn't survive sync: mergeMaps in sync.ts unions
+// keys, so a device that still holds the record resurrects it on the next
+// pull. A deletion is therefore written as a record — a tombstone carrying
+// only `deleted` and a fresh `timestamp` — which wins the existing per-record
+// last-write-wins merge against the stale live copy and propagates the delete
+// instead of losing it. No change to sync.ts is needed; readers here filter
+// tombstones out.
+interface Tombstone {
+  deleted: true;
+  timestamp: string;
+}
+
+function isTombstone(v: unknown): v is Tombstone {
+  return !!v && typeof v === "object" && (v as Tombstone).deleted === true;
+}
+
+// Tombstones are tiny but shouldn't accumulate forever. Purged only after a
+// long horizon: a device that hasn't synced since before the purge would
+// resurrect the record, so the window errs far toward safety over tidiness.
+const TOMBSTONE_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+
+function pruneTombstones<T>(map: Record<string, T>): Record<string, T> {
+  const cutoff = Date.now() - TOMBSTONE_TTL_MS;
+  for (const [k, v] of Object.entries(map)) {
+    if (isTombstone(v) && new Date(v.timestamp).getTime() < cutoff) delete map[k];
+  }
+  return map;
+}
+
 function isPersonRecord(v: unknown): v is Person {
   return !!v && typeof v === "object" && typeof (v as Person).name === "string" && Array.isArray((v as Person).facts);
 }
@@ -138,7 +169,7 @@ export function getPerson(id: string): Person | null {
 }
 
 function putPerson(person: Person): boolean {
-  const map = readMap<unknown>(PEOPLE_NS);
+  const map = pruneTombstones(readMap<unknown>(PEOPLE_NS));
   map[person.id] = person;
   return writeMap(PEOPLE_NS, map);
 }
@@ -197,10 +228,14 @@ export function updatePerson(
   return putPerson(updated) ? updated : null;
 }
 
-export function deletePerson(id: string): void {
-  const map = readMap<unknown>(PEOPLE_NS);
-  delete map[id];
-  writeMap(PEOPLE_NS, map);
+/** Writes a tombstone rather than removing the key, so the deletion wins the
+ *  cross-device merge instead of being resurrected by a stale copy. Returns
+ *  false when the write didn't land. */
+export function deletePerson(id: string): boolean {
+  const map = pruneTombstones(readMap<unknown>(PEOPLE_NS));
+  if (!(id in map)) return true;
+  map[id] = { deleted: true, timestamp: new Date().toISOString() } satisfies Tombstone;
+  return writeMap(PEOPLE_NS, map);
 }
 
 export function appendToPerson(
@@ -243,16 +278,25 @@ export function mergePeople(sourceId: string, targetId: string): Person | null {
     notes: source.notes && source.notes !== target.notes ? `${target.notes}\n${source.notes}`.trim() : target.notes,
     photo: target.photo ?? source.photo,
   });
+  // Best-effort: if this tombstone write fails the target already holds
+  // everything, so the merge still "succeeded" — the leftover source is a
+  // duplicate the user can delete again, not lost data.
   if (merged) deletePerson(sourceId);
   return merged;
 }
 
 // ── Pending suggestions ──
 
-export function getPending(): PendingSuggestion[] {
-  return Object.values(readMap<PendingSuggestion>(PENDING_NS)).sort((a, b) =>
-    b.date.localeCompare(a.date)
+function isPendingRecord(v: unknown): v is PendingSuggestion {
+  return (
+    !!v && typeof v === "object" && !isTombstone(v) && typeof (v as PendingSuggestion).extractedName === "string"
   );
+}
+
+export function getPending(): PendingSuggestion[] {
+  return Object.values(readMap<unknown>(PENDING_NS))
+    .filter(isPendingRecord)
+    .sort((a, b) => b.date.localeCompare(a.date));
 }
 
 /** Ceiling on the queue itself: a backfill over a long history could otherwise
@@ -263,13 +307,16 @@ const MAX_DETAILS_PER_SUGGESTION = 8;
 export function addPending(s: Omit<PendingSuggestion, "id" | "timestamp">): void {
   const name = clip(s.extractedName, MAX_NAME);
   if (!name) return;
-  const map = readMap<PendingSuggestion>(PENDING_NS);
-  // Collapse duplicates: same conversation + same normalized name.
-  const dup = Object.values(map).some(
+  const map = pruneTombstones(readMap<PendingSuggestion>(PENDING_NS));
+  const live = Object.values(map).filter(isPendingRecord);
+  // Collapse duplicates: same conversation + same normalized name. Tombstones
+  // don't count — a resolved suggestion shouldn't block a fresh force-rescan,
+  // matching the old removed-key behavior.
+  const dup = live.some(
     (p) => p.conversationId === s.conversationId && normalize(p.extractedName) === normalize(name)
   );
   if (dup) return;
-  if (Object.keys(map).length >= MAX_PENDING) return;
+  if (live.length >= MAX_PENDING) return;
   const id = crypto.randomUUID();
   map[id] = {
     ...s,
@@ -285,9 +332,12 @@ export function addPending(s: Omit<PendingSuggestion, "id" | "timestamp">): void
   writeMap(PENDING_NS, map);
 }
 
+/** Tombstoned, not removed: a resolved suggestion must stay resolved on every
+ *  device, not reappear in the review queue after the next sync. */
 export function removePending(id: string): void {
-  const map = readMap<PendingSuggestion>(PENDING_NS);
-  delete map[id];
+  const map = pruneTombstones(readMap<PendingSuggestion | Tombstone>(PENDING_NS));
+  if (!(id in map)) return;
+  map[id] = { deleted: true, timestamp: new Date().toISOString() } satisfies Tombstone;
   writeMap(PENDING_NS, map);
 }
 
