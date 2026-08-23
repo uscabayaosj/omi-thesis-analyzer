@@ -25,6 +25,14 @@ export interface Structured {
   events?: unknown[];
 }
 
+export interface OmiGeolocation {
+  latitude?: number;
+  longitude?: number;
+  address?: string;
+  location_name?: string;
+  google_place_id?: string;
+}
+
 export interface Conversation {
   id: string;
   created_at: string;
@@ -36,6 +44,7 @@ export interface Conversation {
   transcript_segments?: TranscriptSegment[];
   folder_id?: string;
   folder_name?: string;
+  geolocation?: OmiGeolocation | null;
 }
 
 export interface Analysis {

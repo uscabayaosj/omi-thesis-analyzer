@@ -2,14 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { getStore, ensureSchema, withTimeout, SYNCED_NAMESPACES, isSyncedNamespace } from "@/lib/kv";
 
 /**
- * Durable mirror of the browser's analysis stores.
+ * Durable mirror of the browser's client-side stores.
  *
  * No auth: this app is single-user by construction and has none. That is only
- * defensible because the writable surface is exactly the four known analysis
- * namespaces (never arbitrary keys) and nothing here is a secret — it is the
- * user's own analyses, already sitting unencrypted in their localStorage. If
- * this app ever gains a second user, this route needs auth before anything
- * else does.
+ * defensible because the writable surface is exactly the known namespaces in
+ * SYNCED_NAMESPACES (never arbitrary keys) and nothing here is a secret — it
+ * is the user's own data, already sitting unencrypted in their localStorage.
+ *
+ * Note that surface is no longer only analyses: the people namespaces carry
+ * names, photos, and GPS coordinates of third parties the user has met. That
+ * raises the cost of exposure without changing the argument, which rests on
+ * there being exactly one user. If this app ever gains a second user, this
+ * route needs auth before anything else does.
  */
 
 // GET /api/store → every synced namespace, for the client to merge on load.
