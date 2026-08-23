@@ -25,6 +25,7 @@ import { formatDateTime, dayOf } from "@/lib/format";
 import { ThesisResults, type Analysis } from "@/components/ThesisResults";
 import { AdhdResults } from "@/components/AdhdResults";
 import type { AdhdAnalysis } from "@/lib/adhd";
+import type { OmiGeolocation } from "@/lib/omi-api";
 import { getAdhdAnalysis, saveAdhdAnalysis, toggleCommitmentDone } from "@/lib/adhd-storage";
 import {
   RefreshIcon,
@@ -42,7 +43,7 @@ import {
 import { BUTTON_PRIMARY } from "@/lib/ui";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { pullAndMerge } from "@/lib/sync";
-import { runExtraction } from "@/lib/people-pipeline";
+import { runExtraction, suggestFromAdhdPeople } from "@/lib/people-pipeline";
 
 interface TranscriptSegment {
   text: string;
@@ -400,6 +401,11 @@ export default function ConversationPage() {
       });
       setAdhdDoneKeys(stored.doneKeys);
       void runExtraction(id).catch(() => {});
+      const adhdDate = data.conversation?.created_at || conversation?.created_at;
+      if (adhdDate) {
+        const geo = (data.conversation as { geolocation?: OmiGeolocation } | undefined)?.geolocation;
+        suggestFromAdhdPeople(id, adhdDate, data.analysis.people, geo);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "ADHD analysis failed");
     } finally {

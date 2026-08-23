@@ -223,9 +223,11 @@ export default function PersonDetailPage() {
     if (!mergeTargetId) return;
     const result = mergePeople(id, mergeTargetId);
     if (!result) {
+      setShowMergeDialog(false);
       setMergeError("Merge failed. Please make sure both people still exist and try again.");
       return;
     }
+    setShowMergeDialog(false);
     setMergeError(null);
     router.push(`/people/${mergeTargetId}`);
   };

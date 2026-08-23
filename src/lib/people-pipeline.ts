@@ -1,7 +1,8 @@
 "use client";
 
 import { fetchJson } from "@/lib/fetch-json";
-import type { Conversation } from "@/lib/omi-api";
+import type { Conversation, OmiGeolocation } from "@/lib/omi-api";
+import type { AdhdPerson } from "@/lib/adhd";
 import {
   addPending,
   getExtractedConversationIds,
@@ -60,4 +61,45 @@ export async function runExtraction(
   }
   markConversationExtracted(conversationId);
   return { suggested };
+}
+
+/**
+ * Route the ADHD lens's own `people` output through the same matcher/pending
+ * pipeline as the LLM extraction pass. Meant to be called alongside
+ * `runExtraction` for the same conversation — `addPending`'s existing
+ * per-conversation + normalized-name dedup collapses any overlap between the
+ * two sources. Never throws: this runs fire-and-forget inside the ADHD lens's
+ * own success handler and touches localStorage synchronously (which can in
+ * principle throw on quota), so failures are swallowed and logged.
+ */
+export function suggestFromAdhdPeople(
+  conversationId: string,
+  date: string,
+  people: AdhdPerson[],
+  geo?: OmiGeolocation | null
+): void {
+  try {
+    const ignored = new Set(getIgnoredNames().map(normalize));
+    const existing = getPeople();
+    for (const ap of people) {
+      if (!ap.name || ignored.has(normalize(ap.name))) continue;
+      const details = [ap.shared, ap.owed].filter(
+        (d): d is string => !!d && d.trim().length > 0 && d.trim().toLowerCase() !== "none"
+      );
+      const match = matchPerson(ap.name, existing);
+      addPending({
+        conversationId,
+        date,
+        extractedName: ap.name,
+        details,
+        placeName: geo?.location_name ?? geo?.address ?? undefined,
+        lat: geo?.latitude,
+        lng: geo?.longitude,
+        matchedPersonId: match.kind === "confident" ? match.personId : undefined,
+        candidateIds: match.kind === "ambiguous" ? match.candidateIds : undefined,
+      });
+    }
+  } catch (e) {
+    console.error("suggestFromAdhdPeople failed", e);
+  }
 }

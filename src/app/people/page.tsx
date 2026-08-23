@@ -72,10 +72,12 @@ export default function PeoplePage() {
   const [addingPerson, setAddingPerson] = useState(false);
   const [newName, setNewName] = useState("");
   const [reassigning, setReassigning] = useState<string | null>(null); // pending suggestion id
+  const [acceptErrorId, setAcceptErrorId] = useState<string | null>(null); // pending suggestion id
 
   // Backfill state
   const [backfillTotal, setBackfillTotal] = useState<number | null>(null);
   const [backfillDone, setBackfillDone] = useState(0);
+  const [backfillFailures, setBackfillFailures] = useState<number | null>(null);
   const cancelBackfillRef = useRef(false);
 
   const refresh = () => {
@@ -132,15 +134,30 @@ export default function PeoplePage() {
     refresh();
   };
 
+  // Accept actions write to a person; if the write fails (target deleted in
+  // another tab, storage write dropped), keep the suggestion queued and show
+  // an inline error instead of silently losing the facts/meeting.
+  const resolveAccept = (s: PendingSuggestion, action: () => Person | null) => {
+    const result = action();
+    if (!result) {
+      setAcceptErrorId(s.id);
+      refresh();
+      return;
+    }
+    setAcceptErrorId((cur) => (cur === s.id ? null : cur));
+    removePending(s.id);
+    refresh();
+  };
+
   const acceptAsNew = (s: PendingSuggestion) => {
-    resolve(s, () => {
+    resolveAccept(s, () => {
       const p = createPerson({ name: s.extractedName });
-      appendToPerson(p.id, factsFrom(s), meetingFrom(s));
+      return appendToPerson(p.id, factsFrom(s), meetingFrom(s));
     });
   };
 
   const acceptInto = (s: PendingSuggestion, personId: string) => {
-    resolve(s, () => appendToPerson(personId, factsFrom(s), meetingFrom(s), s.extractedName));
+    resolveAccept(s, () => appendToPerson(personId, factsFrom(s), meetingFrom(s), s.extractedName));
   };
 
   const doIgnore = (s: PendingSuggestion) => {
@@ -168,13 +185,17 @@ export default function PeoplePage() {
     cancelBackfillRef.current = false;
     setBackfillTotal(candidates.length);
     setBackfillDone(0);
+    setBackfillFailures(null);
+    let failures = 0;
     for (let i = 0; i < candidates.length; i++) {
       if (cancelBackfillRef.current) break;
-      await runExtraction(candidates[i]);
+      const result = await runExtraction(candidates[i]);
+      if ("error" in result) failures++;
       setBackfillDone(i + 1);
     }
     setBackfillTotal(null);
     setBackfillDone(0);
+    setBackfillFailures(failures > 0 ? failures : null);
     refresh();
   };
 
@@ -214,6 +235,7 @@ export default function PeoplePage() {
                 key={s.id}
                 suggestion={s}
                 people={people}
+                showError={acceptErrorId === s.id}
                 reassignOpen={reassigning === s.id}
                 onOpenReassign={() => setReassigning(s.id)}
                 onCloseReassign={() => setReassigning(null)}
@@ -293,6 +315,13 @@ export default function PeoplePage() {
           </div>
         )}
       </div>
+
+      {backfillFailures !== null && (
+        <p className="text-amber-400 text-xs -mt-4 mb-6" role="status">
+          Scanned past conversations — {backfillFailures} couldn&rsquo;t be reached. Check your API keys and try
+          again.
+        </p>
+      )}
 
       {addingPerson && (
         <div className="card p-4 mb-6 flex items-center gap-2">
@@ -383,6 +412,7 @@ export default function PeoplePage() {
 function PendingCard({
   suggestion: s,
   people,
+  showError,
   reassignOpen,
   onOpenReassign,
   onCloseReassign,
@@ -394,6 +424,7 @@ function PendingCard({
 }: {
   suggestion: PendingSuggestion;
   people: Person[];
+  showError: boolean;
   reassignOpen: boolean;
   onOpenReassign: () => void;
   onCloseReassign: () => void;
@@ -428,6 +459,12 @@ function PendingCard({
             <li key={i}>{d}</li>
           ))}
         </ul>
+      )}
+
+      {showError && (
+        <p className="text-red-400 text-xs mb-2" role="alert">
+          Couldn&rsquo;t save — try again.
+        </p>
       )}
 
       <div className="flex flex-wrap gap-2">
