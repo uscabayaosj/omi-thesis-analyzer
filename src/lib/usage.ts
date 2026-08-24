@@ -88,3 +88,77 @@ export async function logUsage(args: {
     VALUES (${args.label}, ${args.provider}, ${args.model}, ${args.usage.promptTokens}, ${args.usage.completionTokens}, ${cost})
   `);
 }
+
+export interface UsagePeriodSummary {
+  costUsd: number | null;
+  callCount: number;
+  promptTokens: number;
+  completionTokens: number;
+}
+
+export interface UsageBreakdownRow {
+  key: string;
+  costUsd: number | null;
+  callCount: number;
+}
+
+export interface UsageSummary {
+  configured: boolean;
+  today: UsagePeriodSummary;
+  thisWeek: UsagePeriodSummary;
+  thisMonth: UsagePeriodSummary;
+  byLabel: UsageBreakdownRow[];
+  byModel: UsageBreakdownRow[];
+}
+
+const EMPTY_PERIOD: UsagePeriodSummary = { costUsd: null, callCount: 0, promptTokens: 0, completionTokens: 0 };
+
+type PeriodRow = {
+  cost_usd: string | null;
+  call_count: string;
+  prompt_tokens: string | null;
+  completion_tokens: string | null;
+};
+
+function toPeriodSummary(row: PeriodRow | undefined): UsagePeriodSummary {
+  if (!row || Number(row.call_count) === 0) return EMPTY_PERIOD;
+  return {
+    costUsd: row.cost_usd === null ? null : Number(row.cost_usd),
+    callCount: Number(row.call_count),
+    promptTokens: Number(row.prompt_tokens ?? 0),
+    completionTokens: Number(row.completion_tokens ?? 0),
+  };
+}
+
+/**
+ * Aggregates trace_usage for the dashboard. All aggregation happens in SQL
+ * (SUM/COUNT/date_trunc) rather than pulling raw rows into JS, so this stays
+ * cheap as the table grows — see spec's "Read API" section.
+ */
+export async function getUsageSummary(): Promise<UsageSummary> {
+  const sql = getStore();
+  if (!sql) {
+    return { configured: false, today: EMPTY_PERIOD, thisWeek: EMPTY_PERIOD, thisMonth: EMPTY_PERIOD, byLabel: [], byModel: [] };
+  }
+
+  await ensureUsageSchema(sql);
+
+  const [todayRows, weekRows, monthRows, labelRows, modelRows] = await withTimeout(
+    Promise.all([
+      sql`SELECT SUM(estimated_cost_usd) AS cost_usd, COUNT(*) AS call_count, SUM(prompt_tokens) AS prompt_tokens, SUM(completion_tokens) AS completion_tokens FROM trace_usage WHERE created_at >= date_trunc('day', now())`,
+      sql`SELECT SUM(estimated_cost_usd) AS cost_usd, COUNT(*) AS call_count, SUM(prompt_tokens) AS prompt_tokens, SUM(completion_tokens) AS completion_tokens FROM trace_usage WHERE created_at >= date_trunc('week', now())`,
+      sql`SELECT SUM(estimated_cost_usd) AS cost_usd, COUNT(*) AS call_count, SUM(prompt_tokens) AS prompt_tokens, SUM(completion_tokens) AS completion_tokens FROM trace_usage WHERE created_at >= date_trunc('month', now())`,
+      sql`SELECT label AS key, SUM(estimated_cost_usd) AS cost_usd, COUNT(*) AS call_count FROM trace_usage WHERE created_at >= date_trunc('month', now()) GROUP BY label ORDER BY cost_usd DESC NULLS LAST`,
+      sql`SELECT model AS key, SUM(estimated_cost_usd) AS cost_usd, COUNT(*) AS call_count FROM trace_usage WHERE created_at >= date_trunc('month', now()) GROUP BY model ORDER BY cost_usd DESC NULLS LAST`,
+    ])
+  ) as [PeriodRow[], PeriodRow[], PeriodRow[], (UsageBreakdownRow & { cost_usd: string | null; call_count: string })[], (UsageBreakdownRow & { cost_usd: string | null; call_count: string })[]];
+
+  return {
+    configured: true,
+    today: toPeriodSummary(todayRows[0]),
+    thisWeek: toPeriodSummary(weekRows[0]),
+    thisMonth: toPeriodSummary(monthRows[0]),
+    byLabel: labelRows.map((r) => ({ key: r.key, costUsd: r.cost_usd === null ? null : Number(r.cost_usd), callCount: Number(r.call_count) })),
+    byModel: modelRows.map((r) => ({ key: r.key, costUsd: r.cost_usd === null ? null : Number(r.cost_usd), callCount: Number(r.call_count) })),
+  };
+}
