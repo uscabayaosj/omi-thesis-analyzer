@@ -64,9 +64,12 @@ New module `src/lib/export.ts`:
   `URL.createObjectURL` + synthetic `<a download>` click + `revokeObjectURL`
   pattern already used by `src/lib/obsidian.ts`'s three markdown-download
   functions — no new download mechanism introduced.
-- Filename: `trace-backup-YYYY-MM-DD.json` (today's date, from the export
-  moment, not `exportedAt` from a possibly-stale server response — cosmetic
-  only, doesn't affect content).
+- Filename: `trace-backup-YYYY-MM-DD-HHMM.json`, stamped from the export
+  moment in **local** time (not `exportedAt` from a possibly-stale server
+  response, and not UTC — a late-evening backup east of UTC would otherwise
+  be labelled with tomorrow's date). The time component also keeps two
+  backups on the same day from colliding. Cosmetic only; doesn't affect
+  content.
 
 ## UI
 
