@@ -717,6 +717,13 @@ function HomeInner() {
               <TrendingUpIcon className="w-4 h-4 flex-shrink-0" />
               Usage
             </Link>
+            <Link
+              href="/search"
+              className="flex items-center gap-1.5 text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors flex-shrink-0"
+            >
+              <SearchIcon className="w-4 h-4 flex-shrink-0" />
+              Search
+            </Link>
             <button
               onClick={() => loadConversations("refresh")}
               disabled={loading || refreshing}
