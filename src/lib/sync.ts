@@ -21,6 +21,7 @@ const ANALYSES_NS = "omi-adhd-analyses";
  */
 
 type RecordMap = Record<string, { timestamp?: string } & Record<string, unknown>>;
+type ArrayRecord = Record<string, unknown>;
 
 function readLocal(ns: string): RecordMap {
   try {
@@ -56,12 +57,51 @@ function mergeMaps(local: RecordMap, remote: RecordMap): RecordMap {
   return merged;
 }
 
-// The group-analyses namespace is an array, not a keyed map, so it can't use
-// the per-record merge above. It is also the one store where a whole-list
-// replace is harmless: entries are keyed by their conversation-id set and
-// re-runnable. Newest-list-wins by its first entry's timestamp.
+// Array-shaped namespaces, each with their own merge strategy — the uniform
+// keyed-map merge above only works for records addressed by a top-level id.
+const ARRAY_NAMESPACES = new Set(["omi-thesis-group-analyses", "omi-thesis-analyses"]);
+
 function isArrayNamespace(ns: string): boolean {
-  return ns === "omi-thesis-group-analyses";
+  return ARRAY_NAMESPACES.has(ns);
+}
+
+// omi-thesis-group-analyses: entries are keyed by their conversation-id set
+// and re-runnable, so a whole-list replace is harmless — newest-list-wins by
+// length is sufficient (there's no per-entry identity worth merging on).
+function mergeByLength(local: ArrayRecord[], remote: ArrayRecord[]): ArrayRecord[] {
+  return remote.length > local.length ? remote : local;
+}
+
+// omi-thesis-analyses: StoredConversation[], one entry per real
+// conversationId whose current.timestamp genuinely can differ between
+// devices (re-analyzing the same conversation on a phone and a laptop). A
+// length comparison would silently drop a newer local edit whenever the
+// *other* side happens to have more distinct conversations analyzed — so
+// this merges per-conversationId instead, the same "newest timestamp wins"
+// rule the keyed-map merge above already uses for the map-shaped namespaces.
+function mergeConversationList(local: ArrayRecord[], remote: ArrayRecord[]): ArrayRecord[] {
+  const byId = new Map<string, ArrayRecord>();
+  for (const r of remote) {
+    const id = r?.conversationId;
+    if (typeof id === "string") byId.set(id, r);
+  }
+  for (const l of local) {
+    const id = l?.conversationId;
+    if (typeof id !== "string") continue;
+    const existing = byId.get(id);
+    if (!existing) {
+      byId.set(id, l);
+      continue;
+    }
+    const lt = (l.current as { timestamp?: string } | undefined)?.timestamp ?? "";
+    const rt = (existing.current as { timestamp?: string } | undefined)?.timestamp ?? "";
+    if (lt > rt) byId.set(id, l);
+  }
+  return Array.from(byId.values());
+}
+
+function mergeArrayNamespace(ns: string, local: ArrayRecord[], remote: ArrayRecord[]): ArrayRecord[] {
+  return ns === "omi-thesis-analyses" ? mergeConversationList(local, remote) : mergeByLength(local, remote);
 }
 
 let pushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -118,12 +158,15 @@ export async function pullAndMerge(force = false): Promise<boolean> {
       if (!remote) continue;
 
       if (isArrayNamespace(ns)) {
-        const remoteList = Array.isArray(remote.list) ? remote.list : [];
-        const localList = JSON.parse(localStorage.getItem(ns) || "[]");
-        if (remoteList.length > localList.length) {
-          localStorage.setItem(ns, JSON.stringify(remoteList));
+        const remoteList: ArrayRecord[] = Array.isArray(remote.list) ? remote.list : [];
+        const localRaw = localStorage.getItem(ns);
+        const localList: ArrayRecord[] = localRaw ? JSON.parse(localRaw) : [];
+        const merged = mergeArrayNamespace(ns, localList, remoteList);
+        if (JSON.stringify(merged) !== JSON.stringify(localList)) {
+          localStorage.setItem(ns, JSON.stringify(merged));
           changed = true;
         }
+        if (JSON.stringify(merged) !== JSON.stringify(remoteList)) schedulePush(ns);
         continue;
       }
 

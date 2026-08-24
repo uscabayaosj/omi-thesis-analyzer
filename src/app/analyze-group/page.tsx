@@ -22,7 +22,7 @@ import {
 } from "@/components/icons";
 import { BUTTON_PRIMARY } from "@/lib/ui";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { schedulePush } from "@/lib/sync";
+import { schedulePush, pullAndMerge } from "@/lib/sync";
 
 interface ConvoRef {
   id: string;
@@ -246,19 +246,35 @@ function GroupAnalysisContent() {
     // changes (navigating to a different group on the same mounted route),
     // and localStorage isn't available during the server-rendered first
     // paint — reading it before mount would cause a hydration mismatch.
-    const stored = getStoredGroupAnalyses();
     const key = groupKey(ids);
-    const existing = stored.find((a) => groupKey(a.conversationIds) === key);
-    if (existing) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+    const applyStored = (): boolean => {
+      const stored = getStoredGroupAnalyses();
+      const existing = stored.find((a) => groupKey(a.conversationIds) === key);
+      if (!existing) return false;
       setAnalysis(existing.analysis);
       setConversations(existing.conversations);
       if (existing.custom) {
         setCustomPrompt(existing.custom.prompt);
         setCustomResult(existing.custom.result);
       }
+      return true;
+    };
+
+    const foundLocally = applyStored();
+    if (foundLocally) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLoading(false);
+      return;
     }
-    setLoading(false);
+
+    // Not found on this device yet — it may exist server-side (e.g. this
+    // page was reached via a server-side search result on a group first
+    // created on another device). Pull once and re-check before showing
+    // "not analyzed yet".
+    pullAndMerge().then((changed) => {
+      if (changed) applyStored();
+      setLoading(false);
+    });
   }, [ids]);
 
   const runAnalysis = useCallback(async () => {

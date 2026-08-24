@@ -137,7 +137,7 @@ export default function SearchPage() {
           <ul className="space-y-3 list-none">
             {result.groupResults.map((r) => (
               <li key={r.conversationIds.join(",")} className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
-                <Link href={`/analyze-group?ids=${r.conversationIds.join(",")}`} className="block">
+                <Link href={`/analyze-group?ids=${r.conversationIds.map(encodeURIComponent).join(",")}`} className="block">
                   <div className="text-slate-200 font-medium mb-2">
                     {r.conversationTitles.length > 0 ? r.conversationTitles.join(", ") : `${r.conversationIds.length} conversations`}
                   </div>

@@ -53,6 +53,18 @@ const GROUP_FIELD_LABELS: Record<string, string> = {
   "custom.result": "Custom Question",
 };
 
+/** Both omi-thesis-analyses and omi-thesis-group-analyses are pushed to Neon
+ *  wrapped as { list: [...] } (see sync.ts's isArrayNamespace/schedulePush) —
+ *  the bare-array branch here is a defensive fallback only, not the expected
+ *  shape. */
+function unwrapList(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (value && typeof value === "object" && Array.isArray((value as { list?: unknown }).list)) {
+    return (value as { list: unknown[] }).list;
+  }
+  return [];
+}
+
 const SNIPPET_RADIUS = 60; // chars of context on each side of the first match
 
 /** Returns a snippet centered on the first case-insensitive match of `query`
@@ -87,25 +99,30 @@ function matchFields(
   return matches;
 }
 
-/** `analysesMap` is the raw JSONB value of the omi-thesis-analyses
- *  namespace: expected shape Record<conversationId, StoredAnalysis>, but
- *  read as `unknown` since it comes straight from Postgres JSONB — this
- *  function defensively narrows it rather than trusting the shape. */
-export function searchAnalyses(analysesMap: unknown, query: string): ConversationSearchResult[] {
+/** `analysesData` is the raw JSONB value of the omi-thesis-analyses
+ *  namespace: expected shape { list: StoredConversation[] } (see
+ *  unwrapList's doc comment), where each StoredConversation is
+ *  { conversationId, current: StoredAnalysis, versions } — the searchable
+ *  fields live under `.current`, not at the top level. */
+export function searchAnalyses(analysesData: unknown, query: string): ConversationSearchResult[] {
   const trimmed = query.trim();
   if (!trimmed) return [];
-  if (!analysesMap || typeof analysesMap !== "object" || Array.isArray(analysesMap)) return [];
 
   const results: ConversationSearchResult[] = [];
-  for (const [conversationId, raw] of Object.entries(analysesMap as Record<string, unknown>)) {
+  for (const raw of unwrapList(analysesData)) {
     if (!raw || typeof raw !== "object") continue;
     const record = raw as Record<string, unknown>;
-    const matches = matchFields(record, THESIS_FIELD_LABELS, trimmed);
+    const conversationId = record.conversationId;
+    const current = record.current;
+    if (typeof conversationId !== "string" || !current || typeof current !== "object") continue;
+    const currentRecord = current as Record<string, unknown>;
+
+    const matches = matchFields(currentRecord, THESIS_FIELD_LABELS, trimmed);
     if (matches.length === 0) continue;
     results.push({
       conversationId,
-      title: typeof record.title === "string" && record.title ? record.title : "Untitled",
-      date: typeof record.date === "string" ? record.date : undefined,
+      title: typeof currentRecord.title === "string" && currentRecord.title ? currentRecord.title : "Untitled",
+      date: typeof currentRecord.date === "string" ? currentRecord.date : undefined,
       matches,
     });
   }
@@ -116,17 +133,15 @@ export function searchAnalyses(analysesMap: unknown, query: string): Conversatio
   });
 }
 
-/** `groupsArray` is the raw JSONB value of the omi-thesis-group-analyses
- *  namespace: expected shape StoredGroupAnalysis[] (an array, unlike the
- *  per-conversation namespace above — confirmed from
- *  src/app/analyze-group/page.tsx's storage format). */
-export function searchGroupAnalyses(groupsArray: unknown, query: string): GroupSearchResult[] {
+/** `groupsData` is the raw JSONB value of the omi-thesis-group-analyses
+ *  namespace: expected shape { list: StoredGroupAnalysis[] } (see
+ *  unwrapList's doc comment). */
+export function searchGroupAnalyses(groupsData: unknown, query: string): GroupSearchResult[] {
   const trimmed = query.trim();
   if (!trimmed) return [];
-  if (!Array.isArray(groupsArray)) return [];
 
   const results: GroupSearchResult[] = [];
-  for (const raw of groupsArray) {
+  for (const raw of unwrapList(groupsData)) {
     if (!raw || typeof raw !== "object") continue;
     const record = raw as Record<string, unknown>;
     const analysis = record.analysis;
@@ -148,7 +163,7 @@ export function searchGroupAnalyses(groupsArray: unknown, query: string): GroupS
       .filter((t): t is string => typeof t === "string" && t.length > 0);
 
     results.push({
-      conversationIds: [...conversationIds].sort(),
+      conversationIds: [...new Set(conversationIds)].sort(),
       conversationTitles,
       timestamp: typeof record.timestamp === "string" ? record.timestamp : "",
       matches,
