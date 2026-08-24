@@ -262,8 +262,15 @@ export default function PeoplePage() {
 
   const backfillActive = backfillTotal !== null;
 
+  // The letter rail is a fixed overlay pinned to the viewport's right edge, so
+  // it doesn't reserve layout space on its own. When it's showing, widen the
+  // container's right padding so right-aligned card content (place, "21h ago")
+  // never runs under it. On wide screens the container is centered with gutters
+  // and the rail sits well clear, but the extra padding there is harmless.
+  const railVisible = view === "grid" && !loading && groups.length > 1;
+
   return (
-    <main className="max-w-3xl mx-auto px-4 py-8">
+    <main className={`max-w-3xl mx-auto py-8 pl-4 ${railVisible ? "pr-9" : "pr-4"}`}>
       <Link
         href="/"
         className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors mb-4"
@@ -491,7 +498,7 @@ export default function PeoplePage() {
         <MeetingMap markers={mapMarkers} />
       )}
 
-      {view === "grid" && !loading && groups.length > 1 && (
+      {railVisible && (
         <LetterRail present={new Set(groups.map((g) => g.letter))} onJump={jumpToLetter} />
       )}
     </main>
@@ -512,7 +519,7 @@ function LetterRail({ present, onJump }: { present: Set<string>; onJump: (letter
   return (
     <nav
       aria-label="Jump to letter"
-      className="fixed right-0.5 top-1/2 -translate-y-1/2 z-10 flex flex-col items-center py-2 pr-[max(0.125rem,env(safe-area-inset-right))]"
+      className="fixed right-0 top-1/2 -translate-y-1/2 z-10 flex flex-col items-center rounded-l-lg bg-slate-950/85 py-2 pl-1 pr-[max(0.25rem,env(safe-area-inset-right))]"
     >
       {ALPHABET.map((letter) => {
         const has = present.has(letter);

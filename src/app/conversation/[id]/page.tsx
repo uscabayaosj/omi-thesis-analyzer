@@ -44,6 +44,7 @@ import { BUTTON_PRIMARY } from "@/lib/ui";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { pullAndMerge } from "@/lib/sync";
 import { runExtraction, suggestFromAdhdPeople } from "@/lib/people-pipeline";
+import MeetingMap, { type MapMarker } from "@/components/MeetingMap";
 
 interface TranscriptSegment {
   text: string;
@@ -61,6 +62,7 @@ interface Conversation {
     category?: string;
   };
   transcript_segments?: TranscriptSegment[];
+  geolocation?: OmiGeolocation | null;
 }
 
 // ── Components ──
@@ -549,6 +551,34 @@ export default function ConversationPage() {
               })}
             </p>
           </header>
+
+          {/* Where it happened — Omi attaches coordinates to some recordings.
+              Shown only when present; a recording without a fix simply omits it. */}
+          {conversation.geolocation?.latitude != null &&
+            conversation.geolocation?.longitude != null && (
+              <section className="mb-6" aria-label="Where this conversation happened">
+                {(conversation.geolocation.address || conversation.geolocation.location_type) && (
+                  <p className="text-slate-400 text-sm mb-2">
+                    {conversation.geolocation.address || conversation.geolocation.location_type}
+                  </p>
+                )}
+                <MeetingMap
+                  markers={
+                    [
+                      {
+                        lat: conversation.geolocation.latitude,
+                        lng: conversation.geolocation.longitude,
+                        label: conversation.structured?.title || "This conversation",
+                        sublabel:
+                          conversation.geolocation.address ||
+                          conversation.geolocation.location_type ||
+                          undefined,
+                      },
+                    ] satisfies MapMarker[]
+                  }
+                />
+              </section>
+            )}
 
           {/* Lens toggle */}
           <div className="flex gap-1 mb-6 p-1 bg-slate-900 rounded-lg w-fit" role="radiogroup" aria-label="Analysis lens">
