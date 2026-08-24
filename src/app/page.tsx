@@ -12,10 +12,11 @@ import { formatDateTime, dayOf } from "@/lib/format";
 import {
   TraceMark, SquareIcon, XIcon, CheckIcon, SparklesIcon, WarningIcon, MicIcon,
   FolderIcon, RefreshIcon, ClipboardIcon, CalendarIcon, ChevronRightIcon, SearchIcon, MapPinIcon,
-  UsersIcon, TrendingUpIcon,
+  UsersIcon, TrendingUpIcon, DownloadIcon,
 } from "@/components/icons";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { pullAndMerge } from "@/lib/sync";
+import { exportAllData } from "@/lib/export";
 
 const CONVERSATIONS_CACHE_KEY = "conversations";
 
@@ -353,6 +354,8 @@ function HomeInner() {
   const [refreshing, setRefreshing] = useState(false);
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "analyzed" | "unanalyzed">("all");
   const [selectMode, setSelectMode] = useState(false);
   // Cross-day, cross-search selection: intentionally never reset when
@@ -670,6 +673,18 @@ function HomeInner() {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
   });
 
+  const handleExport = async () => {
+    setExporting(true);
+    setExportError(null);
+    try {
+      await exportAllData();
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : "Export failed.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <main className="max-w-3xl mx-auto px-4 py-8">
       <header className="mb-6">
@@ -725,6 +740,15 @@ function HomeInner() {
               Search
             </Link>
             <button
+              onClick={handleExport}
+              disabled={exporting}
+              aria-label="Download a backup of all stored analyses"
+              className="flex items-center gap-1.5 text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+            >
+              <DownloadIcon className="w-4 h-4 flex-shrink-0" />
+              {exporting ? "Backing up…" : "Backup"}
+            </button>
+            <button
               onClick={() => loadConversations("refresh")}
               disabled={loading || refreshing}
               aria-label="Refresh conversations from Omi"
@@ -736,6 +760,11 @@ function HomeInner() {
           </div>
         </div>
 
+        {exportError && (
+          <p className="text-sm text-red-400 mt-2" role="alert">
+            {exportError}
+          </p>
+        )}
 
         {/* Search — bypasses day-scoping entirely; the fast path when you know the topic, not the date */}
         {conversations.length > 0 && (
