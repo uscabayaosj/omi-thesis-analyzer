@@ -25,11 +25,15 @@ export interface Structured {
   events?: unknown[];
 }
 
+// Matches Omi's actual `Geolocation` schema (confirmed against
+// docs.omi.me/api-reference/endpoint/conversations/{list,get}). There is no
+// human-readable place-name field here — `location_type` is a coarse category
+// (e.g. "restaurant"), not a name; `address` is the closest thing to one.
 export interface OmiGeolocation {
   latitude?: number;
   longitude?: number;
   address?: string;
-  location_name?: string;
+  location_type?: string;
   google_place_id?: string;
 }
 

@@ -51,7 +51,11 @@ export async function runExtraction(
       date,
       extractedName: ex.name,
       details: ex.details,
-      placeName: ex.place ?? geo?.location_name ?? geo?.address ?? undefined,
+      // Preference order: the LLM's own read of the transcript (a real name,
+      // "the Ronan feed store") beats Omi's `address` (a formatted address,
+      // still human-readable) beats `location_type` (a coarse category like
+      // "restaurant" — better than nothing, but not a name).
+      placeName: ex.place ?? geo?.address ?? geo?.location_type ?? undefined,
       lat: geo?.latitude,
       lng: geo?.longitude,
       matchedPersonId: match.kind === "confident" ? match.personId : undefined,
@@ -106,8 +110,10 @@ export function suggestFromAdhdPeople(
         date,
         extractedName: ap.name,
         details,
+        // Same preference order as runExtraction: transcript read, then
+        // Omi's formatted address, then its coarse location category.
         placeName:
-          meaningful(ap.place) ?? geo?.location_name ?? geo?.address ?? undefined,
+          meaningful(ap.place) ?? geo?.address ?? geo?.location_type ?? undefined,
         lat: geo?.latitude,
         lng: geo?.longitude,
         matchedPersonId: match.kind === "confident" ? match.personId : undefined,
