@@ -12,7 +12,7 @@ import { formatDateTime, dayOf } from "@/lib/format";
 import {
   TraceMark, SquareIcon, XIcon, CheckIcon, SparklesIcon, WarningIcon, MicIcon,
   FolderIcon, RefreshIcon, ClipboardIcon, CalendarIcon, ChevronRightIcon, SearchIcon, MapPinIcon,
-  UsersIcon,
+  UsersIcon, TrendingUpIcon,
 } from "@/components/icons";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { pullAndMerge } from "@/lib/sync";
@@ -709,6 +709,13 @@ function HomeInner() {
             >
               <UsersIcon className="w-4 h-4 flex-shrink-0" />
               People
+            </Link>
+            <Link
+              href="/usage"
+              className="flex items-center gap-1.5 text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors flex-shrink-0"
+            >
+              <TrendingUpIcon className="w-4 h-4 flex-shrink-0" />
+              Usage
             </Link>
             <button
               onClick={() => loadConversations("refresh")}
