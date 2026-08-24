@@ -33,6 +33,10 @@ function findPricing(model: string): { input: number; output: number } | null {
   return match ? PRICING_PER_1M[match] : null;
 }
 
+// Approximate: does not account for prompt-caching discounts (Anthropic
+// excludes cached tokens from input_tokens; OpenAI includes them at a
+// discounted rate not reflected here). Treat these figures as directional,
+// not an exact bill.
 export function estimateCostUsd(model: string, usage: NormalizedUsage): number | null {
   const pricing = findPricing(model);
   if (!pricing) return null;
@@ -42,6 +46,20 @@ export function estimateCostUsd(model: string, usage: NormalizedUsage): number |
 }
 
 import { getStore, withTimeout, type Sql } from "./kv";
+
+export const USAGE_TIMEZONES = {
+  london: "Europe/London",
+  phoenix: "America/Phoenix",
+  manila: "Asia/Manila",
+} as const;
+
+export type UsageTimezoneKey = keyof typeof USAGE_TIMEZONES;
+
+export const DEFAULT_USAGE_TIMEZONE: UsageTimezoneKey = "manila";
+
+export function isUsageTimezoneKey(v: unknown): v is UsageTimezoneKey {
+  return typeof v === "string" && v in USAGE_TIMEZONES;
+}
 
 /** Created on first use, same pattern as ensureSchema() in kv.ts. */
 async function ensureUsageSchema(sql: Sql): Promise<void> {
@@ -64,6 +82,20 @@ async function ensureUsageSchema(sql: Sql): Promise<void> {
   );
 }
 
+let schemaReady: Promise<void> | null = null;
+
+async function ensureUsageSchemaOnce(sql: Sql): Promise<void> {
+  if (!schemaReady) {
+    schemaReady = ensureUsageSchema(sql);
+  }
+  try {
+    await schemaReady;
+  } catch (e) {
+    schemaReady = null; // allow retry on the next call if this attempt failed
+    throw e;
+  }
+}
+
 /**
  * Logs one chatCompletion call. Fire-and-forget by contract: callers do
  * `void logUsage(...)` and never await it on the request's critical path, so
@@ -82,7 +114,7 @@ export async function logUsage(args: {
   if (!sql) return; // Not configured — same "just skip it" posture as kv.ts.
 
   const cost = estimateCostUsd(args.model, args.usage);
-  await ensureUsageSchema(sql);
+  await ensureUsageSchemaOnce(sql);
   await withTimeout(sql`
     INSERT INTO trace_usage (label, provider, model, prompt_tokens, completion_tokens, estimated_cost_usd)
     VALUES (${args.label}, ${args.provider}, ${args.model}, ${args.usage.promptTokens}, ${args.usage.completionTokens}, ${cost})
@@ -135,21 +167,23 @@ function toPeriodSummary(row: PeriodRow | undefined): UsagePeriodSummary {
  * (SUM/COUNT/date_trunc) rather than pulling raw rows into JS, so this stays
  * cheap as the table grows — see spec's "Read API" section.
  */
-export async function getUsageSummary(): Promise<UsageSummary> {
+export async function getUsageSummary(tzKey: UsageTimezoneKey = DEFAULT_USAGE_TIMEZONE): Promise<UsageSummary> {
   const sql = getStore();
   if (!sql) {
     return { configured: false, today: EMPTY_PERIOD, thisWeek: EMPTY_PERIOD, thisMonth: EMPTY_PERIOD, byLabel: [], byModel: [] };
   }
 
-  await ensureUsageSchema(sql);
+  const tz = USAGE_TIMEZONES[tzKey];
+
+  await ensureUsageSchemaOnce(sql);
 
   const [todayRows, weekRows, monthRows, labelRows, modelRows] = await withTimeout(
     Promise.all([
-      sql`SELECT SUM(estimated_cost_usd) AS cost_usd, COUNT(*) AS call_count, SUM(prompt_tokens) AS prompt_tokens, SUM(completion_tokens) AS completion_tokens FROM trace_usage WHERE created_at >= date_trunc('day', now())`,
-      sql`SELECT SUM(estimated_cost_usd) AS cost_usd, COUNT(*) AS call_count, SUM(prompt_tokens) AS prompt_tokens, SUM(completion_tokens) AS completion_tokens FROM trace_usage WHERE created_at >= date_trunc('week', now())`,
-      sql`SELECT SUM(estimated_cost_usd) AS cost_usd, COUNT(*) AS call_count, SUM(prompt_tokens) AS prompt_tokens, SUM(completion_tokens) AS completion_tokens FROM trace_usage WHERE created_at >= date_trunc('month', now())`,
-      sql`SELECT label AS key, SUM(estimated_cost_usd) AS cost_usd, COUNT(*) AS call_count FROM trace_usage WHERE created_at >= date_trunc('month', now()) GROUP BY label ORDER BY cost_usd DESC NULLS LAST`,
-      sql`SELECT model AS key, SUM(estimated_cost_usd) AS cost_usd, COUNT(*) AS call_count FROM trace_usage WHERE created_at >= date_trunc('month', now()) GROUP BY model ORDER BY cost_usd DESC NULLS LAST`,
+      sql`SELECT SUM(estimated_cost_usd) AS cost_usd, COUNT(*) AS call_count, SUM(prompt_tokens) AS prompt_tokens, SUM(completion_tokens) AS completion_tokens FROM trace_usage WHERE created_at >= (date_trunc('day', now() AT TIME ZONE ${tz}) AT TIME ZONE ${tz})`,
+      sql`SELECT SUM(estimated_cost_usd) AS cost_usd, COUNT(*) AS call_count, SUM(prompt_tokens) AS prompt_tokens, SUM(completion_tokens) AS completion_tokens FROM trace_usage WHERE created_at >= (date_trunc('week', now() AT TIME ZONE ${tz}) AT TIME ZONE ${tz})`,
+      sql`SELECT SUM(estimated_cost_usd) AS cost_usd, COUNT(*) AS call_count, SUM(prompt_tokens) AS prompt_tokens, SUM(completion_tokens) AS completion_tokens FROM trace_usage WHERE created_at >= (date_trunc('month', now() AT TIME ZONE ${tz}) AT TIME ZONE ${tz})`,
+      sql`SELECT label AS key, SUM(estimated_cost_usd) AS cost_usd, COUNT(*) AS call_count FROM trace_usage WHERE created_at >= (date_trunc('month', now() AT TIME ZONE ${tz}) AT TIME ZONE ${tz}) GROUP BY label ORDER BY cost_usd DESC NULLS LAST`,
+      sql`SELECT model AS key, SUM(estimated_cost_usd) AS cost_usd, COUNT(*) AS call_count FROM trace_usage WHERE created_at >= (date_trunc('month', now() AT TIME ZONE ${tz}) AT TIME ZONE ${tz}) GROUP BY model ORDER BY cost_usd DESC NULLS LAST`,
     ])
   ) as [PeriodRow[], PeriodRow[], PeriodRow[], (UsageBreakdownRow & { cost_usd: string | null; call_count: string })[], (UsageBreakdownRow & { cost_usd: string | null; call_count: string })[]];
 

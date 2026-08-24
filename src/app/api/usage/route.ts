@@ -1,10 +1,12 @@
-import { NextResponse } from "next/server";
-import { getUsageSummary } from "@/lib/usage";
+import { NextRequest, NextResponse } from "next/server";
+import { getUsageSummary, isUsageTimezoneKey, DEFAULT_USAGE_TIMEZONE } from "@/lib/usage";
 
 // GET /api/usage → aggregated spend/call-count for the dashboard.
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const tzParam = req.nextUrl.searchParams.get("tz");
+  const tz = isUsageTimezoneKey(tzParam) ? tzParam : DEFAULT_USAGE_TIMEZONE;
   try {
-    const summary = await getUsageSummary();
+    const summary = await getUsageSummary(tz);
     return NextResponse.json(summary);
   } catch (err) {
     console.error("usage summary failed:", err);
