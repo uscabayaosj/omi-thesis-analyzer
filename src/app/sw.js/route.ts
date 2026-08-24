@@ -29,11 +29,10 @@ self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
 });
 
-// Push — stub for a future Web Push backend. No subscription is created or
-// sent to a server yet, so this never fires today; it exists so that wiring
-// up real push later only means adding a subscribe endpoint, not touching the
-// worker. Payload shape (once there is a sender): { count?: number, title?,
-// body?, url? }.
+// Push — fires when the daily cron (/api/push/check-rollup) sends a nudge
+// for a missed rollup, delivered via subscriptions registered through
+// /api/push/subscribe. Payload shape: { count?: number, title?, body?,
+// url? }.
 self.addEventListener("push", (event) => {
   const data = (() => {
     try {

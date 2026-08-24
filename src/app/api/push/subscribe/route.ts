@@ -2,6 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { addSubscription } from "@/lib/push-store";
 import { isStoreConfigured } from "@/lib/kv";
 
+const PUSH_ENDPOINT_HOSTS = [
+  /(^|\.)googleapis\.com$/, // Chrome/Edge/Android (FCM)
+  /(^|\.)push\.services\.mozilla\.com$/, // Firefox
+  /(^|\.)notify\.windows\.com$/, // legacy Edge/WNS
+  /^web\.push\.apple\.com$/, // Safari
+];
+
+function isKnownPushEndpoint(endpoint: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    return false;
+  }
+  return url.protocol === "https:" && PUSH_ENDPOINT_HOSTS.some((re) => re.test(url.hostname));
+}
+
 // POST /api/push/subscribe → store a browser's push subscription.
 export async function POST(req: NextRequest) {
   if (!isStoreConfigured()) {
@@ -29,6 +46,10 @@ export async function POST(req: NextRequest) {
       { error: "Expected { endpoint, keys: { p256dh, auth } }." },
       { status: 400 }
     );
+  }
+
+  if (!isKnownPushEndpoint(b.endpoint)) {
+    return NextResponse.json({ error: "Unrecognized push endpoint." }, { status: 400 });
   }
 
   try {

@@ -1,7 +1,7 @@
 // src/app/api/push/check-rollup/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import webpush from "web-push";
-import { getStore, getNamespaceData } from "@/lib/kv";
+import { getStore, ensureSchema, getNamespaceData } from "@/lib/kv";
 import { listSubscriptions, removeSubscription } from "@/lib/push-store";
 
 /**
@@ -37,6 +37,7 @@ export async function GET(req: NextRequest) {
 
   let rollups: Record<string, unknown>;
   try {
+    await ensureSchema(sql);
     const data = await getNamespaceData(sql, "omi-adhd-rollups");
     rollups = data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : {};
   } catch (err) {

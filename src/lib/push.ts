@@ -55,11 +55,18 @@ export async function subscribeToPush(): Promise<void> {
     throw new Error("The browser returned an incomplete push subscription.");
   }
 
-  await fetchJson("/api/push/subscribe", {
+  const result = await fetchJson<{ ok?: boolean; configured?: boolean }>("/api/push/subscribe", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ endpoint: json.endpoint, keys: { p256dh: json.keys.p256dh, auth: json.keys.auth } }),
   });
+
+  if (result.configured === false) {
+    // The browser subscription now exists but nothing was persisted server-side —
+    // undo it so the UI doesn't claim "Reminders on" for something that can never fire.
+    await subscription.unsubscribe().catch(() => {});
+    throw new Error("Reminders need the server-side store configured first.");
+  }
 }
 
 export async function unsubscribeFromPush(): Promise<void> {
