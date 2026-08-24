@@ -3,14 +3,17 @@
 import { fetchJson } from "./fetch-json";
 import { SYNCED_NAMESPACES } from "./kv";
 
-interface ExportResponse {
-  configured: boolean;
-  exportedAt?: string;
-  namespaces?: Record<string, unknown>;
-}
+type ExportResponse =
+  | { configured: false }
+  | { configured: true; exportedAt: string; namespaces: Record<string, unknown> };
 
-function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+/** Local date+time, filename-safe. Local (not UTC) so an evening backup
+ *  isn't stamped with tomorrow's date, and time-stamped so two backups on
+ *  the same day don't collide. */
+function stampStr(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
 }
 
 function download(filename: string, data: unknown): void {
@@ -37,24 +40,25 @@ function exportFromLocalStorage(): void {
       namespaces[ns] = null;
     }
   }
-  download(`trace-backup-${todayStr()}.json`, {
+  download(`trace-backup-${stampStr()}.json`, {
     source: "local",
     exportedAt: new Date().toISOString(),
     namespaces,
   });
 }
 
-export async function exportAllData(): Promise<void> {
+export async function exportAllData(): Promise<"server" | "local"> {
   const res = await fetchJson<ExportResponse>("/api/export");
 
   if (!res.configured) {
     exportFromLocalStorage();
-    return;
+    return "local";
   }
 
-  download(`trace-backup-${todayStr()}.json`, {
+  download(`trace-backup-${stampStr()}.json`, {
     source: "server",
     exportedAt: res.exportedAt,
     namespaces: res.namespaces,
   });
+  return "server";
 }

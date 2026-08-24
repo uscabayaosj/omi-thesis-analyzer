@@ -46,13 +46,20 @@ analysis as one JSON file.
 
 New module `src/lib/export.ts`:
 
-- `exportAllData(): Promise<void>` — calls `/api/export`. If
+- `exportAllData(): Promise<"server" | "local">` — calls `/api/export`. If
   `configured: true`, builds the download directly from the response. If
   `configured: false`, falls back to reading all 6 `SYNCED_NAMESPACES` keys
   straight out of `localStorage` (parsing each with `JSON.parse`, defaulting
   to `null` on a missing/corrupt key) and bundles them into the same shape,
   with `source: "local"` instead of `"server"` recorded in the output so a
-  restored/inspected file is traceable to where it came from.
+  restored/inspected file is traceable to where it came from. Two of those
+  namespaces (`omi-thesis-analyses`, `omi-thesis-group-analyses`) are
+  array-shaped in localStorage, but `/api/store` PUT only accepts an object
+  map, so `src/lib/sync.ts` wraps them as `{ list: [...] }` when mirroring to
+  Neon — a transport artifact of the store's contract, not part of the data
+  model. `/api/export` unwraps this via `toCanonicalShape` (`src/lib/kv.ts`)
+  before returning, so both the server and local paths produce structurally
+  identical files regardless of which source ran.
 - Downloads via the same `Blob([...], { type: "application/json" })` +
   `URL.createObjectURL` + synthetic `<a download>` click + `revokeObjectURL`
   pattern already used by `src/lib/obsidian.ts`'s three markdown-download

@@ -356,6 +356,7 @@ function HomeInner() {
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "analyzed" | "unanalyzed">("all");
   const [selectMode, setSelectMode] = useState(false);
   // Cross-day, cross-search selection: intentionally never reset when
@@ -676,8 +677,14 @@ function HomeInner() {
   const handleExport = async () => {
     setExporting(true);
     setExportError(null);
+    setExportNotice(null);
     try {
-      await exportAllData();
+      const source = await exportAllData();
+      setExportNotice(
+        source === "local"
+          ? "Saved from this device only — the server store wasn't reachable."
+          : null
+      );
     } catch (e) {
       setExportError(e instanceof Error ? e.message : "Export failed.");
     } finally {
@@ -763,6 +770,12 @@ function HomeInner() {
         {exportError && (
           <p className="text-sm text-red-400 mt-2" role="alert">
             {exportError}
+          </p>
+        )}
+
+        {exportNotice && (
+          <p className="text-sm text-slate-400 mt-2">
+            {exportNotice}
           </p>
         )}
 

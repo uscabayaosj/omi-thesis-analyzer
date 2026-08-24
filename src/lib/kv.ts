@@ -107,3 +107,34 @@ export type SyncedNamespace = (typeof SYNCED_NAMESPACES)[number];
 export function isSyncedNamespace(v: string): v is SyncedNamespace {
   return (SYNCED_NAMESPACES as readonly string[]).includes(v);
 }
+
+/**
+ * Namespaces whose localStorage value is a bare array rather than a keyed
+ * map. These cannot be stored as-is: PUT /api/store rejects a top-level
+ * array (it expects an object map), so sync.ts wraps them as
+ * `{ list: [...] }` on push and unwraps on pull. That wrapper is a
+ * transport artifact of the store's object-map contract, NOT part of the
+ * data model — anything reading these namespaces server-side must unwrap
+ * to get the canonical client shape.
+ */
+const ARRAY_NAMESPACES = new Set<string>(["omi-thesis-group-analyses", "omi-thesis-analyses"]);
+
+export function isArrayNamespace(ns: string): boolean {
+  return ARRAY_NAMESPACES.has(ns);
+}
+
+/**
+ * Returns a namespace's value in the canonical client shape — unwrapping
+ * the `{ list: [...] }` transport wrapper for array namespaces so a
+ * server-read value is structurally identical to the localStorage value.
+ * Returns null when there's nothing stored (or the stored value doesn't
+ * match the expected shape).
+ */
+export function toCanonicalShape(ns: string, raw: unknown): unknown {
+  if (!isArrayNamespace(ns)) return raw;
+  if (Array.isArray(raw)) return raw; // defensive: already unwrapped
+  if (raw && typeof raw === "object" && Array.isArray((raw as { list?: unknown }).list)) {
+    return (raw as { list: unknown[] }).list;
+  }
+  return null;
+}

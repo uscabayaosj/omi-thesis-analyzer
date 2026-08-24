@@ -1,6 +1,6 @@
 "use client";
 
-import { SYNCED_NAMESPACES, type SyncedNamespace } from "@/lib/kv";
+import { SYNCED_NAMESPACES, type SyncedNamespace, isArrayNamespace } from "@/lib/kv";
 import { notifyAnalysesChanged } from "@/lib/badge";
 
 const ANALYSES_NS = "omi-adhd-analyses";
@@ -57,13 +57,10 @@ function mergeMaps(local: RecordMap, remote: RecordMap): RecordMap {
   return merged;
 }
 
-// Array-shaped namespaces, each with their own merge strategy — the uniform
-// keyed-map merge above only works for records addressed by a top-level id.
-const ARRAY_NAMESPACES = new Set(["omi-thesis-group-analyses", "omi-thesis-analyses"]);
-
-function isArrayNamespace(ns: string): boolean {
-  return ARRAY_NAMESPACES.has(ns);
-}
+// Array-shaped namespaces each have their own merge strategy below — the
+// uniform keyed-map merge above only works for records addressed by a
+// top-level id. Which namespaces are array-shaped is defined in kv.ts
+// (isArrayNamespace), shared with the server-side export route.
 
 // omi-thesis-group-analyses: entries are keyed by their conversation-id set
 // and re-runnable, so a whole-list replace is harmless — newest-list-wins by
