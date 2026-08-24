@@ -40,3 +40,51 @@ export function estimateCostUsd(model: string, usage: NormalizedUsage): number |
   const outputCost = (usage.completionTokens / 1_000_000) * pricing.output;
   return Math.round((inputCost + outputCost) * 10_000) / 10_000; // 4 decimal places
 }
+
+import { getStore, withTimeout, type Sql } from "./kv";
+
+/** Created on first use, same pattern as ensureSchema() in kv.ts. */
+async function ensureUsageSchema(sql: Sql): Promise<void> {
+  await withTimeout(
+    sql`
+      CREATE TABLE IF NOT EXISTS trace_usage (
+        id                  BIGSERIAL PRIMARY KEY,
+        created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+        label               TEXT NOT NULL,
+        provider            TEXT NOT NULL,
+        model               TEXT NOT NULL,
+        prompt_tokens       INT NOT NULL,
+        completion_tokens   INT NOT NULL,
+        estimated_cost_usd  NUMERIC(10,4)
+      )
+    `
+  );
+  await withTimeout(
+    sql`CREATE INDEX IF NOT EXISTS trace_usage_created_at_idx ON trace_usage (created_at)`
+  );
+}
+
+/**
+ * Logs one chatCompletion call. Fire-and-forget by contract: callers do
+ * `void logUsage(...)` and never await it on the request's critical path, so
+ * a slow or failed write never adds latency or an error to the analysis
+ * itself. This function still awaits internally (so its own errors are
+ * catchable by the caller's `.catch()`) — it just isn't meant to be awaited
+ * by anything that cares about the analysis result.
+ */
+export async function logUsage(args: {
+  label: string;
+  provider: string;
+  model: string;
+  usage: NormalizedUsage;
+}): Promise<void> {
+  const sql = getStore();
+  if (!sql) return; // Not configured — same "just skip it" posture as kv.ts.
+
+  const cost = estimateCostUsd(args.model, args.usage);
+  await ensureUsageSchema(sql);
+  await withTimeout(sql`
+    INSERT INTO trace_usage (label, provider, model, prompt_tokens, completion_tokens, estimated_cost_usd)
+    VALUES (${args.label}, ${args.provider}, ${args.model}, ${args.usage.promptTokens}, ${args.usage.completionTokens}, ${cost})
+  `);
+}
