@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { Analysis } from "./omi-api";
+import { logUsage, type NormalizedUsage } from "./usage";
 
 interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -226,7 +227,29 @@ function extractContent(data: Record<string, unknown>, provider: string): string
   return choices?.[0]?.message?.content || "";
 }
 
-export async function chatCompletion(messages: ChatMessage[], jsonMode = false): Promise<string> {
+function extractUsage(data: Record<string, unknown>, provider: string): NormalizedUsage | null {
+  if (provider === "anthropic") {
+    const usage = data.usage as { input_tokens?: number; output_tokens?: number } | undefined;
+    if (typeof usage?.input_tokens !== "number" || typeof usage?.output_tokens !== "number") return null;
+    return { promptTokens: usage.input_tokens, completionTokens: usage.output_tokens };
+  }
+
+  if (provider === "google") {
+    const usage = data.usageMetadata as { promptTokenCount?: number; candidatesTokenCount?: number } | undefined;
+    if (typeof usage?.promptTokenCount !== "number" || typeof usage?.candidatesTokenCount !== "number") return null;
+    return { promptTokens: usage.promptTokenCount, completionTokens: usage.candidatesTokenCount };
+  }
+
+  const usage = data.usage as { prompt_tokens?: number; completion_tokens?: number } | undefined;
+  if (typeof usage?.prompt_tokens !== "number" || typeof usage?.completion_tokens !== "number") return null;
+  return { promptTokens: usage.prompt_tokens, completionTokens: usage.completion_tokens };
+}
+
+export async function chatCompletion(
+  messages: ChatMessage[],
+  jsonMode = false,
+  label?: string
+): Promise<string> {
   const config = getProviderConfig();
   if (!config.apiKey) {
     throw new Error(`API key not set for provider '${process.env.AI_PROVIDER || "openai"}'. Check your .env.local.`);
@@ -263,6 +286,16 @@ export async function chatCompletion(messages: ChatMessage[], jsonMode = false):
 
   const data = await res.json();
   assertNotTruncated(data, provider);
+
+  if (label) {
+    const usage = extractUsage(data, provider);
+    if (usage) {
+      void logUsage({ label, provider, model: config.model, usage }).catch((e) =>
+        console.error(`usage logging failed for label "${label}":`, e)
+      );
+    }
+  }
+
   return extractContent(data, provider);
 }
 
@@ -434,7 +467,8 @@ export async function analyzeConversation(
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: buildUserPrompt(clampTranscript(transcript), title) },
     ],
-    true
+    true,
+    "thesis"
   );
 
   return toAnalysis(extractJsonObject(content));
@@ -458,8 +492,12 @@ ${clampTranscript(transcript)}
 
 Analysis question: ${customPrompt}`;
 
-  return chatCompletion([
-    { role: "system", content: systemPrompt },
-    { role: "user", content: userPrompt },
-  ]);
+  return chatCompletion(
+    [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+    false,
+    "thesis-custom"
+  );
 }

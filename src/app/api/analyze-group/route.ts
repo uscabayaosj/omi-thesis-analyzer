@@ -133,7 +133,8 @@ export async function POST(req: NextRequest) {
         { role: "system", content: GROUP_SYSTEM_PROMPT },
         { role: "user", content: userPrompt },
       ],
-      true
+      true,
+      "group"
     );
 
     const raw = extractJsonObject(content);

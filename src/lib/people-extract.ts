@@ -27,7 +27,8 @@ export async function extractPeople(transcript: string, title: string, date: str
         content: `Conversation title: "${title}"\nConversation date: ${date}\n\nTranscript:\n${clampTranscript(transcript)}`,
       },
     ],
-    true
+    true,
+    "people-extract"
   );
   const raw = extractJsonObject(content);
   const list = Array.isArray(raw.people) ? raw.people : [];

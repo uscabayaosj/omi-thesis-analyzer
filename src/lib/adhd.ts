@@ -301,7 +301,8 @@ export async function analyzeAdhd(
       { role: "system", content: ADHD_SYSTEM_PROMPT },
       { role: "user", content: buildAdhdUserPrompt(clampTranscript(transcript), title, date) },
     ],
-    true
+    true,
+    "adhd"
   );
   return toAdhdAnalysis(extractJsonObject(content));
 }

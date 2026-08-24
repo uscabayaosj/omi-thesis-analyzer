@@ -117,7 +117,8 @@ ${convoBlocks}`;
       { role: "system", content: ROLLUP_SYSTEM_PROMPT },
       { role: "user", content: userPrompt },
     ],
-    true
+    true,
+    "rollup"
   );
   return toRollup(extractJsonObject(content));
 }

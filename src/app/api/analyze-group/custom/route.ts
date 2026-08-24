@@ -75,10 +75,14 @@ You will be given multiple conversation transcripts and a specific analysis ques
 
 ${convoBlocks}`;
 
-    const result = await chatCompletion([
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ]);
+    const result = await chatCompletion(
+      [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      false,
+      "group-custom"
+    );
 
     return NextResponse.json({ result });
   } catch (err) {
