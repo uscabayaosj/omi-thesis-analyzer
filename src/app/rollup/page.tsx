@@ -16,8 +16,9 @@ import { exportRollupToObsidian, downloadRollupMarkdown } from "@/lib/obsidian";
 import {
   ArrowLeftIcon, CalendarIcon, WarningIcon, LoaderIcon, RefreshIcon,
   ExternalLinkIcon, DownloadIcon, CheckIcon, ZapIcon, ClipboardIcon,
-  UsersIcon, FileTextIcon, XCircleIcon,
+  UsersIcon, FileTextIcon, XCircleIcon, BellIcon,
 } from "@/components/icons";
+import { isPushSupported, getPushSubscriptionState, subscribeToPush, unsubscribeFromPush } from "@/lib/push";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { Prose } from "@/components/Prose";
 import { BUTTON_PRIMARY } from "@/lib/ui";
@@ -110,6 +111,34 @@ function RollupPageInner() {
   const [progress, setProgress] = useState({ done: 0, total: 0, failed: 0 });
   const [exported, setExported] = useState(false);
   const [showRegenConfirm, setShowRegenConfirm] = useState(false);
+  const [pushSupported, setPushSupported] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushError, setPushError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- support/permission checks require browser APIs unavailable during SSR, so this can't be a lazy initializer
+    setPushSupported(isPushSupported());
+    getPushSubscriptionState().then(setPushEnabled).catch(() => setPushEnabled(false));
+  }, []);
+
+  const togglePush = async () => {
+    setPushBusy(true);
+    setPushError(null);
+    try {
+      if (pushEnabled) {
+        await unsubscribeFromPush();
+        setPushEnabled(false);
+      } else {
+        await subscribeToPush();
+        setPushEnabled(true);
+      }
+    } catch (e) {
+      setPushError(e instanceof Error ? e.message : "Something went wrong.");
+    } finally {
+      setPushBusy(false);
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -371,6 +400,24 @@ function RollupPageInner() {
         <p className="text-slate-400 text-sm">
           Pick a day to turn its conversations into one short plan for tomorrow. Anything still open carries over on its own.
         </p>
+        {pushSupported ? (
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              onClick={togglePush}
+              disabled={pushBusy}
+              className="flex items-center gap-1.5 text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              aria-pressed={pushEnabled}
+            >
+              <BellIcon className="w-4 h-4 flex-shrink-0" />
+              {pushEnabled ? "Reminders on" : "Remind me if I forget today's rollup"}
+            </button>
+            {pushError && <span className="text-xs text-red-400">{pushError}</span>}
+          </div>
+        ) : (
+          <p className="text-xs text-slate-500 mt-3">
+            Push reminders aren&apos;t supported in this browser.
+          </p>
+        )}
       </header>
 
       {error && (
