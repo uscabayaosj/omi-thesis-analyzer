@@ -65,6 +65,28 @@ function lastMeeting(p: Person): Meeting | undefined {
   return [...p.meetings].sort((a, b) => b.date.localeCompare(a.date))[0];
 }
 
+const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
+/** First letter for grouping/indexing; anything without one lands in "#". */
+function indexLetter(name: string): string {
+  const c = name.trim()[0]?.toUpperCase();
+  return c && /[A-Z]/.test(c) ? c : "#";
+}
+
+/** People sorted and bucketed by their index letter, in display order
+ *  (A–Z, then "#" last for anyone without a leading letter). */
+function groupByLetter(people: Person[]): { letter: string; people: Person[] }[] {
+  const buckets = new Map<string, Person[]>();
+  for (const p of people) {
+    const letter = indexLetter(p.name);
+    const bucket = buckets.get(letter);
+    if (bucket) bucket.push(p);
+    else buckets.set(letter, [p]);
+  }
+  const order = [...ALPHABET, "#"];
+  return order.filter((l) => buckets.has(l)).map((letter) => ({ letter, people: buckets.get(letter)! }));
+}
+
 type ViewMode = "grid" | "map";
 
 export default function PeoplePage() {
@@ -114,6 +136,17 @@ export default function PeoplePage() {
         (p.role ?? "").toLowerCase().includes(q)
     );
   }, [people, search]);
+
+  const groups = useMemo(() => groupByLetter(filteredPeople), [filteredPeople]);
+
+  // Jump the letter rail to a section. Instant for reduced-motion, since the
+  // scroll itself — not just entrance transitions — is the motion in play.
+  const jumpToLetter = (letter: string) => {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    document
+      .getElementById(`people-letter-${letter}`)
+      ?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+  };
 
   const mapMarkers: MapMarker[] = useMemo(() => {
     const markers: MapMarker[] = [];
@@ -408,37 +441,47 @@ export default function PeoplePage() {
             : "No one matches your search."}
         </p>
       ) : view === "grid" ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {filteredPeople.map((p) => {
-            const m = lastMeeting(p);
-            return (
-              <Link
-                key={p.id}
-                href={`/people/${p.id}`}
-                className="card p-4 flex items-center gap-3 hover:border-cyan-400/40 transition-colors"
-              >
-                {p.photo ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={p.photo}
-                    alt=""
-                    className="w-12 h-12 rounded-full object-cover flex-shrink-0"
-                  />
-                ) : (
-                  <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center text-slate-300 text-sm font-medium flex-shrink-0">
-                    {initials(p.name)}
-                  </div>
-                )}
-                <div className="min-w-0">
-                  <div className="text-white font-medium truncate">{p.name}</div>
-                  {p.role && <div className="text-slate-400 text-sm truncate">{p.role}</div>}
-                  <div className="text-slate-500 text-xs truncate">
-                    Last met {m?.placeName ?? "—"} · {m ? getAnalysisAge(m.date).label : "—"}
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
+        <div>
+          {groups.map(({ letter, people: bucket }, gi) => (
+            <section key={letter} id={`people-letter-${letter}`} className={gi > 0 ? "mt-6" : undefined}>
+              <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wide mb-2">
+                {letter}
+              </h2>
+              <div className="space-y-2">
+                {bucket.map((p) => {
+                  const m = lastMeeting(p);
+                  return (
+                    <Link
+                      key={p.id}
+                      href={`/people/${p.id}`}
+                      className="card p-3.5 flex items-center gap-3 hover:border-cyan-400/40 transition-colors"
+                    >
+                      {p.photo ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={p.photo}
+                          alt=""
+                          className="w-11 h-11 rounded-full object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-11 h-11 rounded-full bg-slate-800 flex items-center justify-center text-slate-300 text-sm font-medium flex-shrink-0">
+                          {initials(p.name)}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="text-white font-medium truncate">{p.name}</div>
+                        {p.role && <div className="text-slate-400 text-sm truncate">{p.role}</div>}
+                      </div>
+                      <div className="text-slate-500 text-xs text-right flex-shrink-0 max-w-[40%]">
+                        <div className="truncate">{m?.placeName ?? "No meetings yet"}</div>
+                        {m && <div>{getAnalysisAge(m.date).label}</div>}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
         </div>
       ) : mapMarkers.length === 0 ? (
         <p className="text-slate-400 text-sm">
@@ -447,7 +490,51 @@ export default function PeoplePage() {
       ) : (
         <MeetingMap markers={mapMarkers} />
       )}
+
+      {view === "grid" && !loading && groups.length > 1 && (
+        <LetterRail present={new Set(groups.map((g) => g.letter))} onJump={jumpToLetter} />
+      )}
     </main>
+  );
+}
+
+// ── letter index rail ──
+//
+// A card-catalog tab index, fixed to the viewport edge rather than laid out
+// as a content column — it carries no content of its own, only a jump
+// affordance, so it doesn't compete with the Single Column Rule the way a
+// real sidebar would. Individual letters run well under the 44px touch-target
+// floor: 26 targets can't each clear that inside any phone's viewport height,
+// the same constraint every real alphabet-index control (iOS Contacts
+// included) accepts. A miss still lands within a line or two of the right
+// section, so the control stays usable despite the small targets.
+function LetterRail({ present, onJump }: { present: Set<string>; onJump: (letter: string) => void }) {
+  return (
+    <nav
+      aria-label="Jump to letter"
+      className="fixed right-0.5 top-1/2 -translate-y-1/2 z-10 flex flex-col items-center py-2 pr-[max(0.125rem,env(safe-area-inset-right))]"
+    >
+      {ALPHABET.map((letter) => {
+        const has = present.has(letter);
+        return has ? (
+          <button
+            key={letter}
+            onClick={() => onJump(letter)}
+            className="text-[10px] leading-[14px] font-semibold text-slate-300 hover:text-cyan-300 active:text-cyan-300 transition-colors px-1"
+          >
+            {letter}
+          </button>
+        ) : (
+          <span
+            key={letter}
+            aria-hidden="true"
+            className="text-[10px] leading-[14px] font-semibold text-slate-700 px-1"
+          >
+            {letter}
+          </span>
+        );
+      })}
+    </nav>
   );
 }
 
