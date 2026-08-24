@@ -682,7 +682,7 @@ function HomeInner() {
       const source = await exportAllData();
       setExportNotice(
         source === "local"
-          ? "Saved from this device only — the server store wasn't reachable."
+          ? "Saved from this device only — the server store is unavailable."
           : null
       );
     } catch (e) {

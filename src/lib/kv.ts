@@ -127,8 +127,12 @@ export function isArrayNamespace(ns: string): boolean {
  * Returns a namespace's value in the canonical client shape — unwrapping
  * the `{ list: [...] }` transport wrapper for array namespaces so a
  * server-read value is structurally identical to the localStorage value.
- * Returns null when there's nothing stored (or the stored value doesn't
- * match the expected shape).
+ *
+ * Anything that doesn't match a known shape is passed through untouched
+ * rather than coerced. This function feeds the backup export, where losing
+ * data is the worst possible failure: a corrupted or unexpectedly-shaped
+ * value is still evidence worth preserving verbatim, and nulling it would
+ * discard it silently — the one way a backup could quietly lose something.
  */
 export function toCanonicalShape(ns: string, raw: unknown): unknown {
   if (!isArrayNamespace(ns)) return raw;
@@ -136,5 +140,5 @@ export function toCanonicalShape(ns: string, raw: unknown): unknown {
   if (raw && typeof raw === "object" && Array.isArray((raw as { list?: unknown }).list)) {
     return (raw as { list: unknown[] }).list;
   }
-  return null;
+  return raw;
 }
