@@ -11,7 +11,7 @@ import { fetchJson } from "@/lib/fetch-json";
 import { formatDateTime, dayOf } from "@/lib/format";
 import {
   TraceMark, SquareIcon, XIcon, CheckIcon, SparklesIcon, WarningIcon, MicIcon,
-  FolderIcon, RefreshIcon, ClipboardIcon, CalendarIcon, ChevronRightIcon, SearchIcon,
+  FolderIcon, RefreshIcon, ClipboardIcon, CalendarIcon, ChevronRightIcon, SearchIcon, MapPinIcon,
   UsersIcon,
 } from "@/components/icons";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -53,6 +53,7 @@ interface Conversation {
     category?: string;
   };
   folder_name?: string;
+  geolocation?: { latitude?: number; longitude?: number } | null;
 }
 
 function LensBadges({ thesis, adhd }: { thesis: boolean; adhd: boolean }) {
@@ -238,6 +239,8 @@ const ConversationRow = memo(function ConversationRow({
   isAdhd: boolean;
   onToggleSelect: (id: string) => void;
 }) {
+  const hasLocation = convo.geolocation?.latitude != null && convo.geolocation?.longitude != null;
+
   if (selectMode) {
     return (
       <button
@@ -271,6 +274,13 @@ const ConversationRow = memo(function ConversationRow({
               {convo.structured?.category && (
                 <span className="bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap">{convo.structured.category}</span>
               )}
+              <span title={hasLocation ? "Location attached" : "No location attached"}>
+                <span className="sr-only">{hasLocation ? "Location attached" : "No location attached"}</span>
+                <MapPinIcon
+                  aria-hidden="true"
+                  className={`w-3.5 h-3.5 flex-shrink-0 ${hasLocation ? "text-cyan-300" : "text-slate-700"}`}
+                />
+              </span>
             </div>
           </div>
         </div>
@@ -306,6 +316,13 @@ const ConversationRow = memo(function ConversationRow({
                 {convo.folder_name}
               </span>
             )}
+            <span title={hasLocation ? "Location attached" : "No location attached"}>
+              <span className="sr-only">{hasLocation ? "Location attached" : "No location attached"}</span>
+              <MapPinIcon
+                aria-hidden="true"
+                className={`w-3.5 h-3.5 flex-shrink-0 ${hasLocation ? "text-cyan-300" : "text-slate-700"}`}
+              />
+            </span>
           </div>
         </div>
         <svg className="w-5 h-5 text-slate-600 mt-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
