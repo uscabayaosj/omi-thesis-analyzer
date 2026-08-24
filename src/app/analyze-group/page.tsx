@@ -269,9 +269,11 @@ function GroupAnalysisContent() {
 
     // Not found on this device yet — it may exist server-side (e.g. this
     // page was reached via a server-side search result on a group first
-    // created on another device). Pull once and re-check before showing
-    // "not analyzed yet".
-    pullAndMerge().then((changed) => {
+    // created on another device). Force a pull even if an earlier page this
+    // session already pulled once (pullAndMerge's once-per-session latch
+    // would otherwise skip a group that appeared server-side after that
+    // first pull) and re-check before showing "not analyzed yet".
+    pullAndMerge(true).then((changed) => {
       if (changed) applyStored();
       setLoading(false);
     });
