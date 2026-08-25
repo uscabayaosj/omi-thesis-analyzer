@@ -8,6 +8,7 @@ import { formatDateTime, mondayOf, addDays } from "@/lib/format";
 import {
   getRollup, getWeeklyRollup, saveWeeklyRollup, type StoredWeeklyRollup,
 } from "@/lib/adhd-storage";
+import { pullAndMerge } from "@/lib/sync";
 import type { WeeklyRollup } from "@/lib/weekly-rollup";
 import {
   ArrowLeftIcon, CalendarIcon, FileTextIcon, TrendingUpIcon, WarningIcon,
@@ -69,19 +70,29 @@ function WeekPageInner() {
   const [stored, setStored] = useState<StoredWeeklyRollup | null>(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dataVersion, setDataVersion] = useState(0);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setStored(getWeeklyRollup(weekStart));
     setError(null);
+    pullAndMerge().then((changed) => {
+      if (!changed) return;
+      setStored(getWeeklyRollup(weekStart));
+      setDataVersion((v) => v + 1);
+    });
   }, [weekStart]);
 
   const dayRollups = useMemo(
     () => days
       .map((day) => ({ day, stored: getRollup(day) }))
       .filter((d): d is { day: string; stored: NonNullable<ReturnType<typeof getRollup>> } => d.stored !== null),
-    [days]
+    // dataVersion is intentionally included so a completed pullAndMerge re-derives this from localStorage.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [days, dataVersion]
   );
+
+  const daysWithRollup = useMemo(() => new Set(dayRollups.map((d) => d.day)), [dayRollups]);
 
   const generate = async () => {
     if (dayRollups.length === 0) return;
@@ -110,7 +121,12 @@ function WeekPageInner() {
   };
 
   const weekEnd = addDays(weekStart, 6);
-  const weekStartLabel = formatDateTime(`${weekStart}T12:00:00`, { day: "numeric", month: "long" });
+  const weekStartLabel = formatDateTime(
+    `${weekStart}T12:00:00`,
+    weekStart.slice(0, 4) !== weekEnd.slice(0, 4)
+      ? { day: "numeric", month: "long", year: "numeric" }
+      : { day: "numeric", month: "long" }
+  );
   const weekEndLabel = formatDateTime(`${weekEnd}T12:00:00`, { day: "numeric", month: "long", year: "numeric" });
   const weekLabel = `${weekStartLabel} – ${weekEndLabel}`;
 
@@ -148,7 +164,7 @@ function WeekPageInner() {
 
       <div className="flex gap-2 mb-6" aria-label="Days this week">
         {days.map((day, i) => {
-          const hasRollup = !!getRollup(day);
+          const hasRollup = daysWithRollup.has(day);
           return (
             <div
               key={day}

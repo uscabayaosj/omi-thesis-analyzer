@@ -16,6 +16,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const validRollups = (dailyRollups as unknown[]).every(
+      (d) => d && typeof d === "object" && typeof (d as { day?: unknown }).day === "string" && !!(d as { rollup?: unknown }).rollup
+    );
+    if (!validRollups) {
+      return NextResponse.json({ error: "Malformed daily rollup data." }, { status: 400 });
+    }
+
     const rollup = await generateWeeklyRollup(weekStart, dailyRollups as DayRollupInput[]);
 
     return NextResponse.json({ rollup });

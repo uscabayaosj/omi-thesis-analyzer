@@ -43,7 +43,7 @@ const WEEKLY_SYSTEM_PROMPT = `You are the weekly executive-function layer for a 
 
 2. Judge completion honestly but without blame: what got done, what didn't, and anything about the week's shape (too packed, too scattered, a specific day that broke the rhythm) that explains it.
 
-3. Anything that shows up as "aging" in 3 or more of the week's daily rollups is chronically aging — call it out by name with a suggested renegotiation script, not just "some things are still open."
+3. Anything that shows up as "aging" in 3 or more of the week's daily rollups is chronically aging — call it out by name with a short friendly message they could send to ask for more time, not just "some things are still open."
 
 4. Consolidate what got dropped across the week into one list — the point is the user trusts nothing vanished silently, at the week level too.
 

@@ -180,10 +180,6 @@ export function getWeeklyRollup(weekStart: string): StoredWeeklyRollup | null {
   return map[weekStart] ?? null;
 }
 
-export function getWeeklyRollupWeeks(): string[] {
-  return Object.keys(readMap<StoredWeeklyRollup>(WEEKLY_ROLLUPS_KEY)).sort().reverse();
-}
-
 export function saveWeeklyRollup(record: {
   weekStart: string;
   dayCount: number;
