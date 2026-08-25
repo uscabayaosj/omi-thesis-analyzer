@@ -1,6 +1,7 @@
 "use client";
 
 import type { AdhdAnalysis, Rollup } from "./adhd";
+import type { WeeklyRollup } from "./weekly-rollup";
 import { schedulePush } from "./sync";
 import { isSyncedNamespace } from "./kv";
 import { syncAppBadge } from "./badge";
@@ -24,6 +25,7 @@ export interface StoredRollup {
 
 const ANALYSES_KEY = "omi-adhd-analyses";
 const ROLLUPS_KEY = "omi-adhd-rollups";
+const WEEKLY_ROLLUPS_KEY = "omi-adhd-weekly-rollups";
 
 // ── low-level ──
 
@@ -162,4 +164,39 @@ export function getPreviousRollup(day: string): StoredRollup | null {
   const earlier = Object.keys(map).filter((d) => d < day).sort();
   const prevDay = earlier[earlier.length - 1];
   return prevDay ? map[prevDay] : null;
+}
+
+// ── weekly rollups ──
+
+export interface StoredWeeklyRollup {
+  weekStart: string; // YYYY-MM-DD, the Monday
+  timestamp: string;
+  dayCount: number;
+  rollup: WeeklyRollup;
+}
+
+export function getWeeklyRollup(weekStart: string): StoredWeeklyRollup | null {
+  const map = readMap<StoredWeeklyRollup>(WEEKLY_ROLLUPS_KEY);
+  return map[weekStart] ?? null;
+}
+
+export function getWeeklyRollupWeeks(): string[] {
+  return Object.keys(readMap<StoredWeeklyRollup>(WEEKLY_ROLLUPS_KEY)).sort().reverse();
+}
+
+export function saveWeeklyRollup(record: {
+  weekStart: string;
+  dayCount: number;
+  rollup: WeeklyRollup;
+}): StoredWeeklyRollup {
+  const map = readMap<StoredWeeklyRollup>(WEEKLY_ROLLUPS_KEY);
+  const stored: StoredWeeklyRollup = {
+    weekStart: record.weekStart,
+    timestamp: new Date().toISOString(),
+    dayCount: record.dayCount,
+    rollup: record.rollup,
+  };
+  map[record.weekStart] = stored;
+  writeMap(WEEKLY_ROLLUPS_KEY, map);
+  return stored;
 }

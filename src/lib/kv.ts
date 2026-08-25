@@ -97,6 +97,7 @@ export const SYNCED_NAMESPACES = [
   "omi-thesis-analyses",
   "omi-adhd-analyses",
   "omi-adhd-rollups",
+  "omi-adhd-weekly-rollups",
   "omi-thesis-group-analyses",
   "omi-people",
   "omi-people-pending",
