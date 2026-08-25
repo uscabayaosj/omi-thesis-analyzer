@@ -418,6 +418,13 @@ function RollupPageInner() {
             Push reminders aren&apos;t supported in this browser.
           </p>
         )}
+        <Link
+          href="/rollup/week"
+          className="flex items-center gap-1.5 text-sm min-h-[44px] px-3 py-2 -ml-3 mt-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors w-fit"
+        >
+          <CalendarIcon className="w-4 h-4 flex-shrink-0" />
+          This Week
+        </Link>
       </header>
 
       {error && (
