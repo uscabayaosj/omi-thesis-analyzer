@@ -16,6 +16,11 @@ import { getAnalysisAge } from "@/lib/storage";
 import { pullAndMerge } from "@/lib/sync";
 import MeetingMap, { type MapMarker } from "@/components/MeetingMap";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import RelationshipEditor from "@/components/RelationshipEditor";
+import {
+  getRelationshipsFor, deleteRelationship, otherId, roleFor,
+  RELATIONSHIP_TYPES, RELATIONSHIP_LABEL, type Relationship,
+} from "@/lib/relationships";
 import {
   ArrowLeftIcon,
   CheckIcon,
@@ -85,12 +90,19 @@ export default function PersonDetailPage() {
   const [mergeTargetId, setMergeTargetId] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
+  const [rels, setRels] = useState<Relationship[]>([]);
+  const [addingRel, setAddingRel] = useState(false);
+  const [editingRel, setEditingRel] = useState<Relationship | null>(null);
+
   const refresh = () => {
     const p = getPerson(id);
     setPerson(p);
     setPeople(getPeople());
+    setRels(getRelationshipsFor(id));
     if (!p) setNotFound(true);
   };
+
+  const refreshRels = () => setRels(getRelationshipsFor(id));
 
   useEffect(() => {
     let cancelled = false;
@@ -99,6 +111,7 @@ export default function PersonDetailPage() {
       const p = getPerson(id);
       setPerson(p);
       setPeople(getPeople());
+      setRels(getRelationshipsFor(id));
       if (!p) setNotFound(true);
       setLoading(false);
     });
@@ -549,6 +562,87 @@ export default function PersonDetailPage() {
               </li>
             ))}
           </ul>
+        )}
+      </section>
+
+      {/* Relationships */}
+      <section className="card p-5 mt-4 mb-6">
+        <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">Relationships</h2>
+
+        {rels.length === 0 && !addingRel && (
+          <p className="text-slate-400 text-sm">No relationships yet.</p>
+        )}
+
+        {RELATIONSHIP_TYPES.map((t) => {
+          const ofType = rels.filter((r) => r.type === t);
+          if (ofType.length === 0) return null;
+          return (
+            <div key={t} className="mb-3 last:mb-0">
+              <p className="text-xs text-slate-400 mb-1.5">{RELATIONSHIP_LABEL[t]}</p>
+              <div className="flex flex-wrap gap-2">
+                {ofType.map((r) => {
+                  const oid = otherId(r, id);
+                  const other = people.find((p) => p.id === oid);
+                  const { otherRole } = roleFor(r, id);
+                  const detail = otherRole || r.note;
+                  return (
+                    <span key={r.id} className="inline-flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-full pl-3 pr-1.5 py-1 text-sm text-slate-200">
+                      <button
+                        onClick={() => router.push(`/people/${oid}`)}
+                        className="hover:text-white transition-colors"
+                      >
+                        {other?.name ?? "Unknown"}{detail ? <span className="text-slate-400"> · {detail}</span> : null}
+                      </button>
+                      <button
+                        onClick={() => { setEditingRel(r); setAddingRel(false); }}
+                        aria-label={`Edit relationship with ${other?.name ?? "person"}`}
+                        className="min-h-[32px] min-w-[32px] flex items-center justify-center rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+                      >
+                        ⋯
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+
+        {editingRel && (
+          <RelationshipEditor
+            selfId={id}
+            people={people}
+            editing={editingRel}
+            onSaved={() => { setEditingRel(null); refreshRels(); }}
+            onCancel={() => setEditingRel(null)}
+          />
+        )}
+
+        {addingRel && !editingRel && (
+          <RelationshipEditor
+            selfId={id}
+            people={people}
+            onSaved={() => { setAddingRel(false); refreshRels(); }}
+            onCancel={() => setAddingRel(false)}
+          />
+        )}
+
+        {!addingRel && !editingRel && (
+          <button
+            onClick={() => setAddingRel(true)}
+            className={`${BUTTON_SECONDARY_CARD} mt-3`}
+          >
+            Add relationship
+          </button>
+        )}
+
+        {editingRel && (
+          <button
+            onClick={() => { if (deleteRelationship(editingRel.id)) { setEditingRel(null); refreshRels(); } }}
+            className="text-sm text-red-400 hover:text-red-300 mt-2 min-h-[44px] px-2"
+          >
+            Remove this relationship
+          </button>
         )}
       </section>
 
