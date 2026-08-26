@@ -22,6 +22,8 @@ import {
   getRelationshipsFor, deleteRelationship, otherId, roleFor,
   RELATIONSHIP_TYPES, RELATIONSHIP_LABEL, type Relationship,
 } from "@/lib/relationships";
+import { getPlaces } from "@/lib/places";
+import { groupMeetingsByPlace } from "@/lib/place-resolve";
 import {
   ArrowLeftIcon,
   CheckIcon,
@@ -141,6 +143,11 @@ export default function PersonDetailPage() {
     if (!person) return [];
     return [...person.meetings].sort((a, b) => b.date.localeCompare(a.date));
   }, [person]);
+
+  const placeGroups = useMemo(
+    () => (person ? groupMeetingsByPlace(person.meetings, getPlaces()) : []),
+    [person]
+  );
 
   const otherPeople = useMemo(() => people.filter((p) => p.id !== id), [people, id]);
 
@@ -655,6 +662,27 @@ export default function PersonDetailPage() {
           </button>
         )}
       </section>
+
+      {/* Where we've met */}
+      {placeGroups.length > 0 && (
+        <section className="card p-5 mt-4 mb-6">
+          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">Where we&apos;ve met</h2>
+          <ul className="space-y-2">
+            {placeGroups.map((g, i) => (
+              <li key={g.place?.id ?? `raw-${i}`} className="flex items-center justify-between text-sm">
+                {g.place ? (
+                  <Link href={`/people/place/${g.place.id}`} className="text-slate-200 hover:text-white transition-colors">
+                    {g.place.name}
+                  </Link>
+                ) : (
+                  <span className="text-slate-300">{g.rawName}</span>
+                )}
+                <span className="text-slate-400">{g.meetings.length}×</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* Meetings */}
       <section className="mb-6">
