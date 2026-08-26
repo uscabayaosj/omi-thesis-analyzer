@@ -122,7 +122,9 @@ export default function RelationshipEditor({ selfId, people, editing, onSaved, o
               aria-checked={type === t}
               onClick={() => setType(t)}
               className={`px-4 py-2 min-h-[44px] rounded-full text-sm transition-colors ${
-                type === t ? "bg-cyan-400 text-slate-950" : "bg-slate-800 text-slate-300 hover:text-white"
+                // Detector cross-pairs mutually-exclusive ternary branches. Real pairs, both AA-clear:
+                // slate-950 on cyan-400 = 11.16:1; slate-300 on slate-800 = 8.59:1.
+                type === t ? "bg-cyan-400 text-slate-950" : "bg-slate-800 text-slate-300 hover:text-white" // impeccable-disable-line gray-on-color
               }`}
             >
               {RELATIONSHIP_LABEL[t]}

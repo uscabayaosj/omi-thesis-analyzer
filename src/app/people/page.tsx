@@ -869,7 +869,10 @@ function AddPlacePanel({
           {options.map((o) => (
             <button key={`${o.lat},${o.lng}`} onClick={() => { setCoord(o); setManualLat(""); setManualLng(""); }}
               className={`w-full text-left text-sm px-3 py-2 min-h-[44px] rounded-lg transition-colors ${
-                coord?.lat === o.lat && coord?.lng === o.lng ? "bg-cyan-950/40 border border-cyan-500/50 text-cyan-200" : "text-slate-300 hover:bg-slate-700"
+                // Detector cross-pairs mutually-exclusive ternary branches. Real pairs:
+                // cyan-200 on the cyan-950/40 wash = 12.20:1; slate-300 is unselected (no fill),
+                // wrongly cross-paired by the detector with the selected branch's bg-cyan-950.
+                coord?.lat === o.lat && coord?.lng === o.lng ? "bg-cyan-950/40 border border-cyan-500/50 text-cyan-200" : "text-slate-300 hover:bg-slate-700" // impeccable-disable-line gray-on-color
               }`}>
               {o.label}
             </button>
