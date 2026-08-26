@@ -21,6 +21,7 @@ import { getAnalyzedIds, getAnalysisAge } from "@/lib/storage";
 import { getAdhdAnalyzedIds } from "@/lib/adhd-storage";
 import { pullAndMerge } from "@/lib/sync";
 import MeetingMap, { type MapMarker } from "@/components/MeetingMap";
+import RelationshipGraph from "@/components/RelationshipGraph";
 import {
   ArrowLeftIcon,
   CompassIcon,
@@ -87,7 +88,7 @@ function groupByLetter(people: Person[]): { letter: string; people: Person[] }[]
   return order.filter((l) => buckets.has(l)).map((letter) => ({ letter, people: buckets.get(letter)! }));
 }
 
-type ViewMode = "grid" | "map";
+type ViewMode = "grid" | "web" | "map" | "places";
 
 export default function PeoplePage() {
   const router = useRouter();
@@ -340,6 +341,16 @@ export default function PeoplePage() {
             Grid
           </button>
           <button
+            onClick={() => setView("web")}
+            className={`flex items-center gap-1.5 text-sm min-h-[36px] px-3 py-1.5 rounded-md transition-colors ${
+              view === "web" ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white"
+            }`}
+            aria-pressed={view === "web"}
+          >
+            <UsersIcon className="w-4 h-4" />
+            Web
+          </button>
+          <button
             onClick={() => setView("map")}
             className={`flex items-center gap-1.5 text-sm min-h-[36px] px-3 py-1.5 rounded-md transition-colors ${
               view === "map" ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white"
@@ -490,6 +501,8 @@ export default function PeoplePage() {
             </section>
           ))}
         </div>
+      ) : view === "web" ? (
+        <RelationshipGraph people={filteredPeople} onOpen={(pid) => router.push(`/people/${pid}`)} />
       ) : mapMarkers.length === 0 ? (
         <p className="text-slate-400 text-sm">
           Nobody in this view has a meeting location on record yet.
