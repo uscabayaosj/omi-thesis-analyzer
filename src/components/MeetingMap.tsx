@@ -14,14 +14,30 @@ export interface MapMarker {
   label: string;
   sublabel?: string;
   href?: string;
+  placeName?: string;
 }
 
-export default function MeetingMap({ markers, className }: { markers: MapMarker[]; className?: string }) {
+export interface PlaceMarker {
+  id: string;
+  lat: number;
+  lng: number;
+  name: string;
+  peopleLabel?: string;
+}
+
+interface MeetingMapProps {
+  markers: MapMarker[];
+  places?: PlaceMarker[];
+  onNameLocation?: (lat: number, lng: number, rawName?: string) => void;
+  className?: string;
+}
+
+export default function MeetingMap({ markers, places, onNameLocation, className }: MeetingMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<LeafletMap | null>(null);
 
   useEffect(() => {
-    if (!containerRef.current || markers.length === 0) return;
+    if (!containerRef.current || (markers.length === 0 && (places?.length ?? 0) === 0)) return;
     let cancelled = false;
     (async () => {
       const L = (await import("leaflet")).default;
@@ -48,9 +64,38 @@ export default function MeetingMap({ markers, className }: { markers: MapMarker[
         const title = m.href
           ? `<a href="${m.href}" style="color:#22d3ee">${esc(m.label)}</a>`
           : `<strong>${esc(m.label)}</strong>`;
-        marker.bindPopup(`${title}${m.sublabel ? `<br/><span>${esc(m.sublabel)}</span>` : ""}`);
+        const nameBtn = onNameLocation
+          ? `<br/><button data-name-loc="1" data-lat="${m.lat}" data-lng="${m.lng}" data-raw="${esc(m.placeName ?? "")}" style="margin-top:6px;color:#d99a5e;background:none;border:none;cursor:pointer;font-size:12px">Name this place</button>`
+          : "";
+        marker.bindPopup(`${title}${m.sublabel ? `<br/><span>${esc(m.sublabel)}</span>` : ""}${nameBtn}`);
         bounds.extend([m.lat, m.lng]);
       }
+
+      // Named places: copper pin + label, popup links to the place page.
+      const placeIcon = L.divIcon({
+        className: "",
+        html: `<div style="width:14px;height:14px;border-radius:4px;background:#b96d33;border:2px solid #14100d"></div>`,
+        iconSize: [14, 14],
+        iconAnchor: [7, 7],
+      });
+      for (const pl of places ?? []) {
+        const m = L.marker([pl.lat, pl.lng], { icon: placeIcon }).addTo(map);
+        m.bindPopup(
+          `<a href="/people/place/${esc(pl.id)}" style="color:#d99a5e;font-weight:600">${esc(pl.name)}</a>` +
+          (pl.peopleLabel ? `<br><span style="color:#a89a88;font-size:12px">${esc(pl.peopleLabel)}</span>` : "")
+        );
+        bounds.extend([pl.lat, pl.lng]);
+      }
+
+      if (onNameLocation) {
+        map.on("popupopen", (e) => {
+          const el = (e.popup.getElement() as HTMLElement | undefined)?.querySelector<HTMLButtonElement>("[data-name-loc]");
+          if (el) {
+            el.onclick = () => onNameLocation(parseFloat(el.dataset.lat!), parseFloat(el.dataset.lng!), el.dataset.raw || undefined);
+          }
+        });
+      }
+
       map.fitBounds(bounds.pad(0.3), { maxZoom: 14 });
     })();
     return () => {
@@ -58,9 +103,9 @@ export default function MeetingMap({ markers, className }: { markers: MapMarker[
       mapRef.current?.remove();
       mapRef.current = null;
     };
-  }, [markers]);
+  }, [markers, places, onNameLocation]);
 
-  if (markers.length === 0) return null;
+  if (markers.length === 0 && (places?.length ?? 0) === 0) return null;
   return (
     <div
       ref={containerRef}
