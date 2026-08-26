@@ -21,6 +21,7 @@ import { getAnalyzedIds, getAnalysisAge } from "@/lib/storage";
 import { getAdhdAnalyzedIds } from "@/lib/adhd-storage";
 import { pullAndMerge } from "@/lib/sync";
 import { getPlaces, createPlace, type Place } from "@/lib/places";
+import LocationPicker from "@/components/LocationPicker";
 import { groupMeetingsByPlace } from "@/lib/place-resolve";
 import MeetingMap, { type MapMarker } from "@/components/MeetingMap";
 import RelationshipGraph from "@/components/RelationshipGraph";
@@ -835,11 +836,9 @@ function AddPlacePanel({
   const [coord, setCoord] = useState<{ lat: number; lng: number } | null>(
     initial ? { lat: initial.lat, lng: initial.lng } : null
   );
-  const [manualLat, setManualLat] = useState("");
-  const [manualLng, setManualLng] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  // Distinct coordinates (rounded) so the picker isn't one row per meeting.
+  // Distinct coordinates (rounded) so the shortcut list isn't one row per meeting.
   const options = useMemo(() => {
     const seen = new Map<string, { lat: number; lng: number; label: string }>();
     for (const m of locatedMeetings) {
@@ -849,12 +848,16 @@ function AddPlacePanel({
     return [...seen.values()].slice(0, 30);
   }, [locatedMeetings]);
 
+  // Frame the map on a nearby meeting when the user hasn't pinned anything yet.
+  const anchor = options[0];
+
   const save = () => {
     setError(null);
-    const lat = coord?.lat ?? parseFloat(manualLat);
-    const lng = coord?.lng ?? parseFloat(manualLng);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) { setError("Pick a location or enter coordinates."); return; }
-    if (!createPlace({ name, lat, lng, notes })) { setError("Could not create the place (name empty or storage full)."); return; }
+    if (!coord || !Number.isFinite(coord.lat) || !Number.isFinite(coord.lng)) {
+      setError("Tap the map to set a location.");
+      return;
+    }
+    if (!createPlace({ name, lat: coord.lat, lng: coord.lng, notes })) { setError("Could not create the place (name empty or storage full)."); return; }
     onCreated();
   };
 
@@ -864,30 +867,33 @@ function AddPlacePanel({
       <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Dry Fork Ranch"
         className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-400 focus:border-cyan-500 focus:outline-none min-h-[44px]" />
 
-      <p className="text-sm text-slate-400 mt-3 mb-1">Pin</p>
-      {options.length > 0 ? (
-        <div className="space-y-1 max-h-40 overflow-auto">
-          {options.map((o) => (
-            <button key={`${o.lat},${o.lng}`} onClick={() => { setCoord(o); setManualLat(""); setManualLng(""); }}
-              className={`w-full text-left text-sm px-3 py-2 min-h-[44px] rounded-lg transition-colors ${
-                // Detector cross-pairs mutually-exclusive ternary branches. Real pairs:
-                // cyan-200 on the cyan-950/40 wash = 12.20:1; slate-300 is unselected (no fill),
-                // wrongly cross-paired by the detector with the selected branch's bg-cyan-950.
-                coord?.lat === o.lat && coord?.lng === o.lng ? "bg-cyan-950/40 border border-cyan-500/50 text-cyan-200" : "text-slate-300 hover:bg-slate-700" // impeccable-disable-line gray-on-color
-              }`}>
-              {o.label}
-            </button>
-          ))}
-        </div>
-      ) : (
-        <p className="text-xs text-slate-400">No meeting locations found — enter coordinates below.</p>
+      {options.length > 0 && (
+        <>
+          <p className="text-sm text-slate-400 mt-3 mb-1">Start from a past meeting</p>
+          <div className="space-y-1 max-h-32 overflow-auto">
+            {options.map((o) => (
+              <button key={`${o.lat},${o.lng}`} onClick={() => setCoord({ lat: o.lat, lng: o.lng })}
+                className={`w-full text-left text-sm px-3 py-2 min-h-[44px] rounded-lg transition-colors ${
+                  // Detector cross-pairs mutually-exclusive ternary branches. Real pairs:
+                  // cyan-200 on the cyan-950/40 wash = 12.20:1; slate-300 is unselected (no fill),
+                  // wrongly cross-paired by the detector with the selected branch's bg-cyan-950.
+                  coord?.lat === o.lat && coord?.lng === o.lng ? "bg-cyan-950/40 border border-cyan-500/50 text-cyan-200" : "text-slate-300 hover:bg-slate-700" // impeccable-disable-line gray-on-color
+                }`}>
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </>
       )}
-      <div className="grid grid-cols-2 gap-2 mt-2">
-        <input value={manualLat} onChange={(e) => { setManualLat(e.target.value); setCoord(null); }} placeholder="lat"
-          className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-400 focus:border-cyan-500 focus:outline-none min-h-[44px]" />
-        <input value={manualLng} onChange={(e) => { setManualLng(e.target.value); setCoord(null); }} placeholder="lng"
-          className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-400 focus:border-cyan-500 focus:outline-none min-h-[44px]" />
-      </div>
+
+      <p className="text-sm text-slate-400 mt-3 mb-1">
+        {coord ? "Tap the map or drag the pin to adjust" : "Tap the map to drop a pin"}
+      </p>
+      <LocationPicker
+        value={coord}
+        onChange={(lat, lng) => setCoord({ lat, lng })}
+        initialCenter={anchor ? { lat: anchor.lat, lng: anchor.lng } : undefined}
+      />
 
       <label className="block text-sm text-slate-400 mb-1 mt-3">Notes (optional)</label>
       <input value={notes} onChange={(e) => setNotes(e.target.value)}

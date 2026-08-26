@@ -7,6 +7,7 @@ import { getPlace, updatePlace, deletePlace, type Place } from "@/lib/places";
 import { getPeople, type Person } from "@/lib/people";
 import { groupMeetingsByPlace } from "@/lib/place-resolve";
 import MeetingMap, { type MapMarker } from "@/components/MeetingMap";
+import LocationPicker from "@/components/LocationPicker";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { pullAndMerge } from "@/lib/sync";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY_CARD, LINK_BACK } from "@/lib/ui";
@@ -20,6 +21,7 @@ export default function PlaceDetailPage() {
   const [editing, setEditing] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [notesDraft, setNotesDraft] = useState("");
+  const [pinDraft, setPinDraft] = useState<{ lat: number; lng: number } | null>(null);
   const [showDelete, setShowDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,7 +64,9 @@ export default function PlaceDetailPage() {
 
   const saveEdit = () => {
     setError(null);
-    if (!updatePlace(id, { name: nameDraft, notes: notesDraft })) { setError("Could not save."); return; }
+    const patch: Parameters<typeof updatePlace>[1] = { name: nameDraft, notes: notesDraft };
+    if (pinDraft) { patch.lat = pinDraft.lat; patch.lng = pinDraft.lng; }
+    if (!updatePlace(id, patch)) { setError("Could not save."); return; }
     setPlace(getPlace(id));
     setEditing(false);
   };
@@ -74,7 +78,7 @@ export default function PlaceDetailPage() {
       {!editing ? (
         <div className="flex items-start justify-between gap-3 mb-4">
           <h1 className="font-bold text-white">{place.name}</h1>
-          <button onClick={() => { setNameDraft(place.name); setNotesDraft(place.notes); setEditing(true); }}
+          <button onClick={() => { setNameDraft(place.name); setNotesDraft(place.notes); setPinDraft({ lat: place.lat, lng: place.lng }); setEditing(true); }}
             className="text-sm text-cyan-400 hover:text-cyan-300 min-h-[44px] px-2">Edit</button>
         </div>
       ) : (
@@ -82,6 +86,11 @@ export default function PlaceDetailPage() {
           <label className="block text-sm text-slate-400 mb-1">Name</label>
           <input value={nameDraft} onChange={(e) => setNameDraft(e.target.value)}
             className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none min-h-[44px]" />
+          <label className="block text-sm text-slate-400 mb-1 mt-3">Location — tap the map or drag the pin to move it</label>
+          <LocationPicker
+            value={pinDraft}
+            onChange={(lat, lng) => setPinDraft({ lat, lng })}
+          />
           <label className="block text-sm text-slate-400 mb-1 mt-3">Notes</label>
           <textarea value={notesDraft} onChange={(e) => setNotesDraft(e.target.value)} rows={4}
             className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none resize-none" />
@@ -93,9 +102,11 @@ export default function PlaceDetailPage() {
         </div>
       )}
 
-      <div className="card p-2 mb-4">
-        <MeetingMap markers={[marker]} className="h-48 w-full rounded-lg overflow-hidden" />
-      </div>
+      {!editing && (
+        <div className="card p-2 mb-4">
+          <MeetingMap markers={[marker]} className="h-48 w-full rounded-lg overflow-hidden" />
+        </div>
+      )}
 
       <section className="card p-5 mb-4">
         <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">Met here</h2>
