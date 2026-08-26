@@ -20,18 +20,25 @@ import { runExtraction } from "@/lib/people-pipeline";
 import { getAnalyzedIds, getAnalysisAge } from "@/lib/storage";
 import { getAdhdAnalyzedIds } from "@/lib/adhd-storage";
 import { pullAndMerge } from "@/lib/sync";
+import { getPlaces, createPlace, type Place } from "@/lib/places";
+import { groupMeetingsByPlace } from "@/lib/place-resolve";
 import MeetingMap, { type MapMarker } from "@/components/MeetingMap";
 import RelationshipGraph from "@/components/RelationshipGraph";
 import {
   ArrowLeftIcon,
   CompassIcon,
+  MapPinIcon,
   RefreshIcon,
   SearchIcon,
   SquareIcon,
   UsersIcon,
   XIcon,
 } from "@/components/icons";
-import { BUTTON_PRIMARY, BUTTON_GHOST } from "@/lib/ui";
+import { BUTTON_PRIMARY, BUTTON_GHOST, BUTTON_SECONDARY_CARD } from "@/lib/ui";
+
+// Meeting has no personId field of its own; this local shape threads one
+// through for per-place people-counting only (see placeStats below).
+type MeetingWithPerson = Meeting & { personId: string };
 
 // ── helpers (pure) ──
 
@@ -97,6 +104,8 @@ export default function PeoplePage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [view, setView] = useState<ViewMode>("grid");
+  const [places, setPlaces] = useState<Place[]>([]);
+  const [addingPlace, setAddingPlace] = useState(false);
   const [addingPerson, setAddingPerson] = useState(false);
   const [newName, setNewName] = useState("");
   const [addError, setAddError] = useState<string | null>(null);
@@ -112,6 +121,7 @@ export default function PeoplePage() {
   const refresh = () => {
     setPeople(getPeople());
     setPending(getPending());
+    setPlaces(getPlaces());
   };
 
   useEffect(() => {
@@ -165,6 +175,33 @@ export default function PeoplePage() {
     }
     return markers;
   }, [filteredPeople]);
+
+  const locatedMeetings = useMemo(() => {
+    const out: { lat: number; lng: number; rawName?: string; personId: string; personName: string; date: string }[] = [];
+    for (const p of people) {
+      for (const m of p.meetings) {
+        if (m.lat != null && m.lng != null) {
+          out.push({ lat: m.lat, lng: m.lng, rawName: m.placeName, personId: p.id, personName: p.name, date: m.date });
+        }
+      }
+    }
+    return out;
+  }, [people]);
+
+  const placeStats = useMemo(() => {
+    // meetings & distinct-people counts per place, via resolution
+    const meetings: MeetingWithPerson[] = people.flatMap((p) =>
+      p.meetings.map((m) => ({ ...m, personId: p.id }))
+    );
+    const groups = groupMeetingsByPlace(meetings, places);
+    const stat = new Map<string, { meetings: number; people: number }>();
+    for (const g of groups) {
+      if (!g.place) continue;
+      const persons = new Set((g.meetings as MeetingWithPerson[]).map((m) => m.personId));
+      stat.set(g.place.id, { meetings: g.meetings.length, people: persons.size });
+    }
+    return stat;
+  }, [people, places]);
 
   // ── review queue actions ──
 
@@ -360,6 +397,16 @@ export default function PeoplePage() {
             <CompassIcon className="w-4 h-4" />
             Map
           </button>
+          <button
+            onClick={() => setView("places")}
+            className={`flex items-center gap-1.5 text-sm min-h-[36px] px-3 py-1.5 rounded-md transition-colors ${
+              view === "places" ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white"
+            }`}
+            aria-pressed={view === "places"}
+          >
+            <MapPinIcon className="w-4 h-4" />
+            Places
+          </button>
         </div>
 
         <button
@@ -503,12 +550,50 @@ export default function PeoplePage() {
         </div>
       ) : view === "web" ? (
         <RelationshipGraph people={filteredPeople} onOpen={(pid) => router.push(`/people/${pid}`)} />
-      ) : mapMarkers.length === 0 ? (
-        <p className="text-slate-400 text-sm">
-          Nobody in this view has a meeting location on record yet.
-        </p>
+      ) : view === "map" ? (
+        mapMarkers.length === 0 ? (
+          <p className="text-slate-400 text-sm">
+            Nobody in this view has a meeting location on record yet.
+          </p>
+        ) : (
+          <MeetingMap markers={mapMarkers} />
+        )
       ) : (
-        <MeetingMap markers={mapMarkers} />
+        <div>
+          <div className="flex justify-end mb-3">
+            <button onClick={() => setAddingPlace(true)} className={BUTTON_SECONDARY_CARD}>Add place</button>
+          </div>
+
+          {addingPlace && (
+            <AddPlacePanel
+              locatedMeetings={locatedMeetings}
+              onCancel={() => setAddingPlace(false)}
+              onCreated={() => { setAddingPlace(false); setPlaces(getPlaces()); }}
+            />
+          )}
+
+          {places.length === 0 && !addingPlace && (
+            <div className="card p-8 text-center">
+              <p className="text-slate-300">No places yet.</p>
+              <p className="text-slate-400 text-sm mt-2">Name a location you&rsquo;ve met people at to start.</p>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            {places.map((pl) => {
+              const s = placeStats.get(pl.id);
+              return (
+                <Link key={pl.id} href={`/people/place/${pl.id}`} className="card p-5 block hover:border-cyan-500/50 transition-colors">
+                  <h2 className="font-serif text-lg text-white">{pl.name}</h2>
+                  <p className="text-slate-400 text-sm mt-1">
+                    {s ? `${s.meetings} meeting${s.meetings === 1 ? "" : "s"} · ${s.people} ${s.people === 1 ? "person" : "people"}` : "No meetings yet"}
+                  </p>
+                  {pl.notes && <p className="text-slate-400 text-sm mt-1 line-clamp-1">{pl.notes}</p>}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
       )}
 
       {railVisible && (
@@ -714,6 +799,82 @@ function PendingCard({
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── add place panel ──
+
+function AddPlacePanel({
+  locatedMeetings, onCancel, onCreated,
+}: {
+  locatedMeetings: { lat: number; lng: number; rawName?: string; personName: string; date: string }[];
+  onCancel: () => void;
+  onCreated: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [notes, setNotes] = useState("");
+  const [coord, setCoord] = useState<{ lat: number; lng: number } | null>(null);
+  const [manualLat, setManualLat] = useState("");
+  const [manualLng, setManualLng] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  // Distinct coordinates (rounded) so the picker isn't one row per meeting.
+  const options = useMemo(() => {
+    const seen = new Map<string, { lat: number; lng: number; label: string }>();
+    for (const m of locatedMeetings) {
+      const key = `${m.lat.toFixed(4)},${m.lng.toFixed(4)}`;
+      if (!seen.has(key)) seen.set(key, { lat: m.lat, lng: m.lng, label: m.rawName || `${m.lat.toFixed(3)}, ${m.lng.toFixed(3)}` });
+    }
+    return [...seen.values()].slice(0, 30);
+  }, [locatedMeetings]);
+
+  const save = () => {
+    setError(null);
+    const lat = coord?.lat ?? parseFloat(manualLat);
+    const lng = coord?.lng ?? parseFloat(manualLng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) { setError("Pick a location or enter coordinates."); return; }
+    if (!createPlace({ name, lat, lng, notes })) { setError("Could not create the place (name empty or storage full)."); return; }
+    onCreated();
+  };
+
+  return (
+    <div className="enter-rise card p-4 mb-3">
+      <label className="block text-sm text-slate-400 mb-1">Name</label>
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Dry Fork Ranch"
+        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-400 focus:border-cyan-500 focus:outline-none min-h-[44px]" />
+
+      <p className="text-sm text-slate-400 mt-3 mb-1">Pin</p>
+      {options.length > 0 ? (
+        <div className="space-y-1 max-h-40 overflow-auto">
+          {options.map((o) => (
+            <button key={`${o.lat},${o.lng}`} onClick={() => { setCoord(o); setManualLat(""); setManualLng(""); }}
+              className={`w-full text-left text-sm px-3 py-2 min-h-[44px] rounded-lg transition-colors ${
+                coord?.lat === o.lat && coord?.lng === o.lng ? "bg-cyan-950/40 border border-cyan-500/50 text-cyan-200" : "text-slate-300 hover:bg-slate-700"
+              }`}>
+              {o.label}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-slate-400">No meeting locations found — enter coordinates below.</p>
+      )}
+      <div className="grid grid-cols-2 gap-2 mt-2">
+        <input value={manualLat} onChange={(e) => { setManualLat(e.target.value); setCoord(null); }} placeholder="lat"
+          className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-400 focus:border-cyan-500 focus:outline-none min-h-[44px]" />
+        <input value={manualLng} onChange={(e) => { setManualLng(e.target.value); setCoord(null); }} placeholder="lng"
+          className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-400 focus:border-cyan-500 focus:outline-none min-h-[44px]" />
+      </div>
+
+      <label className="block text-sm text-slate-400 mb-1 mt-3">Notes (optional)</label>
+      <input value={notes} onChange={(e) => setNotes(e.target.value)}
+        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-400 focus:border-cyan-500 focus:outline-none min-h-[44px]" />
+
+      {error && <p className="text-sm text-red-400 mt-2" role="alert">{error}</p>}
+      <div className="flex gap-2 mt-4">
+        <button onClick={save} className={`${BUTTON_PRIMARY} py-2 px-5`}>Create place</button>
+        <button onClick={onCancel} className={BUTTON_SECONDARY_CARD}>Cancel</button>
+      </div>
     </div>
   );
 }
