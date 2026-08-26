@@ -17,6 +17,7 @@ import {
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { pullAndMerge } from "@/lib/sync";
 import { exportAllData } from "@/lib/export";
+import { BUTTON_GHOST, BUTTON_SECONDARY } from "@/lib/ui";
 
 const CONVERSATIONS_CACHE_KEY = "conversations";
 
@@ -706,51 +707,60 @@ function HomeInner() {
           Personal &amp; research assistant — your Omi conversations as thesis evidence and a daily plan
         </p>
 
-        {/* Sync status + refresh — quiet meta row, read once per visit */}
-        <div className="flex items-center justify-between gap-3 mt-4 pb-4 border-b border-slate-800">
-          <span className="text-sm text-slate-400" aria-live="polite">
+        {/* Header controls, split by job so nothing overflows on a phone:
+            destinations (places to go) wrap freely on their own nav row, while
+            the two utilities (Backup, Refresh) sit beside the sync status they
+            act on. The old single non-wrapping row put ~600px of flex-shrink-0
+            controls into a 343px viewport — Search, Backup, and Refresh were
+            simply off-screen on mobile. */}
+        <nav aria-label="Sections" className="mt-3 -mx-3 flex flex-wrap items-center gap-x-1 gap-y-0">
+          <Link
+            href="/rollup"
+            className={BUTTON_GHOST}
+          >
+            <CalendarIcon className="w-4 h-4 flex-shrink-0" />
+            Daily Rollup
+          </Link>
+          <Link
+            href="/people"
+            className={BUTTON_GHOST}
+          >
+            <UsersIcon className="w-4 h-4 flex-shrink-0" />
+            People
+          </Link>
+          <Link
+            href="/usage"
+            className={BUTTON_GHOST}
+          >
+            <TrendingUpIcon className="w-4 h-4 flex-shrink-0" />
+            Usage
+          </Link>
+          <Link
+            href="/search"
+            className={BUTTON_GHOST}
+          >
+            <SearchIcon className="w-4 h-4 flex-shrink-0" />
+            Search Analyses
+          </Link>
+        </nav>
+
+        {/* Sync status + its two utilities — quiet meta row, read once per visit */}
+        <div className="flex items-center justify-between gap-2 mt-1 pb-3 border-b border-slate-800">
+          <span className="text-sm text-slate-400 min-w-0 truncate" aria-live="polite">
             {refreshing
               ? "Refreshing from Omi…"
               : loading
               ? "Loading…"
               : lastSynced
               ? `Synced ${getAnalysisAge(lastSynced).label}`
-              : ""}
+              : "Not synced yet"}
           </span>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <Link
-              href="/rollup"
-              className="flex items-center gap-1.5 text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors flex-shrink-0"
-            >
-              <CalendarIcon className="w-4 h-4 flex-shrink-0" />
-              Daily Rollup
-            </Link>
-            <Link
-              href="/people"
-              className="flex items-center gap-1.5 text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors flex-shrink-0"
-            >
-              <UsersIcon className="w-4 h-4 flex-shrink-0" />
-              People
-            </Link>
-            <Link
-              href="/usage"
-              className="flex items-center gap-1.5 text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors flex-shrink-0"
-            >
-              <TrendingUpIcon className="w-4 h-4 flex-shrink-0" />
-              Usage
-            </Link>
-            <Link
-              href="/search"
-              className="flex items-center gap-1.5 text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors flex-shrink-0"
-            >
-              <SearchIcon className="w-4 h-4 flex-shrink-0" />
-              Search
-            </Link>
+          <div className="flex items-center gap-1 flex-shrink-0">
             <button
               onClick={handleExport}
               disabled={exporting}
               aria-label="Download a backup of all stored analyses"
-              className="flex items-center gap-1.5 text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+              className={BUTTON_GHOST}
             >
               <DownloadIcon className="w-4 h-4 flex-shrink-0" />
               {exporting ? "Backing up…" : "Backup"}
@@ -759,7 +769,7 @@ function HomeInner() {
               onClick={() => loadConversations("refresh")}
               disabled={loading || refreshing}
               aria-label="Refresh conversations from Omi"
-              className="flex items-center gap-1.5 text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+              className={BUTTON_GHOST}
             >
               <RefreshIcon className={`w-4 h-4 flex-shrink-0 ${refreshing ? "animate-spin" : ""}`} />
               {refreshing ? "Refreshing…" : "Refresh"}
@@ -900,7 +910,7 @@ function HomeInner() {
               <button
                 onClick={() => setSelectMode(true)}
                 aria-label="Enable selection mode to analyze multiple conversations as a group"
-                className="text-sm min-h-[44px] flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg transition-colors flex-shrink-0"
+                className={`${BUTTON_SECONDARY} flex-shrink-0`}
               >
                 <SquareIcon className="w-3.5 h-3.5" />
                 Select &amp; Analyze Group
@@ -909,7 +919,7 @@ function HomeInner() {
               <button
                 onClick={exitSelectMode}
                 aria-label="Cancel selection mode"
-                className="text-sm min-h-[44px] flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg transition-colors flex-shrink-0"
+                className={`${BUTTON_SECONDARY} flex-shrink-0`}
               >
                 <XIcon className="w-3.5 h-3.5" />
                 Cancel

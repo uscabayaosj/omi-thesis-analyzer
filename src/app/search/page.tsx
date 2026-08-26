@@ -5,6 +5,7 @@ import Link from "next/link";
 import { fetchJson } from "@/lib/fetch-json";
 import type { ConversationSearchResult, GroupSearchResult } from "@/lib/search";
 import { ArrowLeftIcon, SearchIcon } from "@/components/icons";
+import { LINK_BACK } from "@/lib/ui";
 
 interface SearchResponse {
   configured: boolean;
@@ -58,13 +59,13 @@ export default function SearchPage() {
     <main className="max-w-3xl mx-auto px-4 py-8">
       <Link
         href="/"
-        className="text-slate-400 hover:text-white text-sm mb-6 inline-flex items-center gap-1.5 min-h-[44px] py-2"
+        className={LINK_BACK}
       >
         <ArrowLeftIcon className="w-4 h-4" />
         Back
       </Link>
 
-      <h1 className="text-2xl font-bold text-white mb-6">Search</h1>
+      <h1 className="text-2xl font-bold text-white mb-6">Search Analyses</h1>
 
       <div className="relative mb-6">
         <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
