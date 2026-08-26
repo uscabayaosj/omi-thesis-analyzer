@@ -6,6 +6,7 @@ import { fetchJson } from "@/lib/fetch-json";
 import type { UsageSummary, UsagePeriodSummary, UsageBreakdownRow, UsageTimezoneKey } from "@/lib/usage";
 import { USAGE_TIMEZONES, DEFAULT_USAGE_TIMEZONE, isUsageTimezoneKey } from "@/lib/usage";
 import { ArrowLeftIcon } from "@/components/icons";
+import { LINK_BACK } from "@/lib/ui";
 
 const USAGE_TZ_STORAGE_KEY = "omi-usage-tz";
 
@@ -73,7 +74,7 @@ export default function UsagePage() {
     <main className="max-w-3xl mx-auto px-4 py-8">
       <Link
         href="/"
-        className="text-slate-400 hover:text-white text-sm mb-6 inline-flex items-center gap-1.5 min-h-[44px] py-2"
+        className={LINK_BACK}
       >
         <ArrowLeftIcon className="w-4 h-4" />
         Back

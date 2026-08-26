@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { UsersIcon, ArrowLeftIcon } from "@/components/icons";
-import { BUTTON_PRIMARY } from "@/lib/ui";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY_CARD } from "@/lib/ui";
 
 export default function PersonError({
   error,
@@ -33,7 +33,7 @@ export default function PersonError({
           </button>
           <Link
             href="/people"
-            className="bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium py-2 px-5 min-h-[44px] rounded-lg text-sm transition-colors inline-flex items-center gap-1.5"
+            className={BUTTON_SECONDARY_CARD}
           >
             <ArrowLeftIcon className="w-4 h-4" />
             All people

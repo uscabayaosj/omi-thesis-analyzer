@@ -21,7 +21,7 @@ import {
 import { isPushSupported, getPushSubscriptionState, subscribeToPush, unsubscribeFromPush } from "@/lib/push";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { Prose } from "@/components/Prose";
-import { BUTTON_PRIMARY } from "@/lib/ui";
+import { BUTTON_PRIMARY, BUTTON_GHOST, LINK_BACK, BUTTON_SECONDARY } from "@/lib/ui";
 
 interface ConvoLite {
   id: string;
@@ -387,7 +387,7 @@ function RollupPageInner() {
 
   return (
     <main className="max-w-3xl mx-auto px-4 py-8">
-      <Link href="/" className="text-slate-400 hover:text-white text-sm mb-6 inline-flex items-center gap-1.5 min-h-[44px] py-2">
+      <Link href="/" className={LINK_BACK}>
         <ArrowLeftIcon className="w-4 h-4" />
         Back to conversations
       </Link>
@@ -405,7 +405,7 @@ function RollupPageInner() {
             <button
               onClick={togglePush}
               disabled={pushBusy}
-              className="flex items-center gap-1.5 text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className={BUTTON_GHOST}
               aria-pressed={pushEnabled}
             >
               <BellIcon className="w-4 h-4 flex-shrink-0" />
@@ -420,7 +420,7 @@ function RollupPageInner() {
         )}
         <Link
           href="/rollup/week"
-          className="flex items-center gap-1.5 text-sm min-h-[44px] px-3 py-2 -ml-3 mt-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors w-fit"
+          className={`${BUTTON_GHOST} -ml-3 mt-1 w-fit`}
         >
           <CalendarIcon className="w-4 h-4 flex-shrink-0" />
           This Week
@@ -572,12 +572,12 @@ function RollupPageInner() {
           {rollup && (
             <section aria-label="Daily rollup">
               <div className="flex items-center justify-end gap-2 mb-4">
-                <button onClick={doExport} className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5">
+                <button onClick={doExport} className={BUTTON_SECONDARY}>
                   <span key={exported ? "saved" : "idle"} className="label-swap inline-flex items-center gap-1.5">
                     {exported ? <><CheckIcon className="w-3.5 h-3.5" /> Saved</> : <><ExternalLinkIcon className="w-3.5 h-3.5" /> Send to Obsidian</>}
                   </span>
                 </button>
-                <button onClick={doDownload} className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5">
+                <button onClick={doDownload} className={BUTTON_SECONDARY}>
                   <DownloadIcon className="w-3.5 h-3.5" /> Download .md
                 </button>
               </div>

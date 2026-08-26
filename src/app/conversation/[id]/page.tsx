@@ -40,7 +40,7 @@ import {
   ExternalLinkIcon,
   LoaderIcon,
 } from "@/components/icons";
-import { BUTTON_PRIMARY } from "@/lib/ui";
+import { BUTTON_PRIMARY, BUTTON_GHOST, BUTTON_SECONDARY } from "@/lib/ui";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { pullAndMerge } from "@/lib/sync";
 import { runExtraction, suggestFromAdhdPeople } from "@/lib/people-pipeline";
@@ -478,7 +478,7 @@ export default function ConversationPage() {
             onClick={() => loadConversation("refresh")}
             disabled={loading || refreshing}
             aria-label="Refresh this conversation and transcript from Omi"
-            className="flex items-center gap-1.5 text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+            className={`${BUTTON_GHOST} flex-shrink-0`}
           >
             <RefreshIcon className={`w-4 h-4 flex-shrink-0 ${refreshing ? "animate-spin" : ""}`} />
             {refreshing ? "Refreshing…" : "Refresh"}
@@ -502,7 +502,7 @@ export default function ConversationPage() {
               onClick={scanForPeople}
               disabled={scanState === "scanning"}
               aria-label="Scan this conversation for people"
-              className="text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className={BUTTON_GHOST}
             >
               {scanState === "scanning" ? "Scanning…" : "Scan for people"}
             </button>
@@ -655,7 +655,7 @@ export default function ConversationPage() {
                     <button
                       onClick={viewCurrent}
                       aria-label="Return to current analysis"
-                      className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5 whitespace-nowrap"
+                      className={`${BUTTON_SECONDARY} whitespace-nowrap`}
                     >
                       <ArrowLeftIcon className="w-3.5 h-3.5" />
                       Current
@@ -666,7 +666,7 @@ export default function ConversationPage() {
                       <button
                         onClick={handleExportObsidian}
                         aria-label="Export analysis to Obsidian vault"
-                        className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5 whitespace-nowrap"
+                        className={`${BUTTON_SECONDARY} whitespace-nowrap`}
                       >
                         <span key={exported["thesis-obsidian"] ? "saved" : "idle"} className="label-swap inline-flex items-center gap-1.5">
                           {exported["thesis-obsidian"] ? (
@@ -685,7 +685,7 @@ export default function ConversationPage() {
                       <button
                         onClick={handleDownload}
                         aria-label="Download analysis as markdown file"
-                        className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5 whitespace-nowrap"
+                        className={`${BUTTON_SECONDARY} whitespace-nowrap`}
                       >
                         <span key={exported["thesis-download"] ? "saved" : "idle"} className="label-swap inline-flex items-center gap-1.5">
                           {exported["thesis-download"] ? (
@@ -756,7 +756,7 @@ export default function ConversationPage() {
                       ADHD Aid
                     </h2>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <button onClick={handleAdhdExport} className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5 whitespace-nowrap">
+                      <button onClick={handleAdhdExport} className={`${BUTTON_SECONDARY} whitespace-nowrap`}>
                         <span key={exported["adhd-obsidian"] ? "saved" : "idle"} className="label-swap inline-flex items-center gap-1.5">
                           {exported["adhd-obsidian"] ? (
                             <>
@@ -771,7 +771,7 @@ export default function ConversationPage() {
                           )}
                         </span>
                       </button>
-                      <button onClick={handleAdhdDownload} className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5 whitespace-nowrap">
+                      <button onClick={handleAdhdDownload} className={`${BUTTON_SECONDARY} whitespace-nowrap`}>
                         <span key={exported["adhd-download"] ? "saved" : "idle"} className="label-swap inline-flex items-center gap-1.5">
                           {exported["adhd-download"] ? (
                             <>

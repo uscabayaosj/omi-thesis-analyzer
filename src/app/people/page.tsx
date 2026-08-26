@@ -30,7 +30,7 @@ import {
   UsersIcon,
   XIcon,
 } from "@/components/icons";
-import { BUTTON_PRIMARY } from "@/lib/ui";
+import { BUTTON_PRIMARY, BUTTON_GHOST } from "@/lib/ui";
 
 // ── helpers (pure) ──
 
@@ -353,7 +353,7 @@ export default function PeoplePage() {
 
         <button
           onClick={() => setAddingPerson(true)}
-          className="flex items-center gap-1.5 text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors flex-shrink-0"
+          className={`${BUTTON_GHOST} flex-shrink-0`}
         >
           + Add person
         </button>
@@ -361,7 +361,7 @@ export default function PeoplePage() {
         {!backfillActive ? (
           <button
             onClick={runBackfill}
-            className="flex items-center gap-1.5 text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors flex-shrink-0"
+            className={`${BUTTON_GHOST} flex-shrink-0`}
           >
             <RefreshIcon className="w-4 h-4" />
             Scan past conversations
@@ -623,7 +623,7 @@ function PendingCard({
             </button>
             <button
               onClick={onOpenReassign}
-              className="text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+              className={BUTTON_GHOST}
             >
               Someone else…
             </button>
@@ -645,7 +645,7 @@ function PendingCard({
             ))}
             <button
               onClick={onAcceptNew}
-              className="text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+              className={BUTTON_GHOST}
             >
               New person
             </button>
@@ -657,7 +657,7 @@ function PendingCard({
             </button>
             <button
               onClick={onOpenReassign}
-              className="text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+              className={BUTTON_GHOST}
             >
               Add to existing…
             </button>

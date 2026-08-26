@@ -15,7 +15,7 @@ import {
   XCircleIcon, UsersIcon, ZapIcon, ChevronRightIcon, LoaderIcon,
 } from "@/components/icons";
 import { Prose } from "@/components/Prose";
-import { BUTTON_PRIMARY } from "@/lib/ui";
+import { BUTTON_PRIMARY, BUTTON_GHOST, LINK_BACK } from "@/lib/ui";
 
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -132,7 +132,7 @@ function WeekPageInner() {
 
   return (
     <main className="max-w-3xl mx-auto px-4 py-8">
-      <Link href="/rollup" className="text-slate-400 hover:text-white text-sm mb-6 inline-flex items-center gap-1.5 min-h-[44px] py-2">
+      <Link href="/rollup" className={LINK_BACK}>
         <ArrowLeftIcon className="w-4 h-4" />
         Back to Daily Rollup
       </Link>
@@ -148,14 +148,14 @@ function WeekPageInner() {
       <div className="flex items-center justify-between mb-6">
         <button
           onClick={() => goToWeek(addDays(weekStart, -7))}
-          className="flex items-center gap-1.5 text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+          className={BUTTON_GHOST}
         >
           <ArrowLeftIcon className="w-4 h-4" />
           Previous week
         </button>
         <button
           onClick={() => goToWeek(addDays(weekStart, 7))}
-          className="flex items-center gap-1.5 text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+          className={BUTTON_GHOST}
         >
           Next week
           <ChevronRightIcon className="w-4 h-4" />
@@ -169,7 +169,10 @@ function WeekPageInner() {
             <div
               key={day}
               className={`flex-1 text-center py-2 rounded-lg text-xs ${
-                hasRollup ? "bg-emerald-500/15 border border-emerald-500/40 text-emerald-400" : "bg-slate-900 border border-slate-800 text-slate-500"
+                // Detector cross-pairs the branches; real pairs are emerald-400
+                // on the emerald wash and slate-400 on slate-900. slate-400,
+                // not slate-500: the Two Greys Rule bars slate-500 from text.
+                hasRollup ? "bg-emerald-500/15 border border-emerald-500/40 text-emerald-400" : "bg-slate-900 border border-slate-800 text-slate-400" // impeccable-disable-line gray-on-color
               }`}
             >
               {WEEKDAY_LABELS[i]}

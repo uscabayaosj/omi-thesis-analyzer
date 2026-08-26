@@ -20,7 +20,7 @@ import {
   PuzzleIcon,
   CogIcon,
 } from "@/components/icons";
-import { BUTTON_PRIMARY } from "@/lib/ui";
+import { BUTTON_PRIMARY, LINK_BACK, BUTTON_SECONDARY } from "@/lib/ui";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { schedulePush, pullAndMerge } from "@/lib/sync";
 
@@ -369,7 +369,7 @@ function GroupAnalysisContent() {
   if (ids.length < 2) {
     return (
       <main className="max-w-3xl mx-auto px-4 py-8">
-        <Link href="/" className="text-slate-400 hover:text-white text-sm mb-6 inline-flex items-center gap-1.5 min-h-[44px] py-2">
+        <Link href="/" className={LINK_BACK}>
           <ArrowLeftIcon className="w-4 h-4" />
           Back to conversations
         </Link>
@@ -412,7 +412,7 @@ function GroupAnalysisContent() {
           onCancel={() => setShowRerunConfirm(false)}
         />
       )}
-      <Link href="/" className="text-slate-400 hover:text-white text-sm mb-6 inline-flex items-center gap-1.5 min-h-[44px] py-2">
+      <Link href="/" className={LINK_BACK}>
         <ArrowLeftIcon className="w-4 h-4" />
         Back to conversations
       </Link>
@@ -505,7 +505,7 @@ function GroupAnalysisContent() {
               <button
                 onClick={handleExportObsidian}
                 aria-label="Export group analysis to Obsidian vault"
-                className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5 whitespace-nowrap"
+                className={`${BUTTON_SECONDARY} whitespace-nowrap`}
               >
                 <span key={exported ? "saved" : "idle"} className="label-swap inline-flex items-center gap-1.5">
                   {exported ? (
@@ -524,7 +524,7 @@ function GroupAnalysisContent() {
               <button
                 onClick={handleDownloadGroup}
                 aria-label="Download group analysis as markdown file"
-                className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5 whitespace-nowrap"
+                className={`${BUTTON_SECONDARY} whitespace-nowrap`}
               >
                 <DownloadIcon className="w-3.5 h-3.5" />
                 Download .md
