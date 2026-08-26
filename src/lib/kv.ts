@@ -101,6 +101,7 @@ export const SYNCED_NAMESPACES = [
   "omi-thesis-group-analyses",
   "omi-people",
   "omi-people-pending",
+  "omi-places",
 ] as const;
 
 export type SyncedNamespace = (typeof SYNCED_NAMESPACES)[number];
