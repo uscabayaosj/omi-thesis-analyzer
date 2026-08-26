@@ -106,6 +106,7 @@ export default function PeoplePage() {
   const [view, setView] = useState<ViewMode>("grid");
   const [places, setPlaces] = useState<Place[]>([]);
   const [addingPlace, setAddingPlace] = useState(false);
+  const [prefill, setPrefill] = useState<{ lat: number; lng: number; raw?: string } | null>(null);
   const [addingPerson, setAddingPerson] = useState(false);
   const [newName, setNewName] = useState("");
   const [addError, setAddError] = useState<string | null>(null);
@@ -202,6 +203,15 @@ export default function PeoplePage() {
     }
     return stat;
   }, [people, places]);
+
+  const placeMarkers = useMemo(
+    () => places.map((pl) => {
+      const s = placeStats.get(pl.id);
+      return { id: pl.id, lat: pl.lat, lng: pl.lng, name: pl.name,
+        peopleLabel: s ? `${s.people} ${s.people === 1 ? "person" : "people"} · ${s.meetings} meeting${s.meetings === 1 ? "" : "s"}` : undefined };
+    }),
+    [places, placeStats]
+  );
 
   // ── review queue actions ──
 
@@ -551,12 +561,17 @@ export default function PeoplePage() {
       ) : view === "web" ? (
         <RelationshipGraph people={filteredPeople} onOpen={(pid) => router.push(`/people/${pid}`)} />
       ) : view === "map" ? (
-        mapMarkers.length === 0 ? (
+        mapMarkers.length === 0 && placeMarkers.length === 0 ? (
           <p className="text-slate-400 text-sm">
             Nobody in this view has a meeting location on record yet.
           </p>
         ) : (
-          <MeetingMap markers={mapMarkers} />
+          <MeetingMap
+            markers={mapMarkers}
+            places={placeMarkers}
+            onNameLocation={(lat, lng, raw) => { setPrefill({ lat, lng, raw }); setAddingPlace(true); setView("places"); }}
+            className="h-[60vh] w-full rounded-xl overflow-hidden"
+          />
         )
       ) : (
         <div>
@@ -567,8 +582,9 @@ export default function PeoplePage() {
           {addingPlace && (
             <AddPlacePanel
               locatedMeetings={locatedMeetings}
-              onCancel={() => setAddingPlace(false)}
-              onCreated={() => { setAddingPlace(false); setPlaces(getPlaces()); }}
+              initial={prefill ?? undefined}
+              onCancel={() => { setAddingPlace(false); setPrefill(null); }}
+              onCreated={() => { setAddingPlace(false); setPrefill(null); setPlaces(getPlaces()); }}
             />
           )}
 
@@ -806,15 +822,18 @@ function PendingCard({
 // ── add place panel ──
 
 function AddPlacePanel({
-  locatedMeetings, onCancel, onCreated,
+  locatedMeetings, initial, onCancel, onCreated,
 }: {
   locatedMeetings: { lat: number; lng: number; rawName?: string; personName: string; date: string }[];
+  initial?: { lat: number; lng: number; raw?: string };
   onCancel: () => void;
   onCreated: () => void;
 }) {
-  const [name, setName] = useState("");
+  const [name, setName] = useState(initial?.raw ?? "");
   const [notes, setNotes] = useState("");
-  const [coord, setCoord] = useState<{ lat: number; lng: number } | null>(null);
+  const [coord, setCoord] = useState<{ lat: number; lng: number } | null>(
+    initial ? { lat: initial.lat, lng: initial.lng } : null
+  );
   const [manualLat, setManualLat] = useState("");
   const [manualLng, setManualLng] = useState("");
   const [error, setError] = useState<string | null>(null);
