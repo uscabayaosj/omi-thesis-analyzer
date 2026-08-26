@@ -27,6 +27,7 @@ import MeetingMap, { type MapMarker } from "@/components/MeetingMap";
 import RelationshipGraph from "@/components/RelationshipGraph";
 import {
   ArrowLeftIcon,
+  ChevronRightIcon,
   CompassIcon,
   MapPinIcon,
   RefreshIcon,
@@ -113,6 +114,10 @@ export default function PeoplePage() {
   const [addError, setAddError] = useState<string | null>(null);
   const [reassigning, setReassigning] = useState<string | null>(null); // pending suggestion id
   const [acceptErrorId, setAcceptErrorId] = useState<string | null>(null); // pending suggestion id
+  // Collapsed by default so the directory, search, and view toggle aren't
+  // buried under the full review queue on first paint — the count banner keeps
+  // it one tap away without owning the whole first screen.
+  const [reviewOpen, setReviewOpen] = useState(false);
 
   // Backfill state
   const [backfillTotal, setBackfillTotal] = useState<number | null>(null);
@@ -347,31 +352,52 @@ export default function PeoplePage() {
         Everyone mentioned in your conversations — who they are, where you met, and what you learned.
       </p>
 
-      {/* Review queue */}
+      {/* Review queue — collapsed to a count banner by default so the search,
+          view toggle, and directory stay reachable without scrolling past every
+          pending suggestion. Tap to expand; tap the header to collapse again. */}
       {pending.length > 0 && (
-        <section className="mb-8">
-          <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wide mb-3">
-            Review ({pending.length})
-          </h2>
-          <div className="space-y-3">
-            {pending.map((s) => (
-              <PendingCard
-                key={s.id}
-                suggestion={s}
-                people={people}
-                showError={acceptErrorId === s.id}
-                reassignOpen={reassigning === s.id}
-                onOpenReassign={() => setReassigning(s.id)}
-                onCloseReassign={() => setReassigning(null)}
-                onAcceptMatched={(id) => acceptInto(s, id)}
-                onAcceptCandidate={(id) => acceptInto(s, id)}
-                onAcceptExisting={(id) => acceptInto(s, id)}
-                onAcceptNew={() => acceptAsNew(s)}
-                onIgnore={() => doIgnore(s)}
-              />
-            ))}
-          </div>
-        </section>
+        reviewOpen ? (
+          <section className="mb-8">
+            <button
+              onClick={() => setReviewOpen(false)}
+              aria-expanded={true}
+              className="w-full flex items-center justify-between gap-2 mb-3 min-h-[44px] text-slate-300 hover:text-white transition-colors"
+            >
+              <span className="text-sm font-semibold uppercase tracking-wide">Review ({pending.length})</span>
+              <ChevronRightIcon className="w-4 h-4 -rotate-90 flex-shrink-0" />
+            </button>
+            <div className="space-y-3">
+              {pending.map((s) => (
+                <PendingCard
+                  key={s.id}
+                  suggestion={s}
+                  people={people}
+                  showError={acceptErrorId === s.id}
+                  reassignOpen={reassigning === s.id}
+                  onOpenReassign={() => setReassigning(s.id)}
+                  onCloseReassign={() => setReassigning(null)}
+                  onAcceptMatched={(id) => acceptInto(s, id)}
+                  onAcceptCandidate={(id) => acceptInto(s, id)}
+                  onAcceptExisting={(id) => acceptInto(s, id)}
+                  onAcceptNew={() => acceptAsNew(s)}
+                  onIgnore={() => doIgnore(s)}
+                />
+              ))}
+            </div>
+          </section>
+        ) : (
+          <button
+            onClick={() => setReviewOpen(true)}
+            aria-expanded={false}
+            className="card w-full p-4 mb-6 flex items-center justify-between gap-2 min-h-[44px] hover:border-cyan-400/40 transition-colors"
+          >
+            <span className="text-sm text-slate-200">
+              <span className="font-semibold">{pending.length}</span>{" "}
+              {pending.length === 1 ? "suggestion" : "suggestions"} to review
+            </span>
+            <ChevronRightIcon className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+          </button>
+        )
       )}
 
       {/* Toolbar */}
@@ -559,10 +585,16 @@ export default function PeoplePage() {
                         <div className="text-white font-medium truncate">{p.name}</div>
                         {p.role && <div className="text-slate-400 text-sm truncate">{p.role}</div>}
                       </div>
-                      <div className="text-slate-500 text-xs text-right flex-shrink-0 max-w-[40%]">
-                        <div className="truncate">{m?.placeName ?? "No meetings yet"}</div>
-                        {m && <div>{getAnalysisAge(m.date).label}</div>}
-                      </div>
+                      {/* Meta only when there's a meeting: place (when known)
+                          + when. No repeated "No meetings yet" filler down the
+                          column, and no misleading label on people who have a
+                          meeting but no captured location. */}
+                      {m && (
+                        <div className="text-slate-400 text-xs text-right flex-shrink-0 max-w-[40%]">
+                          {m.placeName && <div className="truncate">{m.placeName}</div>}
+                          <div>{getAnalysisAge(m.date).label}</div>
+                        </div>
+                      )}
                     </Link>
                   );
                 })}
