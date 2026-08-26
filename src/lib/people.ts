@@ -1,6 +1,7 @@
 "use client";
 
 import { schedulePush } from "./sync";
+import { onPersonDeleted, onPeopleMerged } from "./relationships";
 
 const PEOPLE_NS = "omi-people";
 const PENDING_NS = "omi-people-pending";
@@ -235,7 +236,9 @@ export function deletePerson(id: string): boolean {
   const map = pruneTombstones(readMap<unknown>(PEOPLE_NS));
   if (!(id in map)) return true;
   map[id] = { deleted: true, timestamp: new Date().toISOString() } satisfies Tombstone;
-  return writeMap(PEOPLE_NS, map);
+  const ok = writeMap(PEOPLE_NS, map);
+  if (ok) onPersonDeleted(id);
+  return ok;
 }
 
 export function appendToPerson(
@@ -281,7 +284,10 @@ export function mergePeople(sourceId: string, targetId: string): Person | null {
   // Best-effort: if this tombstone write fails the target already holds
   // everything, so the merge still "succeeded" — the leftover source is a
   // duplicate the user can delete again, not lost data.
-  if (merged) deletePerson(sourceId);
+  if (merged) {
+    onPeopleMerged(sourceId, targetId); // rewire before the source's delete-hook removes them
+    deletePerson(sourceId);
+  }
   return merged;
 }
 
