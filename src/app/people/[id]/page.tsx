@@ -102,7 +102,10 @@ export default function PersonDetailPage() {
     if (!p) setNotFound(true);
   };
 
-  const refreshRels = () => setRels(getRelationshipsFor(id));
+  const refreshRels = () => {
+    setPeople(getPeople());
+    setRels(getRelationshipsFor(id));
+  };
 
   useEffect(() => {
     let cancelled = false;
