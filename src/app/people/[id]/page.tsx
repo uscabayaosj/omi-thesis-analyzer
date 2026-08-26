@@ -17,6 +17,7 @@ import { pullAndMerge } from "@/lib/sync";
 import MeetingMap, { type MapMarker } from "@/components/MeetingMap";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import RelationshipEditor from "@/components/RelationshipEditor";
+import EgoWeb from "@/components/EgoWeb";
 import {
   getRelationshipsFor, deleteRelationship, otherId, roleFor,
   RELATIONSHIP_TYPES, RELATIONSHIP_LABEL, type Relationship,
@@ -574,6 +575,12 @@ export default function PersonDetailPage() {
 
         {rels.length === 0 && !addingRel && (
           <p className="text-slate-400 text-sm">No relationships yet.</p>
+        )}
+
+        {rels.length > 0 && person && (
+          <div className="mb-4">
+            <EgoWeb self={person} rels={rels} people={people} onNavigate={(pid) => router.push(`/people/${pid}`)} />
+          </div>
         )}
 
         {RELATIONSHIP_TYPES.map((t) => {
