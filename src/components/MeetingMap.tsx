@@ -23,6 +23,7 @@ export interface PlaceMarker {
   lng: number;
   name: string;
   peopleLabel?: string;
+  people?: { name: string; href: string }[];
 }
 
 interface MeetingMapProps {
@@ -80,9 +81,17 @@ export default function MeetingMap({ markers, places, onNameLocation, className 
       });
       for (const pl of places ?? []) {
         const m = L.marker([pl.lat, pl.lng], { icon: placeIcon }).addTo(map);
+        // People met here are listed as links (the meeting pins for these people
+        // are absorbed into this marker); the summary count is the fallback.
+        const peopleHtml = pl.people && pl.people.length > 0
+          ? `<br><span style="font-size:12px">${pl.people
+              .map((pn) => `<a href="${esc(pn.href)}" style="color:#a89a88">${esc(pn.name)}</a>`)
+              .join(", ")}</span>`
+          : pl.peopleLabel
+          ? `<br><span style="color:#a89a88;font-size:12px">${esc(pl.peopleLabel)}</span>`
+          : "";
         m.bindPopup(
-          `<a href="/people/place/${esc(pl.id)}" style="color:#d99a5e;font-weight:600">${esc(pl.name)}</a>` +
-          (pl.peopleLabel ? `<br><span style="color:#a89a88;font-size:12px">${esc(pl.peopleLabel)}</span>` : "")
+          `<a href="/people/place/${esc(pl.id)}" style="color:#d99a5e;font-weight:600">${esc(pl.name)}</a>${peopleHtml}`
         );
         bounds.extend([pl.lat, pl.lng]);
       }

@@ -22,7 +22,7 @@ import { getAdhdAnalyzedIds } from "@/lib/adhd-storage";
 import { pullAndMerge } from "@/lib/sync";
 import { getPlaces, createPlace, type Place } from "@/lib/places";
 import LocationPicker from "@/components/LocationPicker";
-import { groupMeetingsByPlace } from "@/lib/place-resolve";
+import { groupMeetingsByPlace, resolvePlaceFrom } from "@/lib/place-resolve";
 import MeetingMap, { type MapMarker } from "@/components/MeetingMap";
 import RelationshipGraph from "@/components/RelationshipGraph";
 import {
@@ -166,6 +166,10 @@ export default function PeoplePage() {
     for (const p of filteredPeople) {
       const m = lastMeeting(p);
       if (m?.lat != null && m?.lng != null) {
+        // Absorb into the place marker: a meeting that resolves to a named
+        // place is represented by that place's copper pin (whose popup lists
+        // who was met there), so drop the duplicate person pin at the same spot.
+        if (resolvePlaceFrom({ lat: m.lat, lng: m.lng }, places)) continue;
         markers.push({
           lat: m.lat,
           lng: m.lng,
@@ -177,7 +181,7 @@ export default function PeoplePage() {
       }
     }
     return markers;
-  }, [filteredPeople]);
+  }, [filteredPeople, places]);
 
   const locatedMeetings = useMemo(() => {
     const out: { lat: number; lng: number; rawName?: string; personId: string; personName: string; date: string }[] = [];
@@ -197,22 +201,28 @@ export default function PeoplePage() {
       p.meetings.map((m) => ({ ...m, personId: p.id }))
     );
     const groups = groupMeetingsByPlace(meetings, places);
-    const stat = new Map<string, { meetings: number; people: number }>();
+    const stat = new Map<string, { meetings: number; people: number; personIds: string[] }>();
     for (const g of groups) {
       if (!g.place) continue;
-      const persons = new Set((g.meetings as MeetingWithPerson[]).map((m) => m.personId));
-      stat.set(g.place.id, { meetings: g.meetings.length, people: persons.size });
+      const personIds = [...new Set((g.meetings as MeetingWithPerson[]).map((m) => m.personId))];
+      stat.set(g.place.id, { meetings: g.meetings.length, people: personIds.length, personIds });
     }
     return stat;
   }, [people, places]);
 
+  const nameById = useMemo(() => new Map(people.map((p) => [p.id, p.name])), [people]);
+
   const placeMarkers = useMemo(
     () => places.map((pl) => {
       const s = placeStats.get(pl.id);
-      return { id: pl.id, lat: pl.lat, lng: pl.lng, name: pl.name,
-        peopleLabel: s ? `${s.people} ${s.people === 1 ? "person" : "people"} · ${s.meetings} meeting${s.meetings === 1 ? "" : "s"}` : undefined };
+      return {
+        id: pl.id, lat: pl.lat, lng: pl.lng, name: pl.name,
+        peopleLabel: s ? `${s.people} ${s.people === 1 ? "person" : "people"} · ${s.meetings} meeting${s.meetings === 1 ? "" : "s"}` : undefined,
+        // The people met here, so the absorbed pin's popup still names them.
+        people: s ? s.personIds.map((pid) => ({ name: nameById.get(pid) ?? "Unknown", href: `/people/${pid}` })) : [],
+      };
     }),
-    [places, placeStats]
+    [places, placeStats, nameById]
   );
 
   // ── review queue actions ──
@@ -561,7 +571,10 @@ export default function PeoplePage() {
           ))}
         </div>
       ) : view === "web" ? (
-        <RelationshipGraph people={filteredPeople} onOpen={(pid) => router.push(`/people/${pid}`)} />
+        // Whole-network view: uses the full directory, not the search-filtered
+        // list, so typing in the people search never silently prunes nodes and
+        // their edges from the "whole network." Search narrows Grid/Map.
+        <RelationshipGraph people={people} onOpen={(pid) => router.push(`/people/${pid}`)} />
       ) : view === "map" ? (
         mapMarkers.length === 0 && placeMarkers.length === 0 ? (
           <p className="text-slate-400 text-sm">
