@@ -39,8 +39,7 @@ export default function EgoWeb({ self, rels, people, onNavigate }: EgoWebProps) 
   });
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-md mx-auto block" role="img"
-      aria-label={`Relationship web for ${self.name}`}>
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-md mx-auto block" aria-hidden="true">
       {nodes.map((n) => (
         <line key={`e-${n.rel.id}`} x1={CX} y1={CY} x2={n.x} y2={n.y}
           stroke="#4d4133" strokeWidth={1.5} strokeDasharray={REL_DASH[n.rel.type]} />
@@ -54,8 +53,7 @@ export default function EgoWeb({ self, rels, people, onNavigate }: EgoWebProps) 
         );
       })}
       {nodes.map((n) => (
-        <g key={`n-${n.rel.id}`} onClick={() => onNavigate(n.oid)} style={{ cursor: "pointer" }}
-          role="button" aria-label={`Open ${nameOf(n.oid)}`}>
+        <g key={`n-${n.rel.id}`} onClick={() => onNavigate(n.oid)} style={{ cursor: "pointer" }}>
           <circle cx={n.x} cy={n.y} r={20} fill="#262019" stroke="#4d4133" />
           <text x={n.x} y={n.y + 3} textAnchor="middle" fill="#dcd2bf" fontSize={9}>
             {nameOf(n.oid).split(" ")[0].slice(0, 8)}
