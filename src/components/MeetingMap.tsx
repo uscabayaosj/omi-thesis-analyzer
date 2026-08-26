@@ -14,6 +14,7 @@ export interface MapMarker {
   label: string;
   sublabel?: string;
   href?: string;
+  placeName?: string;
 }
 
 export interface PlaceMarker {
@@ -64,7 +65,7 @@ export default function MeetingMap({ markers, places, onNameLocation, className 
           ? `<a href="${m.href}" style="color:#22d3ee">${esc(m.label)}</a>`
           : `<strong>${esc(m.label)}</strong>`;
         const nameBtn = onNameLocation
-          ? `<br/><button data-name-loc="1" data-lat="${m.lat}" data-lng="${m.lng}" data-raw="${esc(m.sublabel ?? "")}" style="margin-top:6px;color:#d99a5e;background:none;border:none;cursor:pointer;font-size:12px">Name this place</button>`
+          ? `<br/><button data-name-loc="1" data-lat="${m.lat}" data-lng="${m.lng}" data-raw="${esc(m.placeName ?? "")}" style="margin-top:6px;color:#d99a5e;background:none;border:none;cursor:pointer;font-size:12px">Name this place</button>`
           : "";
         marker.bindPopup(`${title}${m.sublabel ? `<br/><span>${esc(m.sublabel)}</span>` : ""}${nameBtn}`);
         bounds.extend([m.lat, m.lng]);

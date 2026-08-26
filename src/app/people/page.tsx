@@ -171,6 +171,7 @@ export default function PeoplePage() {
           label: p.name,
           sublabel: [m.placeName, getAnalysisAge(m.date).label].filter(Boolean).join(" · "),
           href: `/people/${p.id}`,
+          placeName: m.placeName,
         });
       }
     }

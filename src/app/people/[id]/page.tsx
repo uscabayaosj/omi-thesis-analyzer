@@ -151,6 +151,11 @@ export default function PersonDetailPage() {
 
   const otherPeople = useMemo(() => people.filter((p) => p.id !== id), [people, id]);
 
+  const visibleRels = useMemo(() => {
+    if (people.length === 0) return rels;
+    return rels.filter((r) => people.some((p) => p.id === otherId(r, id)));
+  }, [rels, people, id]);
+
   // ── photo pipeline (per brief) ──
 
   async function onPhotoSelected(file: File) {
@@ -580,18 +585,18 @@ export default function PersonDetailPage() {
       <section className="card p-5 mt-4 mb-6">
         <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">Relationships</h2>
 
-        {rels.length === 0 && !addingRel && (
+        {visibleRels.length === 0 && !addingRel && (
           <p className="text-slate-400 text-sm">No relationships yet.</p>
         )}
 
-        {rels.length > 0 && person && (
+        {visibleRels.length > 0 && person && (
           <div className="mb-4">
-            <EgoWeb self={person} rels={rels} people={people} onNavigate={(pid) => router.push(`/people/${pid}`)} />
+            <EgoWeb self={person} rels={visibleRels} people={people} onNavigate={(pid) => router.push(`/people/${pid}`)} />
           </div>
         )}
 
         {RELATIONSHIP_TYPES.map((t) => {
-          const ofType = rels.filter((r) => r.type === t);
+          const ofType = visibleRels.filter((r) => r.type === t);
           if (ofType.length === 0) return null;
           return (
             <div key={t} className="mb-3 last:mb-0">
