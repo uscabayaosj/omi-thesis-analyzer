@@ -1,10 +1,17 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Map as LeafletMap, Marker as LeafletMarker } from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { SearchIcon, LoaderIcon } from "@/components/icons";
 
 interface LatLng {
+  lat: number;
+  lng: number;
+}
+
+interface GeocodeResult {
+  label: string;
   lat: number;
   lng: number;
 }
@@ -16,6 +23,9 @@ interface LocationPickerProps {
   onChange: (lat: number, lng: number) => void;
   /** Where to center when there is no value yet (e.g. a nearby meeting). */
   initialCenter?: LatLng;
+  /** Fired alongside onChange when the pin came from a named search result,
+   *  so a caller can prefill its own name field. */
+  onResolveName?: (label: string) => void;
   className?: string;
 }
 
@@ -31,7 +41,7 @@ function pinHtml(): string {
   return '<div style="width:16px;height:16px;border-radius:4px;background:#b96d33;border:2px solid #14100d"></div>';
 }
 
-export default function LocationPicker({ value, onChange, initialCenter, className }: LocationPickerProps) {
+export default function LocationPicker({ value, onChange, initialCenter, onResolveName, className }: LocationPickerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const markerRef = useRef<LeafletMarker | null>(null);
@@ -142,11 +152,111 @@ export default function LocationPicker({ value, onChange, initialCenter, classNa
   }, [value]);
 
   return (
-    <div
-      ref={containerRef}
-      className={`rounded-lg overflow-hidden border border-slate-700 h-64 ${className ?? ""}`}
-      role="application"
-      aria-label="Tap the map to set the location, or drag the pin to move it"
-    />
+    <div>
+      <AddressSearch
+        onPick={(r) => {
+          onChange(r.lat, r.lng);
+          onResolveName?.(r.label);
+        }}
+      />
+      <div
+        ref={containerRef}
+        className={`rounded-lg overflow-hidden border border-slate-700 h-64 ${className ?? ""}`}
+        role="application"
+        aria-label="Tap the map to set the location, or drag the pin to move it"
+      />
+    </div>
+  );
+}
+
+/**
+ * Type an address, pick a match, and the pin moves there.
+ *
+ * The map alone could only be driven by tapping the right patch of tiles,
+ * which means knowing where a place is before you can record where it is.
+ * This is the way in when you know the name but not the spot.
+ */
+function AddressSearch({ onPick }: { onPick: (r: GeocodeResult) => void }) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<GeocodeResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Guards against a slow earlier request resolving after a later one and
+  // overwriting fresher results.
+  const runRef = useRef(0);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const q = query.trim();
+    if (q.length < 3) {
+      setResults([]);
+      setSearching(false);
+      setMessage(null);
+      return;
+    }
+    setSearching(true);
+    setMessage(null);
+    const run = ++runRef.current;
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`);
+        const data: { results?: GeocodeResult[]; error?: string } = await res.json();
+        if (run !== runRef.current) return;
+        const found = data.results ?? [];
+        setResults(found);
+        setMessage(data.error ?? (found.length === 0 ? `No match for “${q}”.` : null));
+      } catch {
+        if (run !== runRef.current) return;
+        setResults([]);
+        setMessage("Address search is unavailable right now. Tap the map instead.");
+      } finally {
+        if (run === runRef.current) setSearching(false);
+      }
+    }, 450);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [query]);
+
+  return (
+    <div className="mb-2">
+      <div className="relative">
+        <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search an address or landmark…"
+          aria-label="Search for an address to place the pin"
+          className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-9 py-2.5 text-sm text-slate-200 placeholder-slate-400 focus:border-cyan-500 focus:outline-none min-h-[44px]"
+        />
+        {searching && (
+          <LoaderIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 animate-spin" />
+        )}
+      </div>
+
+      {results.length > 0 && (
+        <ul className="mt-1 space-y-1 max-h-40 overflow-auto">
+          {results.map((r) => (
+            <li key={`${r.lat},${r.lng},${r.label}`}>
+              <button
+                onClick={() => {
+                  onPick(r);
+                  setResults([]);
+                  setQuery("");
+                }}
+                className="w-full text-left text-sm text-slate-300 hover:text-white px-3 py-2 min-h-[44px] rounded-lg hover:bg-slate-700 transition-colors"
+              >
+                {r.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {message && <p className="text-xs text-slate-400 mt-1">{message}</p>}
+    </div>
   );
 }

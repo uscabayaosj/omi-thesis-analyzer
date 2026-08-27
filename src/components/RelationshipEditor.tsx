@@ -11,6 +11,11 @@ import { BUTTON_PRIMARY, BUTTON_SECONDARY_CARD } from "@/lib/ui";
 
 interface RelationshipEditorProps {
   selfId: string;
+  /** The profile-page owner's name — "self" here means whichever person's
+   *  page this editor was opened from, not the app's own single user, and
+   *  the role labels below need that name spelled out to avoid reading as
+   *  a first-person "my." */
+  selfName: string;
   people: Person[];
   editing?: Relationship;
   onSaved: () => void;
@@ -19,7 +24,7 @@ interface RelationshipEditorProps {
 
 const ROLE_TYPES: RelationshipType[] = ["kin", "introduced"];
 
-export default function RelationshipEditor({ selfId, people, editing, onSaved, onCancel }: RelationshipEditorProps) {
+export default function RelationshipEditor({ selfId, selfName, people, editing, onSaved, onCancel }: RelationshipEditorProps) {
   const directory = useMemo(() => people.filter((p) => p.id !== selfId), [people, selfId]);
 
   const editingOtherId = editing ? otherId(editing, selfId) : undefined;
@@ -42,6 +47,13 @@ export default function RelationshipEditor({ selfId, people, editing, onSaved, o
       .filter((p) => [p.name, ...p.aliases].some((n) => normalize(n).includes(q)))
       .slice(0, 6);
   }, [query, chosenId, directory]);
+
+  // Names the two role fields by the actual people involved instead of
+  // "my"/"their" — "my" would otherwise misread as the app's single user
+  // rather than whichever profile this editor was opened from.
+  const otherName = (chosenId ? directory.find((p) => p.id === chosenId)?.name : query.trim()) || undefined;
+  const otherRoleLabel = otherName ? `${otherName}'s role` : "The other person's role";
+  const selfRoleLabel = `${selfName}'s role`;
 
   const showRoles = ROLE_TYPES.includes(type);
   const canCreate = query.trim().length > 0 && !chosenId && matches.length === 0;
@@ -136,13 +148,15 @@ export default function RelationshipEditor({ selfId, people, editing, onSaved, o
       {showRoles && (
         <div className="mt-3 grid grid-cols-2 gap-2">
           <div>
-            <label className="block text-sm text-slate-400 mb-1">Their role</label>
+            <label className="block text-sm text-slate-400 mb-1 truncate" title={otherRoleLabel}>{otherRoleLabel}</label>
             <input value={otherRole} onChange={(e) => setOtherRole(e.target.value)} placeholder="e.g. daughter"
+              aria-label={otherRoleLabel}
               className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-400 focus:border-cyan-500 focus:outline-none min-h-[44px]" />
           </div>
           <div>
-            <label className="block text-sm text-slate-400 mb-1">My role</label>
+            <label className="block text-sm text-slate-400 mb-1 truncate" title={selfRoleLabel}>{selfRoleLabel}</label>
             <input value={selfRole} onChange={(e) => setSelfRole(e.target.value)} placeholder="e.g. father"
+              aria-label={selfRoleLabel}
               className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-400 focus:border-cyan-500 focus:outline-none min-h-[44px]" />
           </div>
         </div>

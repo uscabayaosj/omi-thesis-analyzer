@@ -6,6 +6,7 @@ import Link from "next/link";
 import { getPlace, updatePlace, deletePlace, type Place } from "@/lib/places";
 import { getPeople, type Person } from "@/lib/people";
 import { groupMeetingsByPlace } from "@/lib/place-resolve";
+import { getMeetingLocations, onPlaceDeleted } from "@/lib/meeting-location";
 import MeetingMap, { type MapMarker } from "@/components/MeetingMap";
 import LocationPicker from "@/components/LocationPicker";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -36,12 +37,14 @@ export default function PlaceDetailPage() {
     return () => { cancelled = true; };
   }, [id]);
 
-  // People met here, with counts, via resolution against this one place.
+  // People met here, with counts, via resolution against this one place —
+  // including meetings pinned here by hand, which proximity alone would miss.
   const metHere = useMemo(() => {
     if (!place) return [];
+    const overrides = getMeetingLocations();
     const rows: { person: Person; count: number }[] = [];
     for (const p of people) {
-      const groups = groupMeetingsByPlace(p.meetings, [place]);
+      const groups = groupMeetingsByPlace(p.meetings, [place], overrides);
       const g = groups.find((x) => x.place?.id === place.id);
       if (g) rows.push({ person: p, count: g.meetings.length });
     }
@@ -145,7 +148,14 @@ export default function PlaceDetailPage() {
           title={`Delete "${place.name}"?`}
           body="Meetings keep their locations; they just lose this name."
           confirmLabel="Delete"
-          onConfirm={() => { if (deletePlace(id)) router.push("/people"); }}
+          onConfirm={() => {
+            if (!deletePlace(id)) return;
+            // Meetings pinned here by hand would otherwise keep pointing at a
+            // place that no longer exists; drop those assignments so they fall
+            // back to proximity (or to no place at all).
+            onPlaceDeleted(id);
+            router.push("/people");
+          }}
           onCancel={() => setShowDelete(false)}
         />
       )}

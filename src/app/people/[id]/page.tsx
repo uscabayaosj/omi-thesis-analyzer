@@ -23,7 +23,9 @@ import {
   RELATIONSHIP_TYPES, RELATIONSHIP_LABEL, type Relationship,
 } from "@/lib/relationships";
 import { getPlaces } from "@/lib/places";
-import { groupMeetingsByPlace } from "@/lib/place-resolve";
+import { groupMeetingsByPlace, effectiveMeetingLocation } from "@/lib/place-resolve";
+import { getMeetingLocations } from "@/lib/meeting-location";
+import MeetingLocationEditor from "@/components/MeetingLocationEditor";
 import {
   ArrowLeftIcon,
   CheckIcon,
@@ -93,6 +95,11 @@ export default function PersonDetailPage() {
   const [mergeTargetId, setMergeTargetId] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
+  const [editingMeetingId, setEditingMeetingId] = useState<string | null>(null);
+  // Bumped after a location correction so every derived view (place groups,
+  // map pins, row labels) re-reads it from storage.
+  const [locationVersion, setLocationVersion] = useState(0);
+
   const [rels, setRels] = useState<Relationship[]>([]);
   const [addingRel, setAddingRel] = useState(false);
   const [editingRel, setEditingRel] = useState<Relationship | null>(null);
@@ -126,18 +133,24 @@ export default function PersonDetailPage() {
     };
   }, [id]);
 
+  // Map pins use the corrected location when one exists, so a repaired
+  // meeting moves on the map instead of staying at Omi's original fix.
   const meetingsWithCoords: MapMarker[] = useMemo(() => {
     if (!person) return [];
+    const overrides = getMeetingLocations();
     return person.meetings
-      .filter((m): m is typeof m & { lat: number; lng: number } => m.lat != null && m.lng != null)
-      .map((m) => ({
-        lat: m.lat,
-        lng: m.lng,
-        label: m.placeName ?? formatDate(m.date),
+      .map((m) => ({ m, eff: effectiveMeetingLocation(m, overrides) }))
+      .filter((x): x is { m: typeof x.m; eff: typeof x.eff & { lat: number; lng: number } } =>
+        x.eff.lat != null && x.eff.lng != null)
+      .map(({ m, eff }) => ({
+        lat: eff.lat,
+        lng: eff.lng,
+        label: eff.placeName ?? formatDate(m.date),
         sublabel: formatDate(m.date),
         href: `/conversation/${m.conversationId}`,
       }));
-  }, [person]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [person, locationVersion]);
 
   const sortedMeetings = useMemo(() => {
     if (!person) return [];
@@ -145,8 +158,21 @@ export default function PersonDetailPage() {
   }, [person]);
 
   const placeGroups = useMemo(
-    () => (person ? groupMeetingsByPlace(person.meetings, getPlaces()) : []),
-    [person]
+    () => (person ? groupMeetingsByPlace(person.meetings, getPlaces(), getMeetingLocations()) : []),
+    // locationVersion re-reads corrections from storage after one is saved.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [person, locationVersion]
+  );
+
+  const meetingOverrides = useMemo(
+    () => getMeetingLocations(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [locationVersion]
+  );
+  const places = useMemo(
+    () => getPlaces(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [locationVersion]
   );
 
   const otherPeople = useMemo(() => people.filter((p) => p.id !== id), [people, id]);
@@ -609,14 +635,22 @@ export default function PersonDetailPage() {
                   const oid = otherId(r, id);
                   const other = people.find((p) => p.id === oid);
                   const { otherRole } = roleFor(r, id);
-                  const detail = otherRole || r.note;
+                  // otherRole is the OTHER person's role in this relationship
+                  // (e.g. "daughter" on Andrew's page means Barbara is his
+                  // daughter) — spelling out whose role it is, instead of a
+                  // bare "· daughter", keeps that direction unambiguous.
                   return (
                     <span key={r.id} className="inline-flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-full pl-3 pr-1.5 py-1 font-serif text-sm text-slate-200">
                       <button
                         onClick={() => router.push(`/people/${oid}`)}
                         className="hover:text-white transition-colors"
                       >
-                        {other?.name ?? "Unknown"}{detail ? <span className="text-slate-400"> · {detail}</span> : null}
+                        {other?.name ?? "Unknown"}
+                        {otherRole ? (
+                          <span className="text-slate-400"> — {person.name}&rsquo;s {otherRole}</span>
+                        ) : r.note ? (
+                          <span className="text-slate-400"> · {r.note}</span>
+                        ) : null}
                       </button>
                       <button
                         onClick={() => { setEditingRel(r); setAddingRel(false); }}
@@ -636,6 +670,7 @@ export default function PersonDetailPage() {
         {editingRel && (
           <RelationshipEditor
             selfId={id}
+            selfName={person.name}
             people={people}
             editing={editingRel}
             onSaved={() => { setEditingRel(null); refreshRels(); }}
@@ -646,6 +681,7 @@ export default function PersonDetailPage() {
         {addingRel && !editingRel && (
           <RelationshipEditor
             selfId={id}
+            selfName={person.name}
             people={people}
             onSaved={() => { setAddingRel(false); refreshRels(); }}
             onCancel={() => setAddingRel(false)}
@@ -671,10 +707,13 @@ export default function PersonDetailPage() {
         )}
       </section>
 
-      {/* Where we've met */}
+      {/* Where we've met — same meetings as the list below, grouped by place
+          instead of by date; the two sections read as duplicates without a
+          line saying so. */}
       {placeGroups.length > 0 && (
         <section className="card p-5 mt-4 mb-6">
-          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">Where we&apos;ve met</h2>
+          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-1">Where we&apos;ve met</h2>
+          <p className="text-xs text-slate-500 font-serif italic mb-3">The meetings below, grouped by place</p>
           <ul className="space-y-2">
             {placeGroups.map((g, i) => (
               <li key={g.place?.id ?? `raw-${i}`} className="flex items-center justify-between text-sm">
@@ -692,32 +731,64 @@ export default function PersonDetailPage() {
         </section>
       )}
 
-      {/* Meetings */}
+      {/* Meeting history — every meeting one row at a time, newest first;
+          "Where we've met" above is the same list grouped by place instead. */}
       <section className="mb-6">
-        <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wide mb-3">
-          Meetings ({person.meetings.length})
+        <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wide mb-1">
+          Meeting history ({person.meetings.length})
         </h2>
         {sortedMeetings.length === 0 ? (
           <p className="text-slate-400 text-sm">No meetings recorded yet.</p>
         ) : (
           <>
+            <p className="text-xs text-slate-500 font-serif italic mb-3">Every meeting, most recent first</p>
             <ul className="space-y-1.5 mb-4">
-              {sortedMeetings.map((m) => (
-                <li key={m.conversationId} className="card p-3 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-serif text-sm text-slate-200 truncate">{m.placeName ?? "Unknown place"}</p>
-                    <p className="font-mono text-xs text-slate-500">
-                      {getAnalysisAge(m.date).label} · {formatDate(m.date)}
-                    </p>
-                  </div>
-                  <Link
-                    href={`/conversation/${m.conversationId}`}
-                    className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors flex-shrink-0"
-                  >
-                    View →
-                  </Link>
-                </li>
-              ))}
+              {sortedMeetings.map((m) => {
+                const eff = effectiveMeetingLocation(m, meetingOverrides);
+                const pinnedPlace = eff.placeId ? places.find((p) => p.id === eff.placeId) : null;
+                const label = pinnedPlace?.name ?? eff.placeName ?? "Unknown place";
+                const isEditing = editingMeetingId === m.conversationId;
+                return (
+                  <li key={m.conversationId} className="card p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-serif text-sm text-slate-200 truncate">{label}</p>
+                        <p className="font-mono text-xs text-slate-500">
+                          {getAnalysisAge(m.date).label} · {formatDate(m.date)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => setEditingMeetingId(isEditing ? null : m.conversationId)}
+                          aria-expanded={isEditing}
+                          className="text-xs text-slate-400 hover:text-white min-h-[44px] px-2 transition-colors"
+                        >
+                          {eff.lat != null || eff.placeId ? "Edit place" : "Set place"}
+                        </button>
+                        <Link
+                          href={`/conversation/${m.conversationId}`}
+                          className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
+                        >
+                          View →
+                        </Link>
+                      </div>
+                    </div>
+                    {isEditing && (
+                      <MeetingLocationEditor
+                        conversationId={m.conversationId}
+                        omiLat={m.lat}
+                        omiLng={m.lng}
+                        omiPlaceName={m.placeName}
+                        onSaved={() => {
+                          setEditingMeetingId(null);
+                          setLocationVersion((v) => v + 1);
+                        }}
+                        onCancel={() => setEditingMeetingId(null)}
+                      />
+                    )}
+                  </li>
+                );
+              })}
             </ul>
             <MeetingMap markers={meetingsWithCoords} />
           </>

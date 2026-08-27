@@ -1,7 +1,7 @@
 "use client";
 
 import { Prose } from "@/components/Prose";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -45,6 +45,9 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { pullAndMerge } from "@/lib/sync";
 import { runExtraction, suggestFromAdhdPeople } from "@/lib/people-pipeline";
 import MeetingMap, { type MapMarker } from "@/components/MeetingMap";
+import MeetingLocationEditor from "@/components/MeetingLocationEditor";
+import { getMeetingLocation } from "@/lib/meeting-location";
+import { getPlace } from "@/lib/places";
 
 interface TranscriptSegment {
   text: string;
@@ -177,6 +180,10 @@ export default function ConversationPage() {
   const [customResult, setCustomResult] = useState<string | null>(null);
   const [showRerunConfirm, setShowRerunConfirm] = useState(false);
   const [showAdhdRerunConfirm, setShowAdhdRerunConfirm] = useState(false);
+  const [editingLocation, setEditingLocation] = useState(false);
+  // Bumped after a save so the override is re-read from localStorage; the
+  // stored value is the source of truth, not a copy held in state.
+  const [locationVersion, setLocationVersion] = useState(0);
   const [scanState, setScanState] = useState<"idle" | "scanning" | "done" | "error">("idle");
   const scanForPeople = useCallback(async () => {
     setScanState("scanning");
@@ -199,6 +206,31 @@ export default function ConversationPage() {
   const [adhdSeen, setAdhdSeen] = useState<AdhdAnalysis | null>(null);
   const animateThesis = analysis !== null && thesisSeen !== analysis;
   const animateAdhd = adhd !== null && adhdSeen !== adhd;
+
+  // The location actually shown: a manual correction when one exists, else
+  // whatever Omi reported, else nothing. Read from storage rather than state
+  // so a correction made here and one pulled from another device agree.
+  const effectiveLocation = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    const override = getMeetingLocation(id);
+    const place = override?.placeId ? getPlace(override.placeId) : null;
+    const lat = override?.lat ?? conversation?.geolocation?.latitude;
+    const lng = override?.lng ?? conversation?.geolocation?.longitude;
+    if (lat == null || lng == null) return null;
+    return {
+      lat,
+      lng,
+      label:
+        place?.name ||
+        override?.placeName ||
+        conversation?.geolocation?.address ||
+        conversation?.geolocation?.location_type ||
+        "",
+      corrected: override != null,
+    };
+    // locationVersion re-reads storage after a save; it has no other use.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, conversation, locationVersion]);
 
   // Load stored analysis (both lenses) + pick the default lens. Can't be a
   // lazy useState initializer: this must re-run whenever `id` changes
@@ -555,33 +587,75 @@ export default function ConversationPage() {
             </p>
           </header>
 
-          {/* Where it happened — Omi attaches coordinates to some recordings.
-              Shown only when present; a recording without a fix simply omits it. */}
-          {conversation.geolocation?.latitude != null &&
-            conversation.geolocation?.longitude != null && (
-              <section className="mb-6" aria-label="Where this conversation happened">
-                {(conversation.geolocation.address || conversation.geolocation.location_type) && (
-                  <p className="text-slate-400 text-sm mb-2">
-                    {conversation.geolocation.address || conversation.geolocation.location_type}
+          {/* Where it happened. Omi attaches coordinates to only some
+              recordings, and the ones it does attach can sit far enough from
+              the real spot to break place resolution — so this section is
+              always present and always editable, showing either the map or an
+              invitation to add the location that's missing. */}
+          <section className="mb-6" aria-label="Where this conversation happened">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-slate-500">
+                Location
+              </p>
+              {!editingLocation && (
+                <button
+                  onClick={() => setEditingLocation(true)}
+                  className="text-sm text-cyan-400 hover:text-cyan-300 min-h-[44px] px-2 transition-colors"
+                >
+                  {effectiveLocation ? "Edit location" : "Add location"}
+                </button>
+              )}
+            </div>
+
+            {effectiveLocation ? (
+              <>
+                {effectiveLocation.label && (
+                  <p className="text-slate-400 font-serif italic text-sm mb-2">
+                    {effectiveLocation.label}
+                    {effectiveLocation.corrected && (
+                      <span className="not-italic font-mono text-xs text-slate-500"> · corrected</span>
+                    )}
                   </p>
                 )}
                 <MeetingMap
                   markers={
                     [
                       {
-                        lat: conversation.geolocation.latitude,
-                        lng: conversation.geolocation.longitude,
+                        lat: effectiveLocation.lat,
+                        lng: effectiveLocation.lng,
                         label: conversation.structured?.title || "This conversation",
-                        sublabel:
-                          conversation.geolocation.address ||
-                          conversation.geolocation.location_type ||
-                          undefined,
+                        sublabel: effectiveLocation.label || undefined,
                       },
                     ] satisfies MapMarker[]
                   }
                 />
-              </section>
+              </>
+            ) : (
+              !editingLocation && (
+                <p className="text-slate-400 font-serif italic text-sm">
+                  This recording arrived without a location.
+                </p>
+              )
             )}
+
+            {editingLocation && (
+              <MeetingLocationEditor
+                conversationId={id}
+                omiLat={conversation.geolocation?.latitude ?? undefined}
+                omiLng={conversation.geolocation?.longitude ?? undefined}
+                omiPlaceName={
+                  conversation.geolocation?.address ||
+                  conversation.geolocation?.location_type ||
+                  undefined
+                }
+                onSaved={() => {
+                  setEditingLocation(false);
+                  setLocationVersion((v) => v + 1);
+                }}
+                onCancel={() => setEditingLocation(false)}
+              />
+            )}
+          </section>
 
           {/* Lens toggle */}
           <div className="flex gap-1 mb-6 p-1 bg-slate-900 rounded-lg w-fit" role="radiogroup" aria-label="Analysis lens">

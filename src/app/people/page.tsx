@@ -23,6 +23,7 @@ import { pullAndMerge } from "@/lib/sync";
 import { getPlaces, createPlace, type Place } from "@/lib/places";
 import LocationPicker from "@/components/LocationPicker";
 import { groupMeetingsByPlace, resolvePlaceFrom } from "@/lib/place-resolve";
+import { getMeetingLocations } from "@/lib/meeting-location";
 import MeetingMap, { type MapMarker } from "@/components/MeetingMap";
 import RelationshipGraph from "@/components/RelationshipGraph";
 import {
@@ -205,7 +206,7 @@ export default function PeoplePage() {
     const meetings: MeetingWithPerson[] = people.flatMap((p) =>
       p.meetings.map((m) => ({ ...m, personId: p.id }))
     );
-    const groups = groupMeetingsByPlace(meetings, places);
+    const groups = groupMeetingsByPlace(meetings, places, getMeetingLocations());
     const stat = new Map<string, { meetings: number; people: number; personIds: string[] }>();
     for (const g of groups) {
       if (!g.place) continue;
@@ -609,7 +610,11 @@ export default function PeoplePage() {
         // Whole-network view: uses the full directory, not the search-filtered
         // list, so typing in the people search never silently prunes nodes and
         // their edges from the "whole network." Search narrows Grid/Map.
-        <RelationshipGraph people={people} onOpen={(pid) => router.push(`/people/${pid}`)} />
+        <RelationshipGraph
+          people={people}
+          onOpen={(pid) => router.push(`/people/${pid}`)}
+          onOpenPlace={(plid) => router.push(`/people/place/${plid}`)}
+        />
       ) : view === "map" ? (
         mapMarkers.length === 0 && placeMarkers.length === 0 ? (
           <p className="text-slate-400 text-sm">
@@ -941,11 +946,15 @@ function AddPlacePanel({
       )}
 
       <p className="text-sm text-slate-400 mt-3 mb-1">
-        {coord ? "Tap the map or drag the pin to adjust" : "Tap the map to drop a pin"}
+        {coord ? "Search, tap the map, or drag the pin to adjust" : "Search an address, or tap the map to drop a pin"}
       </p>
       <LocationPicker
         value={coord}
         onChange={(lat, lng) => setCoord({ lat, lng })}
+        // A searched result already carries a name; offer it rather than
+        // making the user retype what they just typed. Only when the name
+        // field is still empty, so it never overwrites their own wording.
+        onResolveName={(label) => setName((n) => n.trim() ? n : label.split(",")[0].trim())}
         initialCenter={anchor ? { lat: anchor.lat, lng: anchor.lng } : undefined}
       />
 

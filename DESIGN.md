@@ -33,6 +33,12 @@ typography:
     fontSize: "clamp(1rem, 2.5vw, 1.25rem)"
     fontWeight: 600
     lineHeight: 1.3
+  subtitle:
+    fontFamily: "'Source Serif 4', Georgia, serif"
+    fontSize: "0.95rem"
+    fontWeight: 400
+    fontStyle: "italic"
+    lineHeight: 1.5
   body:
     fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif"
     fontSize: "0.875rem"
@@ -43,6 +49,13 @@ typography:
     fontSize: "0.75rem"
     fontWeight: 500
     lineHeight: 1.4
+  eyebrow:
+    fontFamily: "ui-monospace, SFMono-Regular, monospace"
+    fontSize: "0.6875rem"
+    fontWeight: 500
+    lineHeight: 1.4
+    letterSpacing: "0.14em"
+    textTransform: "uppercase"
   micro:
     fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif"
     fontSize: "0.625rem"
@@ -140,8 +153,10 @@ The palette is a narrow, deliberately dark stack: one background, one panel colo
 - **Display** (700, `clamp(1.5rem, 4vw, 2.25rem)`, 1.2): Page-level `h1` only — "Thesis Analyzer," a conversation's title.
 - **Headline** (600, `clamp(1.15rem, 3vw, 1.5rem)`, 1.25): `h2`, section-level headings.
 - **Title** (600, `clamp(1rem, 2.5vw, 1.25rem)`, 1.3): `h3`, individual analysis-block headings (e.g. "Do today," "RQ1 — Documentary Record").
+- **Subtitle** (400 italic serif, 0.95rem, 1.5): The one-line gloss directly under a page or section heading — what this screen is, or what a list is showing ("Every meeting, most recent first"). Italic serif because it is the journal's own aside about its content, not content itself; it never carries a control or a fact the reader must act on. Sits fractionally above Body so it reads as part of the heading block rather than as the first line of the copy beneath it.
 - **Body** (400, 0.875rem/14px, 1.7): Analysis prose and card copy. The unusually tall 1.7 line-height is deliberate — this is dense generated text read at arm's length, not marketing copy.
 - **Label** (500, 0.75rem/12px mono, 1.4): Timestamps, confidence tags, directional metadata ("them → me").
+- **Eyebrow** (500, 0.6875rem/11px mono, uppercase, 0.14em tracking): The running head above a page or section title — "Directory," "Planning," "Profile," "Location," a conversation's own category. One step below Label because it sits *above* a heading and must not compete with it; the wide tracking and uppercase are what make it read as a running head rather than as small body text. Never used for anything the reader needs to act on.
 - **Micro** (600, 0.625rem/10px sans, 1): A single glyph inside a compact circular badge (the T/A lens dots, the accordion's numbered dimension markers) — the smallest step, reserved for exactly that role. It exists because 12px (Label) doesn't fit comfortably as a centered single character inside a 20px circle; two components converged on 10px independently before either used a token for it.
 
 ### Named Rules

@@ -30,22 +30,63 @@ export interface PlaceGroup {
   meetings: Meeting[];
 }
 
-/** Group meetings by resolved place. Located meetings that snap to a place are
- *  grouped under it; everything else is grouped under `place: null`, keyed by
- *  the meeting's raw Omi `placeName` (or "Unknown location"). Pure. */
-export function groupMeetingsByPlace(meetings: Meeting[], places: Place[]): PlaceGroup[] {
+/**
+ * The effective location of a meeting: a manual correction when one exists,
+ * otherwise whatever Omi reported. Pure — the caller supplies the overrides.
+ *
+ * Precedence is deliberate. An explicit `placeId` is a direct statement by the
+ * user and beats every distance calculation; corrected coordinates beat Omi's;
+ * Omi's are the floor. That ordering is what makes a wrong or missing GPS fix
+ * repairable instead of permanent.
+ */
+export function effectiveMeetingLocation(
+  meeting: Meeting,
+  overrides: Record<string, MeetingLocationOverride> = {}
+): { lat?: number; lng?: number; placeId?: string; placeName?: string } {
+  const o = overrides[meeting.conversationId];
+  return {
+    lat: o?.lat ?? meeting.lat,
+    lng: o?.lng ?? meeting.lng,
+    placeId: o?.placeId,
+    placeName: o?.placeName ?? meeting.placeName,
+  };
+}
+
+/** The override shape this module needs, kept structural so `place-resolve`
+ *  stays free of the client-only storage module and remains testable. */
+export interface MeetingLocationOverride {
+  lat?: number;
+  lng?: number;
+  placeId?: string;
+  placeName?: string;
+}
+
+/** Group meetings by resolved place. A meeting pinned to a place by hand is
+ *  grouped under it outright; otherwise a located meeting that snaps within
+ *  SNAP_RADIUS_M is grouped under the nearest place, and everything else is
+ *  grouped under `place: null`, keyed by its place name (or "Unknown
+ *  location"). Pure. */
+export function groupMeetingsByPlace(
+  meetings: Meeting[],
+  places: Place[],
+  overrides: Record<string, MeetingLocationOverride> = {}
+): PlaceGroup[] {
   const byPlace = new Map<string, PlaceGroup>();
   const byRaw = new Map<string, PlaceGroup>();
 
   for (const m of meetings) {
-    const located = m.lat != null && m.lng != null;
-    const place = located ? resolvePlaceFrom({ lat: m.lat!, lng: m.lng! }, places) : null;
+    const eff = effectiveMeetingLocation(m, overrides);
+    // An explicit assignment short-circuits proximity entirely — but only to a
+    // place that still exists, so a stale id falls back rather than vanishing.
+    const pinned = eff.placeId ? places.find((p) => p.id === eff.placeId) ?? null : null;
+    const located = eff.lat != null && eff.lng != null;
+    const place = pinned ?? (located ? resolvePlaceFrom({ lat: eff.lat!, lng: eff.lng! }, places) : null);
     if (place) {
       const g = byPlace.get(place.id) ?? { place, meetings: [] };
       g.meetings.push(m);
       byPlace.set(place.id, g);
     } else {
-      const raw = (m.placeName ?? "").trim() || "Unknown location";
+      const raw = (eff.placeName ?? "").trim() || "Unknown location";
       const g = byRaw.get(raw) ?? { place: null, rawName: raw, meetings: [] };
       g.meetings.push(m);
       byRaw.set(raw, g);
