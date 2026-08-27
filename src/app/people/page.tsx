@@ -418,47 +418,32 @@ export default function PeoplePage() {
           />
         </div>
 
+        {/* Four views is one too many to spell out on a 320px phone: at that
+            width the labelled control ran 319px wide inside a 288px column,
+            clipping "Places" off-screen and pushing the whole page into
+            horizontal scroll. Below `sm` the labels drop and the icons carry
+            the control — each button keeps its name for screen readers and a
+            44px square for thumbs, so nothing is hidden, only compacted. */}
         <div className="flex items-center bg-slate-800 rounded-lg p-1 flex-shrink-0" role="group" aria-label="View mode">
-          <button
-            onClick={() => setView("grid")}
-            className={`flex items-center gap-1.5 text-sm min-h-[36px] px-3 py-1.5 rounded-md transition-colors ${
-              view === "grid" ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white"
-            }`}
-            aria-pressed={view === "grid"}
-          >
-            <SquareIcon className="w-4 h-4" />
-            Grid
-          </button>
-          <button
-            onClick={() => setView("web")}
-            className={`flex items-center gap-1.5 text-sm min-h-[36px] px-3 py-1.5 rounded-md transition-colors ${
-              view === "web" ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white"
-            }`}
-            aria-pressed={view === "web"}
-          >
-            <UsersIcon className="w-4 h-4" />
-            Web
-          </button>
-          <button
-            onClick={() => setView("map")}
-            className={`flex items-center gap-1.5 text-sm min-h-[36px] px-3 py-1.5 rounded-md transition-colors ${
-              view === "map" ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white"
-            }`}
-            aria-pressed={view === "map"}
-          >
-            <CompassIcon className="w-4 h-4" />
-            Map
-          </button>
-          <button
-            onClick={() => setView("places")}
-            className={`flex items-center gap-1.5 text-sm min-h-[36px] px-3 py-1.5 rounded-md transition-colors ${
-              view === "places" ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white"
-            }`}
-            aria-pressed={view === "places"}
-          >
-            <MapPinIcon className="w-4 h-4" />
-            Places
-          </button>
+          {([
+            { key: "grid", label: "Grid", Icon: SquareIcon },
+            { key: "web", label: "Web", Icon: UsersIcon },
+            { key: "map", label: "Map", Icon: CompassIcon },
+            { key: "places", label: "Places", Icon: MapPinIcon },
+          ] as const).map(({ key, label, Icon }) => (
+            <button
+              key={key}
+              onClick={() => setView(key)}
+              aria-pressed={view === key}
+              aria-label={label}
+              className={`flex items-center justify-center gap-1.5 text-sm min-h-[36px] min-w-[44px] sm:min-w-0 px-2.5 sm:px-3 py-1.5 rounded-md transition-colors ${
+                view === key ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <Icon className="w-4 h-4 flex-shrink-0" />
+              <span className="hidden sm:inline">{label}</span>
+            </button>
+          ))}
         </div>
 
         <button
@@ -682,19 +667,27 @@ export default function PeoplePage() {
 
 // ── letter index rail ──
 //
-// A card-catalog tab index, fixed to the viewport edge rather than laid out
-// as a content column — it carries no content of its own, only a jump
-// affordance, so it doesn't compete with the Single Column Rule the way a
-// real sidebar would. Individual letters run well under the 44px touch-target
-// floor: 26 targets can't each clear that inside any phone's viewport height,
-// the same constraint every real alphabet-index control (iOS Contacts
-// included) accepts. A miss still lands within a line or two of the right
-// section, so the control stays usable despite the small targets.
+// A card-catalog tab index, fixed rather than laid out as a content column —
+// it carries no content of its own, only a jump affordance, so it doesn't
+// compete with the Single Column Rule the way a real sidebar would. Individual
+// letters run well under the 44px touch-target floor: 26 targets can't each
+// clear that inside any phone's viewport height, the same constraint every
+// real alphabet-index control (iOS Contacts included) accepts. A miss still
+// lands within a line or two of the right section, so the control stays usable
+// despite the small targets.
+//
+// It tracks the *column*, not the viewport. Pinned to the viewport edge it
+// was adjacent to the list on a phone but stranded 310px away from it at
+// 1440px — a tab index floating in empty margin, pointing at nothing. From
+// `md` up it aligns to the right edge of the centred 768px column instead,
+// landing inside the `pr-9` gutter the list already reserves for it. The
+// breakpoint is md, not lg, because at exactly 768px the calc evaluates to
+// zero — identical to `right-0` — so the two regimes meet with no seam.
 function LetterRail({ present, onJump }: { present: Set<string>; onJump: (letter: string) => void }) {
   return (
     <nav
       aria-label="Jump to letter"
-      className="fixed right-0 top-1/2 -translate-y-1/2 z-10 flex flex-col items-center rounded-l-lg bg-slate-950/85 py-2 pl-1 pr-[max(0.25rem,env(safe-area-inset-right))]"
+      className="fixed right-0 md:right-[calc(50%-384px)] top-1/2 -translate-y-1/2 z-10 flex flex-col items-center rounded-l-lg bg-slate-950/85 py-2 pl-1 pr-[max(0.25rem,env(safe-area-inset-right))]"
     >
       {ALPHABET.map((letter) => {
         const has = present.has(letter);

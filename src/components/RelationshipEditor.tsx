@@ -145,8 +145,12 @@ export default function RelationshipEditor({ selfId, selfName, people, editing, 
         </div>
       </div>
 
+      {/* Roles stack on a phone: these labels now carry real names ("Barbara's
+          role"), which two 140px columns truncate to uselessness at 320px.
+          Side by side from `sm`, where the pairing reads as the two halves of
+          one relationship. */}
       {showRoles && (
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
           <div>
             <label className="block text-sm text-slate-400 mb-1 truncate" title={otherRoleLabel}>{otherRoleLabel}</label>
             <input value={otherRole} onChange={(e) => setOtherRole(e.target.value)} placeholder="e.g. daughter"

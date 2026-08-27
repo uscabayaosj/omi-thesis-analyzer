@@ -149,13 +149,41 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
   }
 }
 
-/* Coarse pointer (touch) — larger targets */
+/* Coarse pointer (touch) — larger targets.
+   Two things this rule used to miss, both of which made the app's stated
+   44px floor quietly untrue on a phone:
+
+   1. `min-height` has no effect on a non-replaced *inline* box, so every
+      inline text link ("view conversation →", "View →") ignored it and sat
+      at ~38px while computing a 44px min-height — the guarantee looked
+      satisfied in devtools and wasn't. Handled by the padding rule below.
+   2. Form controls were never in the selector at all, so inputs and selects
+      (the alias field at 28px) were exempt from the floor the rest of the
+      app enforces. */
 @media (pointer: coarse) {
   .card {
     min-height: 44px;
   }
-  button, a, [role="button"], [role="option"], [role="radio"] {
+  button, a, [role="button"], [role="option"], [role="radio"],
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+  select, textarea, summary {
     min-height: 44px;
+  }
+  /* Inline links can't grow via min-height, and forcing a flex box on every
+     link would stop long ones wrapping mid-sentence. Vertical padding is the
+     one lever that enlarges an inline element's hit area without touching
+     line layout — the padded box overflows the line box instead of pushing
+     lines apart. `:where()` keeps this at zero specificity so any explicit
+     padding utility still wins. */
+  :where(a:not(.block):not(.flex):not(.inline-flex):not(.grid):not(.inline-block)) {
+    padding-block: 0.375rem;
+  }
+  /* Leaflet's attribution is a licence credit, not an app control. It is
+     deliberately outside the 44px floor: padding it out inflates the map's
+     footer bar, and nobody is meant to hit it with a thumb. */
+  .leaflet-control-attribution a {
+    padding-block: 0;
+    min-height: 0;
   }
 }
 
