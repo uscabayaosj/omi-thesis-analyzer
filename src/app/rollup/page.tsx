@@ -393,11 +393,14 @@ function RollupPageInner() {
       </Link>
 
       <header className="mb-6">
+        <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-500">
+          Planning
+        </p>
         <h1 className="font-bold text-white mb-2 flex items-center gap-2">
           <CalendarIcon className="w-6 h-6 text-cyan-400 flex-shrink-0" />
           Daily Rollup
         </h1>
-        <p className="text-slate-400 text-sm">
+        <p className="text-slate-400 font-serif italic text-[0.95rem]">
           Pick a day to turn its conversations into one short plan for tomorrow. Anything still open carries over on its own.
         </p>
         {pushSupported ? (
@@ -455,11 +458,11 @@ function RollupPageInner() {
                   className="w-full text-left card p-5 hover:border-cyan-500/50 transition-colors min-h-[44px] flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div>
-                    <p className="font-semibold text-white">{formatDateTime(`${day}T12:00:00`, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
-                    <p className="text-slate-400 text-sm mt-1">{list.length} conversation{list.length === 1 ? "" : "s"}</p>
+                    <p className="font-serif font-semibold text-white">{formatDateTime(`${day}T12:00:00`, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
+                    <p className="text-slate-400 font-mono text-sm mt-1">{list.length} conversation{list.length === 1 ? "" : "s"}</p>
                   </div>
                   {hasRollup && (
-                    <span className="text-xs bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 px-2 py-0.5 rounded-full">rollup saved</span>
+                    <span className="font-mono text-xs bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 px-2 py-0.5 rounded-full">rollup saved</span>
                   )}
                 </button>
               </li>
@@ -480,8 +483,8 @@ function RollupPageInner() {
           </button>
 
           <div className="card p-5 mb-6">
-            <p className="font-semibold text-white">{formatDateTime(`${selectedDay}T12:00:00`, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
-            <p className="text-slate-400 text-sm mt-1">{selectedConvos.length} conversation{selectedConvos.length === 1 ? "" : "s"} this day</p>
+            <p className="font-serif font-semibold text-white">{formatDateTime(`${selectedDay}T12:00:00`, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
+            <p className="text-slate-400 font-mono text-sm mt-1">{selectedConvos.length} conversation{selectedConvos.length === 1 ? "" : "s"} this day</p>
 
             {/* One list per time-of-day group rather than a single outer list:
                 a role="list" may only own listitems, and the group wrappers in
@@ -492,17 +495,17 @@ function RollupPageInner() {
                 : ([[null, selectedConvos]] as [string | null, ConvoLite[]][])
               ).map(([label, group]) => (
                 <div key={label ?? "all"}>
-                  {label && <p className="text-xs font-semibold text-slate-400 mb-1.5">{label}</p>}
+                  {label && <p className="font-mono text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1.5">{label}</p>}
                   <div className="space-y-1.5" role="list" aria-label={label ? `${label} conversations` : "Conversations this day"}>
                     {group.map((c) => {
                       const analyzed = !!getAdhdAnalysis(c.id);
                       return (
                         <div key={c.id} role="listitem" className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-slate-900/60">
-                          <span className="text-sm text-slate-300 truncate min-w-0">{c.structured?.title || "Untitled"}</span>
+                          <span className="font-serif text-sm text-slate-300 truncate min-w-0">{c.structured?.title || "Untitled"}</span>
                           {analyzed ? (
-                            <span className="text-xs bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 px-2 py-0.5 rounded-full flex-shrink-0">analyzed</span>
+                            <span className="font-mono text-xs bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 px-2 py-0.5 rounded-full flex-shrink-0">analyzed</span>
                           ) : (
-                            <span className="text-xs bg-slate-800/60 border border-slate-700 text-slate-400 px-2 py-0.5 rounded-full flex-shrink-0">not yet</span>
+                            <span className="font-mono text-xs bg-slate-800/60 border border-slate-700 text-slate-400 px-2 py-0.5 rounded-full flex-shrink-0">not yet</span>
                           )}
                         </div>
                       );

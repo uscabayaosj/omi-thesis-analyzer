@@ -269,10 +269,10 @@ const ConversationRow = memo(function ConversationRow({
               {convo.structured?.title || "Untitled"}
             </h2>
             {convo.structured?.overview && (
-              <p className="text-slate-400 text-sm mt-1 line-clamp-1">{convo.structured.overview}</p>
+              <p className="text-slate-400 font-serif italic text-sm mt-1 line-clamp-1">{convo.structured.overview}</p>
             )}
             <div className="flex items-center gap-3 mt-2 text-xs text-slate-400 flex-wrap">
-              <span className="whitespace-nowrap">{formatDateTime(convo.created_at)}</span>
+              <span className="font-mono whitespace-nowrap">{formatDateTime(convo.created_at)}</span>
               {convo.structured?.category && (
                 <span className="bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap">{convo.structured.category}</span>
               )}
@@ -294,8 +294,10 @@ const ConversationRow = memo(function ConversationRow({
     <Link
       href={`/conversation/${convo.id}`}
       aria-label={`${convo.structured?.title || "Untitled conversation"}${isAnalyzedEither ? " (analyzed)" : ""}`}
-      className={`card p-5 block transition-colors min-h-[44px] ${
-        isAnalyzedEither ? "hover:border-emerald-500/50" : "hover:border-cyan-500/50"
+      className={`card p-5 block transition-colors min-h-[44px] border-l-2 ${
+        isAnalyzedEither
+          ? "border-l-emerald-500/40 hover:border-emerald-500/50"
+          : "border-l-transparent hover:border-cyan-500/50"
       }`}
     >
       <div className="flex items-start gap-3">
@@ -305,10 +307,10 @@ const ConversationRow = memo(function ConversationRow({
             {convo.structured?.title || "Untitled"}
           </h2>
           {convo.structured?.overview && (
-            <p className="text-slate-400 text-sm mt-1 line-clamp-2">{convo.structured.overview}</p>
+            <p className="text-slate-400 font-serif italic text-sm mt-1 line-clamp-2">{convo.structured.overview}</p>
           )}
           <div className="flex items-center gap-3 mt-2 text-xs text-slate-400 flex-wrap">
-            <span className="whitespace-nowrap">{formatDateTime(convo.created_at)}</span>
+            <span className="font-mono whitespace-nowrap">{formatDateTime(convo.created_at)}</span>
             {convo.structured?.category && (
               <span className="bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap">{convo.structured.category}</span>
             )}
@@ -355,6 +357,23 @@ function HomeInner() {
   const [refreshing, setRefreshing] = useState(false);
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Journal dateline for the masthead. Computed client-side only, after
+  // mount: `new Date()` during SSR reads the server's clock/timezone, which
+  // can print a different date than the browser's — a literal SSR/CSR
+  // mismatch that React's hydration flags as an error. Starting from `null`
+  // renders identical (empty) markup on the server and the first client
+  // pass, then fills in once mounted.
+  const [todayDateline, setTodayDateline] = useState<string | null>(null);
+  useEffect(() => {
+    setTodayDateline(
+      new Date().toLocaleDateString("en-GB", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    );
+  }, []);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [exportNotice, setExportNotice] = useState<string | null>(null);
@@ -696,14 +715,22 @@ function HomeInner() {
   return (
     <main className="max-w-3xl mx-auto px-4 py-8">
       <header className="mb-6">
+        {/* Dateline — the masthead's one signature touch: today's date set
+            like a journal entry's opening line, mono-tracked and quiet. It's
+            what makes the page read as "today's page in the journal" rather
+            than a static app title, without adding any new color or icon. */}
+        <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-500" aria-hidden={!todayDateline}>
+          {todayDateline || " "}
+        </p>
+
         {/* Wordmark: the mark carries the brand's navy/cyan two-tone, so it is
             sized to the cap-height of TRACE and tracked wide to match the logo
             lockup rather than sitting as a generic leading icon. */}
-        <h1 className="mb-2 flex items-center gap-2.5 text-3xl font-bold text-white">
-          <TraceMark className="w-9 h-9 flex-shrink-0 text-white" />
+        <h1 className="mb-2 flex items-center gap-3 text-4xl font-bold text-white">
+          <TraceMark className="w-10 h-10 flex-shrink-0 text-white" />
           <span className="tracking-[0.18em]">TRACE</span>
         </h1>
-        <p className="text-slate-400">
+        <p className="text-slate-400 font-serif italic text-[0.95rem]">
           Personal &amp; research assistant — your Omi conversations as thesis evidence and a daily plan
         </p>
 
@@ -712,36 +739,43 @@ function HomeInner() {
             the two utilities (Backup, Refresh) sit beside the sync status they
             act on. The old single non-wrapping row put ~600px of flex-shrink-0
             controls into a 343px viewport — Search, Backup, and Refresh were
-            simply off-screen on mobile. */}
-        <nav aria-label="Sections" className="mt-3 -mx-3 flex flex-wrap items-center gap-x-1 gap-y-0">
-          <Link
-            href="/rollup"
-            className={BUTTON_GHOST}
-          >
-            <CalendarIcon className="w-4 h-4 flex-shrink-0" />
-            Daily Rollup
-          </Link>
-          <Link
-            href="/people"
-            className={BUTTON_GHOST}
-          >
-            <UsersIcon className="w-4 h-4 flex-shrink-0" />
-            People
-          </Link>
-          <Link
-            href="/usage"
-            className={BUTTON_GHOST}
-          >
-            <TrendingUpIcon className="w-4 h-4 flex-shrink-0" />
-            Usage
-          </Link>
-          <Link
-            href="/search"
-            className={BUTTON_GHOST}
-          >
-            <SearchIcon className="w-4 h-4 flex-shrink-0" />
-            Search Analyses
-          </Link>
+            simply off-screen on mobile. Rendered as a labeled contents rule
+            (small caps "Contents" + hairline) rather than plain ghost pills,
+            so it reads as a journal's table of contents, not app-shell nav. */}
+        <nav aria-label="Sections" className="mt-5 -mx-3">
+          <p className="mb-1.5 px-3 font-mono text-[10px] uppercase tracking-[0.16em] text-slate-500">
+            Contents
+          </p>
+          <div className="flex flex-wrap items-center gap-x-1 gap-y-0">
+            <Link
+              href="/rollup"
+              className={BUTTON_GHOST}
+            >
+              <CalendarIcon className="w-4 h-4 flex-shrink-0" />
+              Daily Rollup
+            </Link>
+            <Link
+              href="/people"
+              className={BUTTON_GHOST}
+            >
+              <UsersIcon className="w-4 h-4 flex-shrink-0" />
+              People
+            </Link>
+            <Link
+              href="/usage"
+              className={BUTTON_GHOST}
+            >
+              <TrendingUpIcon className="w-4 h-4 flex-shrink-0" />
+              Usage
+            </Link>
+            <Link
+              href="/search"
+              className={BUTTON_GHOST}
+            >
+              <SearchIcon className="w-4 h-4 flex-shrink-0" />
+              Search Analyses
+            </Link>
+          </div>
         </nav>
 
         {/* Sync status + its two utilities — quiet meta row, read once per visit */}

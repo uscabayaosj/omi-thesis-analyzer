@@ -92,7 +92,7 @@ function AnalysisAgeBadge({ timestamp }: { timestamp: string }) {
 
   return (
     <span
-      className={`text-xs px-2 py-0.5 rounded-full font-normal ${
+      className={`font-mono text-xs px-2 py-0.5 rounded-full font-normal ${
         isStale
           ? "bg-amber-900/50 text-amber-300"
           : "bg-cyan-900/50 text-cyan-200"
@@ -134,12 +134,12 @@ function VersionHistory({
             className="w-full text-left p-3 rounded-lg bg-slate-900 hover:bg-slate-700 transition-colors min-h-[44px]"
           >
             <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-300">
+              <span className="font-serif text-sm text-slate-300">
                 Version {versions.length - i}
               </span>
-              <span className="text-xs text-slate-400">{formatDateTime(v.timestamp)}</span>
+              <span className="font-mono text-xs text-slate-400">{formatDateTime(v.timestamp)}</span>
             </div>
-            <p className="text-xs text-slate-400 mt-1">Click to view this version</p>
+            <p className="font-serif italic text-xs text-slate-400 mt-1">Click to view this version</p>
           </button>
         ))}
       </div>
@@ -537,14 +537,17 @@ export default function ConversationPage() {
       {conversation && (
         <>
           <header className="mb-6">
+            <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-500">
+              {conversation.structured?.category || "Entry"}
+            </p>
             <h1 className="font-bold text-white mb-2">
               <span aria-hidden="true">{conversation.structured?.emoji || "💬"}</span>{" "}
               {conversation.structured?.title || "Untitled"}
             </h1>
             {conversation.structured?.overview && (
-              <p className="text-slate-400">{conversation.structured.overview}</p>
+              <p className="text-slate-400 font-serif italic text-[0.95rem]">{conversation.structured.overview}</p>
             )}
-            <p className="text-slate-400 text-sm mt-2">
+            <p className="text-slate-400 text-sm mt-2 font-mono">
               {formatDateTime(conversation.created_at, {
                 weekday: "long", day: "numeric", month: "long", year: "numeric",
                 hour: "2-digit", minute: "2-digit",
@@ -621,14 +624,14 @@ export default function ConversationPage() {
                   <LoaderIcon className="w-6 h-6 text-cyan-400 animate-spin flex-shrink-0" />
                   <div>
                     <p className="font-semibold text-white">Analyzing conversation...</p>
-                    <p className="text-slate-400 text-sm mt-1">Running 8-dimension Pioneer Sovereignty analysis</p>
+                    <p className="text-slate-400 font-serif italic text-sm mt-1">Running 8-dimension Pioneer Sovereignty analysis</p>
                   </div>
                 </div>
               ) : (
                 <div>
                   <CompassIcon className="w-7 h-7 mx-auto mb-2 text-cyan-400" />
                   <p className="font-semibold text-white">Run Pioneer Sovereignty Analysis</p>
-                  <p className="text-slate-400 text-sm mt-1">4 research questions + conditions + rival hypothesis + refutation</p>
+                  <p className="text-slate-400 font-serif italic text-sm mt-1">4 research questions + conditions + rival hypothesis + refutation</p>
                 </div>
               )}
             </button>
@@ -743,7 +746,7 @@ export default function ConversationPage() {
                     <div>
                       <ClipboardIcon className="w-7 h-7 mx-auto mb-2 text-cyan-400" />
                       <p className="font-semibold text-white">Run ADHD Aid</p>
-                      <p className="text-slate-400 text-sm mt-1">Commitments, people, open loops, and next actions</p>
+                      <p className="text-slate-400 font-serif italic text-sm mt-1">Commitments, people, open loops, and next actions</p>
                     </div>
                   )}
                 </button>
@@ -856,7 +859,7 @@ export default function ConversationPage() {
                 <CogIcon className="w-5 h-5 text-slate-400 flex-shrink-0" />
                 <div>
                   <p className="font-semibold text-white">Custom Analysis</p>
-                  <p className="text-slate-400 text-sm">
+                  <p className="text-slate-400 font-serif italic text-sm">
                     {customResult
                       ? `Last: "${customPrompt.length > 50 ? `${customPrompt.substring(0, 50)}…` : customPrompt}"`
                       : "Ask any question about this conversation through the lens of Pioneer Sovereignty"}

@@ -138,11 +138,14 @@ function WeekPageInner() {
       </Link>
 
       <header className="mb-6">
+        <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-500">
+          Planning
+        </p>
         <h1 className="font-bold text-white mb-2 flex items-center gap-2">
           <CalendarIcon className="w-6 h-6 text-cyan-400 flex-shrink-0" />
           This Week
         </h1>
-        <p className="text-slate-400 text-sm">{weekLabel}</p>
+        <p className="text-slate-400 font-mono text-sm">{weekLabel}</p>
       </header>
 
       <div className="flex items-center justify-between mb-6">
@@ -193,7 +196,7 @@ function WeekPageInner() {
 
       {!stored && (
         <div className="card p-8 text-center">
-          <p className="text-slate-400 mb-4">
+          <p className="text-slate-400 font-serif italic mb-4">
             {dayRollups.length === 0
               ? "No daily rollups yet this week — run at least one from Daily Rollup first."
               : `${dayRollups.length} of 7 days have a rollup ready to synthesize.`}
@@ -212,7 +215,7 @@ function WeekPageInner() {
       {stored && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <p className="text-xs text-slate-500">
+            <p className="font-mono text-xs text-slate-500">
               Synthesized from {stored.dayCount} of 7 days
             </p>
             <button

@@ -65,6 +65,9 @@ export default function SearchPage() {
         Back
       </Link>
 
+      <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-500">
+        Archive
+      </p>
       <h1 className="text-2xl font-bold text-white mb-6">Search Analyses</h1>
 
       <div className="relative mb-6">
@@ -89,39 +92,39 @@ export default function SearchPage() {
       {error && <p className="text-sm text-red-400 mb-4">{error}</p>}
 
       {!hasQuery && !error && (
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-slate-400 font-serif italic">
           Search across every stored thesis analysis and group analysis.
         </p>
       )}
 
       {hasQuery && !result.configured && !error && (
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-slate-400 font-serif italic">
           Search needs the server-side store configured (same one used for cross-device sync). Nothing to search yet.
         </p>
       )}
 
-      {hasQuery && loading && <p className="text-sm text-slate-400">Searching…</p>}
+      {hasQuery && loading && <p className="text-sm text-slate-400 font-mono">Searching…</p>}
 
       {hasQuery && !loading && result.configured && !hasResults && !error && (
-        <p className="text-sm text-slate-400">No matches for &ldquo;{query.trim()}&rdquo;.</p>
+        <p className="text-sm text-slate-400 font-serif italic">No matches for &ldquo;{query.trim()}&rdquo;.</p>
       )}
 
       {result.conversationResults.length > 0 && (
         <section className="mb-8">
-          <h2 className="text-sm font-medium text-slate-400 mb-3">Conversations</h2>
+          <h2 className="font-mono text-xs uppercase tracking-[0.1em] font-medium text-slate-400 mb-3">Conversations</h2>
           <ul className="space-y-3 list-none">
             {result.conversationResults.map((r) => (
               <li key={r.conversationId} className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
                 <Link href={`/conversation/${r.conversationId}`} className="block">
                   <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="text-slate-200 font-medium">{r.title}</span>
-                    <span className="text-xs text-slate-500 flex-shrink-0">{formatDate(r.date)}</span>
+                    <span className="text-slate-200 font-serif font-medium">{r.title}</span>
+                    <span className="text-xs font-mono text-slate-500 flex-shrink-0">{formatDate(r.date)}</span>
                   </div>
                   <div className="space-y-1.5">
                     {r.matches.map((m) => (
                       <div key={m.field} className="text-sm">
-                        <span className="text-cyan-400">{m.label}: </span>
-                        <span className="text-slate-400">{m.snippet}</span>
+                        <span className="text-cyan-400 font-mono text-xs uppercase tracking-wide">{m.label}: </span>
+                        <span className="text-slate-400 font-serif italic">{m.snippet}</span>
                       </div>
                     ))}
                   </div>
@@ -134,19 +137,19 @@ export default function SearchPage() {
 
       {result.groupResults.length > 0 && (
         <section>
-          <h2 className="text-sm font-medium text-slate-400 mb-3">Groups</h2>
+          <h2 className="font-mono text-xs uppercase tracking-[0.1em] font-medium text-slate-400 mb-3">Groups</h2>
           <ul className="space-y-3 list-none">
             {result.groupResults.map((r) => (
               <li key={r.conversationIds.join(",")} className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
                 <Link href={`/analyze-group?ids=${r.conversationIds.map(encodeURIComponent).join(",")}`} className="block">
-                  <div className="text-slate-200 font-medium mb-2">
+                  <div className="text-slate-200 font-serif font-medium mb-2">
                     {r.conversationTitles.length > 0 ? r.conversationTitles.join(", ") : `${r.conversationIds.length} conversations`}
                   </div>
                   <div className="space-y-1.5">
                     {r.matches.map((m) => (
                       <div key={m.field} className="text-sm">
-                        <span className="text-cyan-400">{m.label}: </span>
-                        <span className="text-slate-400">{m.snippet}</span>
+                        <span className="text-cyan-400 font-mono text-xs uppercase tracking-wide">{m.label}: </span>
+                        <span className="text-slate-400 font-serif italic">{m.snippet}</span>
                       </div>
                     ))}
                   </div>

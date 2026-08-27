@@ -418,11 +418,14 @@ function GroupAnalysisContent() {
       </Link>
 
       <header className="mb-6">
+        <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-500">
+          Synthesis
+        </p>
         <h1 className="font-bold text-white mb-2 flex items-center gap-2">
           <CompassIcon className="w-6 h-6 text-cyan-400 flex-shrink-0" />
           Group Analysis
         </h1>
-        <p className="text-slate-400 text-sm">
+        <p className="text-slate-400 font-serif italic text-sm">
           {ids.length} conversations selected for cross-conversation analysis
         </p>
         {skipped > 0 && (
@@ -433,7 +436,7 @@ function GroupAnalysisContent() {
         {conversations.length > 0 && (
           <div className="flex flex-wrap gap-2 mt-3" role="list" aria-label="Conversations in this group">
             {conversations.map((c) => (
-              <span key={c.id} className="text-sm bg-slate-800 text-slate-300 px-3 py-1.5 rounded-md" role="listitem">
+              <span key={c.id} className="font-serif text-sm bg-slate-800 text-slate-300 px-3 py-1.5 rounded-md" role="listitem">
                 <span aria-hidden="true">{c.emoji}</span> {c.title}
               </span>
             ))}
@@ -479,14 +482,14 @@ function GroupAnalysisContent() {
               <LoaderIcon className="w-6 h-6 text-cyan-400 animate-spin flex-shrink-0" />
               <div>
                 <p className="font-semibold text-white">Analyzing {ids.length} conversations...</p>
-                <p className="text-slate-400 text-sm mt-1">Running cross-conversation analysis</p>
+                <p className="text-slate-400 font-serif italic text-sm mt-1">Running cross-conversation analysis</p>
               </div>
             </div>
           ) : (
             <div>
               <CompassIcon className="w-7 h-7 mx-auto mb-2 text-cyan-400" />
               <p className="font-semibold text-white">Run Group Analysis</p>
-              <p className="text-slate-400 text-sm mt-1">Find patterns across {ids.length} conversations</p>
+              <p className="text-slate-400 font-serif italic text-sm mt-1">Find patterns across {ids.length} conversations</p>
             </div>
           )}
         </button>
@@ -499,7 +502,7 @@ function GroupAnalysisContent() {
             <h2 className="font-bold text-white flex items-center gap-2 flex-wrap">
               <CompassIcon className="w-5 h-5 text-cyan-400 flex-shrink-0" />
               Cross-Conversation Analysis
-              <span className="text-xs bg-cyan-900/50 text-cyan-200 px-2 py-0.5 rounded-full font-normal">saved</span>
+              <span className="font-mono text-xs bg-cyan-900/50 text-cyan-200 px-2 py-0.5 rounded-full font-normal">saved</span>
             </h2>
             <div className="flex items-center gap-2 flex-wrap">
               <button
@@ -547,7 +550,7 @@ function GroupAnalysisContent() {
                     <section.icon className="w-[1.05em] h-[1.05em] flex-shrink-0" />
                     {section.title}
                   </h3>
-                  <p className="text-xs text-slate-400 mb-3">{section.subtitle}</p>
+                  <p className="text-xs text-slate-400 font-serif italic mb-3">{section.subtitle}</p>
                   <Prose text={section.content} className="text-sm leading-relaxed" />
                 </div>
               </div>
@@ -568,7 +571,7 @@ function GroupAnalysisContent() {
             <CogIcon className="w-5 h-5 text-slate-400 flex-shrink-0" />
             <div>
               <p className="font-semibold text-white">Custom Group Analysis</p>
-              <p className="text-slate-400 text-sm">Ask a question across all selected conversations</p>
+              <p className="text-slate-400 font-serif italic text-sm">Ask a question across all selected conversations</p>
             </div>
           </div>
           <svg className={`w-5 h-5 text-slate-400 transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] ${showCustom ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -633,7 +636,7 @@ function GroupAnalysisContent() {
                 <CogIcon className="w-[1.05em] h-[1.05em] flex-shrink-0" />
                 Custom Group Analysis
               </h3>
-              <p className="text-xs text-slate-400 mb-1">Prompt: &ldquo;{customPrompt}&rdquo;</p>
+              <p className="text-xs text-slate-400 font-serif italic mb-1">Prompt: &ldquo;{customPrompt}&rdquo;</p>
               <Prose text={customResult} className="text-sm leading-relaxed mt-3" />
             </div>
           </div>

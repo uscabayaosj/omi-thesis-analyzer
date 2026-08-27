@@ -62,8 +62,19 @@
   --dur-enter: 200ms;
 }
 
+/* Lamplight atmosphere — the "field journal" concept made literal: a single
+   warm light source pooling from the top of the page, and a fine paper grain
+   across the whole field. Both are background-image tricks, not elevation —
+   the Flat Field Rule (no shadows) is untouched, this is texture on the one
+   surface that already exists, not a second surface floating above it. */
 body {
-  background: var(--background);
+  background:
+    radial-gradient(ellipse 900px 560px at 50% -8%, rgba(185, 109, 51, 0.16), transparent 62%),
+    /* eslint-disable-next-line -- inline SVG noise; a data URI keeps this a
+       zero-request, zero-dependency grain instead of shipping a PNG asset */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E"),
+    var(--background);
+  background-attachment: fixed, fixed, fixed;
   color: var(--foreground);
   /* Safe areas for notched phones (iPhone X+, Pixel, etc.) */
   padding-top: env(safe-area-inset-top);

@@ -344,11 +344,14 @@ export default function PeoplePage() {
         All conversations
       </Link>
 
+      <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-500">
+        Directory
+      </p>
       <h1 className="mb-2 flex items-center gap-2.5 text-3xl font-bold text-white">
         <UsersIcon className="w-8 h-8 flex-shrink-0" />
         People
       </h1>
-      <p className="text-slate-400 mb-6">
+      <p className="text-slate-400 font-serif italic text-[0.95rem] mb-6">
         Everyone mentioned in your conversations — who they are, where you met, and what you learned.
       </p>
 
@@ -582,15 +585,15 @@ export default function PeoplePage() {
                         </div>
                       )}
                       <div className="min-w-0 flex-1">
-                        <div className="text-white font-medium truncate">{p.name}</div>
-                        {p.role && <div className="text-slate-400 text-sm truncate">{p.role}</div>}
+                        <div className="font-serif font-medium text-white truncate">{p.name}</div>
+                        {p.role && <div className="text-slate-400 font-serif italic text-sm truncate">{p.role}</div>}
                       </div>
                       {/* Meta only when there's a meeting: place (when known)
                           + when. No repeated "No meetings yet" filler down the
                           column, and no misleading label on people who have a
                           meeting but no captured location. */}
                       {m && (
-                        <div className="text-slate-400 text-xs text-right flex-shrink-0 max-w-[40%]">
+                        <div className="text-slate-400 font-mono text-xs text-right flex-shrink-0 max-w-[40%]">
                           {m.placeName && <div className="truncate">{m.placeName}</div>}
                           <div>{getAnalysisAge(m.date).label}</div>
                         </div>
@@ -646,12 +649,18 @@ export default function PeoplePage() {
             {places.map((pl) => {
               const s = placeStats.get(pl.id);
               return (
-                <Link key={pl.id} href={`/people/place/${pl.id}`} className="card p-5 block hover:border-cyan-500/50 transition-colors">
+                <Link
+                  key={pl.id}
+                  href={`/people/place/${pl.id}`}
+                  className={`card p-5 block transition-colors border-l-2 ${
+                    s ? "border-l-emerald-500/40 hover:border-emerald-500/50" : "border-l-transparent hover:border-cyan-500/50"
+                  }`}
+                >
                   <h2 className="font-serif text-lg text-white">{pl.name}</h2>
-                  <p className="text-slate-400 text-sm mt-1">
+                  <p className="text-slate-400 font-mono text-xs mt-1">
                     {s ? `${s.meetings} meeting${s.meetings === 1 ? "" : "s"} · ${s.people} ${s.people === 1 ? "person" : "people"}` : "No meetings yet"}
                   </p>
-                  {pl.notes && <p className="text-slate-400 text-sm mt-1 line-clamp-1">{pl.notes}</p>}
+                  {pl.notes && <p className="text-slate-400 font-serif italic text-sm mt-1.5 line-clamp-1">{pl.notes}</p>}
                 </Link>
               );
             })}

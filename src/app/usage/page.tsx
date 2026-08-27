@@ -18,9 +18,9 @@ function formatCost(costUsd: number | null): string {
 function StatTile({ title, summary }: { title: string; summary: UsagePeriodSummary }) {
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
-      <div className="text-sm text-slate-400 mb-1">{title}</div>
-      <div className="text-2xl font-semibold text-white">{formatCost(summary.costUsd)}</div>
-      <div className="text-sm text-slate-400 mt-1">
+      <div className="font-mono text-[11px] uppercase tracking-[0.1em] text-slate-400 mb-1">{title}</div>
+      <div className="font-mono text-2xl font-semibold text-white">{formatCost(summary.costUsd)}</div>
+      <div className="font-mono text-sm text-slate-400 mt-1">
         {summary.callCount} {summary.callCount === 1 ? "call" : "calls"}
       </div>
     </div>
@@ -30,11 +30,11 @@ function StatTile({ title, summary }: { title: string; summary: UsagePeriodSumma
 function BreakdownTable({ title, rows }: { title: string; rows: UsageBreakdownRow[] }) {
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
-      <div className="text-sm text-slate-400 mb-3">{title} — this month</div>
+      <div className="font-mono text-[11px] uppercase tracking-[0.1em] text-slate-400 mb-3">{title} — this month</div>
       {rows.length === 0 ? (
-        <div className="text-sm text-slate-500">No calls yet this month.</div>
+        <div className="text-sm text-slate-500 font-serif italic">No calls yet this month.</div>
       ) : (
-        <table className="w-full text-sm">
+        <table className="w-full font-mono text-sm">
           <tbody>
             {rows.map((row) => (
               <tr key={row.key} className="border-t border-slate-800 first:border-t-0">
@@ -80,6 +80,9 @@ export default function UsagePage() {
         Back
       </Link>
 
+      <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-500">
+        System
+      </p>
       <h1 className="text-2xl font-bold text-white mb-2">Usage</h1>
 
       <div className="mb-4">
@@ -96,16 +99,16 @@ export default function UsagePage() {
         </select>
       </div>
 
-      <p className="text-xs text-slate-500 mb-4">
+      <p className="text-xs text-slate-500 font-serif italic mb-4">
         Estimates are approximate — they don&apos;t account for prompt-caching discounts.
       </p>
 
       {error && <p className="text-sm text-red-400 mb-4">{error}</p>}
 
-      {!summary && !error && <p className="text-sm text-slate-400">Loading…</p>}
+      {!summary && !error && <p className="text-sm text-slate-400 font-mono">Loading…</p>}
 
       {summary && !summary.configured && (
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-slate-400 font-serif italic">
           Usage tracking needs the server-side store configured (same one used for cross-device sync). Nothing to show yet.
         </p>
       )}

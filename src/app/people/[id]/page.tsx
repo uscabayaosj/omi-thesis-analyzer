@@ -350,6 +350,9 @@ export default function PersonDetailPage() {
       </Link>
 
       {/* Header */}
+      <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-500">
+        Profile
+      </p>
       <div className="card p-6 mb-6">
         <div className="flex items-start gap-4">
           <div className="relative flex-shrink-0 group">
@@ -413,7 +416,7 @@ export default function PersonDetailPage() {
             ) : (
               <button
                 onClick={startEditName}
-                className="text-2xl font-bold text-white hover:text-cyan-300 transition-colors text-left mb-1 truncate max-w-full"
+                className="font-serif text-2xl font-bold text-white hover:text-cyan-300 transition-colors text-left mb-1 truncate max-w-full"
               >
                 {person.name}
               </button>
@@ -563,7 +566,7 @@ export default function PersonDetailPage() {
                   <p className="text-sm text-slate-200 break-words">{f.text}</p>
                   <Link
                     href={`/conversation/${f.conversationId}`}
-                    className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
+                    className="font-mono text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
                   >
                     {formatDate(f.date)} · view conversation →
                   </Link>
@@ -608,7 +611,7 @@ export default function PersonDetailPage() {
                   const { otherRole } = roleFor(r, id);
                   const detail = otherRole || r.note;
                   return (
-                    <span key={r.id} className="inline-flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-full pl-3 pr-1.5 py-1 text-sm text-slate-200">
+                    <span key={r.id} className="inline-flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-full pl-3 pr-1.5 py-1 font-serif text-sm text-slate-200">
                       <button
                         onClick={() => router.push(`/people/${oid}`)}
                         className="hover:text-white transition-colors"
@@ -676,13 +679,13 @@ export default function PersonDetailPage() {
             {placeGroups.map((g, i) => (
               <li key={g.place?.id ?? `raw-${i}`} className="flex items-center justify-between text-sm">
                 {g.place ? (
-                  <Link href={`/people/place/${g.place.id}`} className="text-slate-200 hover:text-white transition-colors">
+                  <Link href={`/people/place/${g.place.id}`} className="font-serif text-slate-200 hover:text-white transition-colors">
                     {g.place.name}
                   </Link>
                 ) : (
-                  <span className="text-slate-300">{g.rawName}</span>
+                  <span className="font-serif text-slate-300">{g.rawName}</span>
                 )}
-                <span className="text-slate-400">{g.meetings.length}×</span>
+                <span className="font-mono text-slate-400">{g.meetings.length}×</span>
               </li>
             ))}
           </ul>
@@ -702,8 +705,8 @@ export default function PersonDetailPage() {
               {sortedMeetings.map((m) => (
                 <li key={m.conversationId} className="card p-3 flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm text-slate-200 truncate">{m.placeName ?? "Unknown place"}</p>
-                    <p className="text-xs text-slate-500">
+                    <p className="font-serif text-sm text-slate-200 truncate">{m.placeName ?? "Unknown place"}</p>
+                    <p className="font-mono text-xs text-slate-500">
                       {getAnalysisAge(m.date).label} · {formatDate(m.date)}
                     </p>
                   </div>

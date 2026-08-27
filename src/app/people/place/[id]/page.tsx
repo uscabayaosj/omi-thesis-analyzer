@@ -76,10 +76,15 @@ export default function PlaceDetailPage() {
       <Link href="/people" className={LINK_BACK}>← People</Link>
 
       {!editing ? (
-        <div className="flex items-start justify-between gap-3 mb-4">
-          <h1 className="font-bold text-white">{place.name}</h1>
-          <button onClick={() => { setNameDraft(place.name); setNotesDraft(place.notes); setPinDraft({ lat: place.lat, lng: place.lng }); setEditing(true); }}
-            className="text-sm text-cyan-400 hover:text-cyan-300 min-h-[44px] px-2">Edit</button>
+        <div className="mb-4">
+          <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-500">
+            Location
+          </p>
+          <div className="flex items-start justify-between gap-3">
+            <h1 className="font-bold text-white">{place.name}</h1>
+            <button onClick={() => { setNameDraft(place.name); setNotesDraft(place.notes); setPinDraft({ lat: place.lat, lng: place.lng }); setEditing(true); }}
+              className="text-sm text-cyan-400 hover:text-cyan-300 min-h-[44px] px-2">Edit</button>
+          </div>
         </div>
       ) : (
         <div className="card p-4 mb-4">
@@ -116,8 +121,8 @@ export default function PlaceDetailPage() {
           <div className="flex flex-wrap gap-2">
             {metHere.map(({ person, count }) => (
               <Link key={person.id} href={`/people/${person.id}`}
-                className="inline-flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-full px-3 py-1 text-sm text-slate-200 hover:border-cyan-500/50 transition-colors">
-                {person.name}<span className="text-slate-400">· {count}</span>
+                className="inline-flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-full px-3 py-1 font-serif text-sm text-slate-200 hover:border-cyan-500/50 transition-colors">
+                {person.name}<span className="font-mono text-slate-400">· {count}</span>
               </Link>
             ))}
           </div>
