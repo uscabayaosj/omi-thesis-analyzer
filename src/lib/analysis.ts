@@ -49,6 +49,7 @@ function getProviderConfig(): ProviderConfig {
         model: model || "gemini-2.0-flash",
         headers: {
           "Content-Type": "application/json",
+          "x-goog-api-key": process.env.GOOGLE_API_KEY || "",
         },
       };
 
@@ -256,11 +257,7 @@ export async function chatCompletion(
   }
 
   const provider = process.env.AI_PROVIDER || "openai";
-  let url = config.baseUrl;
-
-  if (provider === "google") {
-    url += `?key=${config.apiKey}`;
-  }
+  const url = config.baseUrl;
 
   const body = buildRequestBody(config, messages, jsonMode);
 

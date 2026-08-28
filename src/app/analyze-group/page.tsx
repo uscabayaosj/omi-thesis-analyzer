@@ -429,8 +429,13 @@ function GroupAnalysisContent() {
           {ids.length} conversations selected for cross-conversation analysis
         </p>
         {skipped > 0 && (
-          <p className="text-amber-300/90 text-sm mt-1" role="status">
-            {skipped} conversation{skipped === 1 ? "" : "s"} could not be loaded from Omi and {skipped === 1 ? "was" : "were"} left out of this analysis.
+          <p
+            className={`text-sm mt-1 ${skipped >= ids.length / 2 ? "font-semibold text-red-300" : "text-amber-300/90"}`}
+            role="status"
+          >
+            {skipped >= ids.length / 2 ? "⚠ " : ""}
+            {skipped} of {ids.length} conversation{ids.length === 1 ? "" : "s"} could not be loaded from Omi and {skipped === 1 ? "was" : "were"} left out
+            {skipped >= ids.length / 2 ? " — this synthesis covers less than half of the selected group and should not be treated as complete." : " of this analysis."}
           </p>
         )}
         {conversations.length > 0 && (
