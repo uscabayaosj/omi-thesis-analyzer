@@ -377,6 +377,7 @@ function HomeInner() {
   // pass, then fills in once mounted.
   const [todayDateline, setTodayDateline] = useState<string | null>(null);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- deliberate: renders identical markup on the server and the first client pass, then fills in once mounted
     setTodayDateline(
       new Date().toLocaleDateString("en-GB", {
         weekday: "long",

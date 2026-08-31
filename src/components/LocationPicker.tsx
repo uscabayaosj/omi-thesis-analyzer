@@ -198,6 +198,7 @@ function AddressSearch({ onPick }: { onPick: (r: GeocodeResult) => void }) {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     const q = query.trim();
     if (q.length < 3) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing results when the query drops below the search threshold is the synchronization this effect exists for
       setResults([]);
       setSearching(false);
       setMessage(null);

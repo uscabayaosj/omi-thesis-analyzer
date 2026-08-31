@@ -82,6 +82,7 @@ function WeekPageInner() {
   const [showRegenConfirm, setShowRegenConfirm] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration-safe mount flag: it exists to hold the first client render to the server's output before any localStorage-derived value is read
     setMounted(true);
   }, []);
 

@@ -5,11 +5,11 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { fetchJson } from "@/lib/fetch-json";
 import { formatDateTime, dayOf } from "@/lib/format";
-import type { AdhdAnalysis, Rollup, RollupPlanStep } from "@/lib/adhd";
+import type { AdhdAnalysis, Rollup } from "@/lib/adhd";
 import type { DayConvoOutput } from "@/lib/rollup";
 import type { RollupJobState } from "@/lib/rollup-job";
 import {
-  getAdhdAnalysis, saveAdhdAnalysis, getRollup, saveRollup, getPreviousRollup, getRollupDays, togglePlanStepDone,
+  getAdhdAnalysis, saveAdhdAnalysis, getRollup, saveRollup, getPreviousRollup, getRollupDays, togglePlanStepDone, restoreRollup,
 } from "@/lib/adhd-storage";
 import { pullAndMerge } from "@/lib/sync";
 import { countOpen } from "@/lib/commitments";
@@ -17,10 +17,12 @@ import { exportRollupToObsidian, downloadRollupMarkdown } from "@/lib/obsidian";
 import {
   ArrowLeftIcon, CalendarIcon, WarningIcon, LoaderIcon, RefreshIcon,
   ExternalLinkIcon, DownloadIcon, CheckIcon, ZapIcon, ClipboardIcon,
-  UsersIcon, FileTextIcon, XCircleIcon, BellIcon, CheckSquareIcon, SquareIcon,
+  UsersIcon, FileTextIcon, XCircleIcon, BellIcon,
 } from "@/components/icons";
 import { isPushSupported, getPushSubscriptionState, subscribeToPush, unsubscribeFromPush } from "@/lib/push";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import UndoBar from "@/components/UndoBar";
+import { useUndo } from "@/lib/use-undo";
 import PlanChecklist from "@/components/PlanChecklist";
 import { Prose } from "@/components/Prose";
 import { BUTTON_PRIMARY, BUTTON_GHOST, LINK_BACK, BUTTON_SECONDARY } from "@/lib/ui";
@@ -132,6 +134,7 @@ function RollupPageInner() {
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [restOpen, setRestOpen] = useState(false);
+  const { offer: undoOffer, offerUndo, undo, clear: clearUndo } = useUndo();
   const [error, setError] = useState<string | null>(null);
   const dayParam = searchParams.get("day");
   const [selectedDay, setSelectedDay] = useState<string | null>(
@@ -189,6 +192,9 @@ function RollupPageInner() {
   };
 
   useEffect(() => {
+    // Deliberate: this flag exists precisely to hold the first client render
+    // to the server's output before any localStorage-derived value is read.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 
@@ -399,15 +405,26 @@ function RollupPageInner() {
           previousRollup: prev?.rollup,
         }),
       });
+      const replaced = getRollup(day);
       saveRollup({ day, conversationIds: dayConvos.map((c) => c.id), rollup: data.rollup });
       setRollup(data.rollup);
       setPlanDone(new Set(getRollup(day)?.planDoneKeys ?? []));
+      // Rollups keep no version history, so regenerating used to be the one
+      // destructive act with a confirm and no way back. The replaced record is
+      // written back verbatim, ticked plan steps included.
+      if (replaced) {
+        offerUndo("Previous rollup replaced.", () => {
+          restoreRollup(replaced);
+          setRollup(replaced.rollup);
+          setPlanDone(new Set(replaced.planDoneKeys ?? []));
+        });
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Rollup failed");
     } finally {
       setRunning(false); setStartedAt(null);
     }
-  }, []);
+  }, [offerUndo]);
 
   // Entry point: hand the whole batch to a server-side job so it survives
   // this tab closing, and only fall back to running it here if no durable
@@ -498,6 +515,10 @@ function RollupPageInner() {
           at y=668 behind an eyebrow, a title, a three-line subtitle and two
           nav rows. With a plan open the header collapses to the title alone;
           the picker view keeps the full treatment, where it orients. */}
+      {undoOffer && (
+        <UndoBar label={undoOffer.label} onUndo={undo} onDismiss={clearUndo} />
+      )}
+
       <header className={planOpen ? "mb-4" : "mb-6"}>
         {!planOpen && (
           <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">

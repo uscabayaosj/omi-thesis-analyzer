@@ -189,6 +189,16 @@ export function saveRollup(record: {
 }
 
 /** Most recent stored rollup for a day strictly earlier than `day`. */
+/** Write a previously-saved rollup back verbatim, timestamp included.
+ *  Regenerating a day replaced its rollup with no recovery path — rollups keep
+ *  no version history, so the confirm dialog was the only thing between the
+ *  user and losing a day-close permanently. */
+export function restoreRollup(stored: StoredRollup): void {
+  const map = readMap<StoredRollup>(ROLLUPS_KEY);
+  map[stored.day] = stored;
+  writeMap(ROLLUPS_KEY, map);
+}
+
 export function getPreviousRollup(day: string): StoredRollup | null {
   const map = readMap<StoredRollup>(ROLLUPS_KEY);
   const earlier = Object.keys(map).filter((d) => d < day).sort();

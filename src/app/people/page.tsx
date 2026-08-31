@@ -11,12 +11,16 @@ import {
   getPending,
   ignoreName,
   removePending,
+  restorePending,
+  unignoreName,
   type Meeting,
   type PendingSuggestion,
   type Person,
   type PersonFact,
 } from "@/lib/people";
 import { runExtraction } from "@/lib/people-pipeline";
+import UndoBar from "@/components/UndoBar";
+import { useUndo } from "@/lib/use-undo";
 import { getAnalyzedIds, getAnalysisAge } from "@/lib/storage";
 import { getAdhdAnalyzedIds } from "@/lib/adhd-storage";
 import { pullAndMerge } from "@/lib/sync";
@@ -123,6 +127,7 @@ export default function PeoplePage() {
   const [reassigning, setReassigning] = useState<string | null>(null); // pending suggestion id
   const [acceptErrorId, setAcceptErrorId] = useState<string | null>(null); // pending suggestion id
   const [batchResult, setBatchResult] = useState<string | null>(null);
+  const { offer: undoOffer, offerUndo, undo, clear: clearUndo } = useUndo();
   // Collapsed by default so the directory, search, and view toggle aren't
   // buried under the full review queue on first paint — the count banner keeps
   // it one tap away without owning the whole first screen.
@@ -278,6 +283,14 @@ export default function PeoplePage() {
 
   const doIgnore = (s: PendingSuggestion) => {
     resolve(s, () => ignoreName(s.extractedName));
+    // Ignoring both removes the suggestion and adds the name to a permanent
+    // ignore list, so a mis-tap on a 43-item queue silently taught the app to
+    // never surface that person again. Both halves are reversible.
+    offerUndo(`Ignored “${s.extractedName}”.`, () => {
+      unignoreName(s.extractedName);
+      restorePending(s);
+      refresh();
+    });
   };
 
   /* A 43-item queue with only per-item buttons is a queue that does not get
@@ -389,6 +402,10 @@ export default function PeoplePage() {
       <p className="text-slate-400 font-serif italic text-[0.95rem] mb-6">
         Everyone mentioned in your conversations — who they are, where you met, and what you learned.
       </p>
+
+      {undoOffer && (
+        <UndoBar label={undoOffer.label} onUndo={undo} onDismiss={clearUndo} />
+      )}
 
       {/* Review queue — collapsed to a count banner by default so the search,
           view toggle, and directory stay reachable without scrolling past every

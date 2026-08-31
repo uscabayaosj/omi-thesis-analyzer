@@ -33,6 +33,7 @@ import {
   WarningIcon,
   CheckIcon,
   CompassIcon,
+  ZapIcon,
   CogIcon,
   ClipboardIcon,
   FileTextIcon,
@@ -217,6 +218,7 @@ export default function ConversationPage() {
   const rovingLens = useRovingRadioGroup(LENS_VALUES, lens, setLens);
   const [adhd, setAdhd] = useState<AdhdAnalysis | null>(null);
   const [adhdDoneKeys, setAdhdDoneKeys] = useState<string[]>([]);
+  const [adhdTitle, setAdhdTitle] = useState<string | null>(null);
   const [adhdAnalyzing, setAdhdAnalyzing] = useState(false);
 
   // Results sections stagger in on first reveal, but the lens toggle
@@ -293,6 +295,8 @@ export default function ConversationPage() {
     if (storedAdhd) {
       setAdhd(storedAdhd.analysis);
       setAdhdDoneKeys(storedAdhd.doneKeys);
+      // Kept so the degraded view has a real title when the shell can't load.
+      setAdhdTitle(storedAdhd.title);
     }
     // Default lens: the single lens that has results; else thesis.
     const hasThesis = !!stored;
@@ -609,6 +613,70 @@ export default function ConversationPage() {
             Dismiss
           </button>
         </div>
+      )}
+
+      {/* The whole page used to be gated on `conversation`, so when Omi was
+          unreachable and nothing was cached the route rendered an error card
+          and literally nothing else — no h1, no title, no recovery path — even
+          though an analysis for this conversation was sitting in local
+          storage. That contradicts the app's own promise that the browser is
+          the working copy. The saved analysis is shown on its own terms
+          instead, with the missing shell named rather than implied. */}
+      {!loading && !conversation && (storedAnalysis || adhd) && (
+        <>
+          <header className="mb-6">
+            <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
+              Saved copy
+            </p>
+            <h1 className="font-bold text-white mb-2">
+              {storedAnalysis?.title || adhdTitle || "Saved analysis"}
+            </h1>
+            <p className="text-slate-400 font-serif italic text-[0.95rem]">
+              Couldn&apos;t reach Omi, so the recording and transcript aren&apos;t available. This is the
+              analysis already saved on this device.
+            </p>
+          </header>
+
+          {storedAnalysis && (
+            <section className="mb-8" aria-label="Saved Pioneer Sovereignty analysis">
+              <h2 className="font-bold text-white mb-4 flex items-center gap-2">
+                <CompassIcon className="w-5 h-5 text-cyan-400 flex-shrink-0" />
+                Pioneer Sovereignty Analysis
+              </h2>
+              <ThesisResults analysis={storedAnalysis} animate={false} />
+            </section>
+          )}
+
+          {adhd && (
+            <section className="mb-8" aria-label="Saved ADHD Aid analysis">
+              <h2 className="font-bold text-white mb-4 flex items-center gap-2">
+                <ZapIcon className="w-5 h-5 text-cyan-400 flex-shrink-0" />
+                ADHD Aid
+              </h2>
+              <AdhdResults
+                analysis={adhd}
+                doneKeys={adhdDoneKeys}
+                onToggleDone={handleToggleDone}
+                animate={false}
+              />
+            </section>
+          )}
+        </>
+      )}
+
+      {/* Nothing cached and nothing saved — say what to do next rather than
+          leaving a bare error card with no heading. */}
+      {!loading && !conversation && !storedAnalysis && !adhd && (
+        <header className="mb-6">
+          <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
+            Unavailable
+          </p>
+          <h1 className="font-bold text-white mb-2">Conversation unavailable</h1>
+          <p className="text-slate-400 font-serif italic text-[0.95rem]">
+            This conversation isn&apos;t cached on this device and Omi couldn&apos;t be reached. Try
+            Refresh above, or go back to the list.
+          </p>
+        </header>
       )}
 
       {conversation && (

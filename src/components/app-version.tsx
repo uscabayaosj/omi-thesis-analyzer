@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import Link from "next/link";
 import { RefreshIcon } from "@/components/icons";
 
 // Inlined at build time, so this is the deployment the running bundle actually
@@ -42,6 +43,17 @@ export default function AppVersion() {
 
   return (
     <footer className="max-w-3xl mx-auto px-4 pb-6 flex items-center justify-center gap-1 text-xs text-slate-400">
+      {/* The manual existed but was reachable only from the hub's Contents
+          strip, so any sub-route raised a question with no way to answer it
+          without navigating home first. The footer already renders on every
+          screen, which makes it the one place a help link belongs. */}
+      <Link
+        href="/help"
+        className="min-h-[44px] px-2 inline-flex items-center text-slate-400 hover:text-slate-300 transition-colors"
+      >
+        How this works
+      </Link>
+      <span aria-hidden="true">·</span>
       <span aria-label={`Running version ${VERSION}`}>TRACE {VERSION}</span>
       <span aria-hidden="true">·</span>
       <button

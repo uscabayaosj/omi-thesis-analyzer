@@ -78,6 +78,9 @@ export default function ConfirmDialog({
     // Remember what had focus so it can be handed back on close: cancelling
     // from deep in a list otherwise dumped the user at document start.
     const opener = document.activeElement as HTMLElement | null;
+    // Captured now: reading panelRef.current in the cleanup would consult a ref
+    // that has almost certainly changed by the time the dialog unmounts.
+    const panelAtMount = panelRef.current;
     cancelRef.current?.focus();
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -110,7 +113,7 @@ export default function ConfirmDialog({
       // Only if focus is still inside the dialog (or lost to <body>) — never
       // steal it back from something the confirmed action itself focused.
       const active = document.activeElement;
-      if (!active || active === document.body || panelRef.current?.contains(active)) {
+      if (!active || active === document.body || panelAtMount?.contains(active)) {
         opener?.focus?.();
       }
     };

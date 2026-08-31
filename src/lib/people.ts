@@ -347,6 +347,14 @@ export function removePending(id: string): void {
   writeMap(PENDING_NS, map);
 }
 
+/** Put a removed suggestion back, id and all, so an undo restores the exact
+ *  record rather than a lookalike with a new id. */
+export function restorePending(s: PendingSuggestion): void {
+  const map = pruneTombstones(readMap<PendingSuggestion | Tombstone>(PENDING_NS));
+  map[s.id] = s;
+  writeMap(PENDING_NS, map);
+}
+
 // ── Ignore list + extracted-conversation tracking (meta records) ──
 
 function readMeta(key: string): string[] {
@@ -368,6 +376,15 @@ export function ignoreName(name: string): void {
   const list = getIgnoredNames();
   const n = normalize(name);
   if (!list.some((x) => normalize(x) === n)) writeMeta(IGNORE_KEY, [...list, name]);
+}
+
+/** Undo of `ignoreName`. Matches on the same normalized form the add uses, so
+ *  a name ignored in one casing is un-ignored in any. */
+export function unignoreName(name: string): void {
+  const n = normalize(name);
+  const list = getIgnoredNames();
+  const next = list.filter((x) => normalize(x) !== n);
+  if (next.length !== list.length) writeMeta(IGNORE_KEY, next);
 }
 
 export function getExtractedConversationIds(): Set<string> {

@@ -33,11 +33,12 @@ import { getPlaces } from "@/lib/places";
 import { groupMeetingsByPlace, effectiveMeetingLocation, shortPlaceLabel } from "@/lib/place-resolve";
 import { getMeetingLocations } from "@/lib/meeting-location";
 import MeetingLocationEditor from "@/components/MeetingLocationEditor";
+import UndoBar from "@/components/UndoBar";
+import { useUndo } from "@/lib/use-undo";
 import {
   ArrowLeftIcon,
   CheckIcon,
   TrashIcon,
-  UndoIcon,
   UsersIcon,
   WarningIcon,
   XIcon,
@@ -123,23 +124,12 @@ export default function PersonDetailPage() {
 
   /* Deleting a fact removes a piece of fieldwork evidence with a provenance
      link back to the conversation it came from. It used to commit instantly,
-     from a 32px-wide × sitting beside a 26px provenance link, with no dialog
-     and no way back — while re-running an analysis (recoverable, merely
-     expensive) got a full modal. Rather than add a dialog to a frequent
-     action, the delete is made reversible: the row is removed immediately and
-     an undo offer stands for 10 seconds. */
-  const [undoOffer, setUndoOffer] = useState<{ label: string; restore: Person } | null>(null);
-  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const offerUndo = (label: string, snapshot: Person) => {
-    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
-    setUndoOffer({ label, restore: snapshot });
-    undoTimerRef.current = setTimeout(() => setUndoOffer(null), 10_000);
-  };
-
-  useEffect(() => () => {
-    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
-  }, []);
+     with no dialog and no way back — while re-running an analysis (recoverable,
+     merely expensive) got a full modal. Rather than add a dialog to a frequent
+     action, the delete is reversible. Uses the shared undo primitive so this
+     route is no longer the only place in the app where a mistake is
+     recoverable. */
+  const { offer: undoOffer, offerUndo, undo, clear: clearUndo } = useUndo();
 
   const [showMergeDialog, setShowMergeDialog] = useState(false);
   const [mergeTargetId, setMergeTargetId] = useState("");
@@ -342,13 +332,15 @@ export default function PersonDetailPage() {
 
   const removeAlias = (alias: string) => {
     if (!person) return;
-    offerUndo(`Removed alias “${alias}”.`, person);
+    const snapshot = person;
+    offerUndo(`Removed alias “${alias}”.`, () => commit({ aliases: snapshot.aliases, facts: snapshot.facts }));
     commit({ aliases: person.aliases.filter((a) => a !== alias) });
   };
 
   const removeFact = (fact: PersonFact) => {
     if (!person) return;
-    offerUndo("Fact deleted.", person);
+    const snapshot = person;
+    offerUndo("Fact deleted.", () => commit({ aliases: snapshot.aliases, facts: snapshot.facts }));
     commit({
       facts: person.facts.filter(
         (f) => !(f.text === fact.text && f.conversationId === fact.conversationId && f.date === fact.date)
@@ -640,22 +632,7 @@ export default function PersonDetailPage() {
       </div>
 
       {undoOffer && (
-        <div
-          role="status"
-          className="enter-rise card p-3 mb-4 flex flex-wrap items-center justify-between gap-3 border-cyan-500/30"
-        >
-          <p className="text-sm text-slate-200">{undoOffer.label}</p>
-          <button
-            onClick={() => {
-              commit({ aliases: undoOffer.restore.aliases, facts: undoOffer.restore.facts });
-              setUndoOffer(null);
-            }}
-            className="bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm px-3 py-2 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5"
-          >
-            <UndoIcon className="w-4 h-4" />
-            Undo
-          </button>
-        </div>
+        <UndoBar label={undoOffer.label} onUndo={undo} onDismiss={clearUndo} />
       )}
 
       {/* Facts */}
