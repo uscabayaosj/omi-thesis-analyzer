@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 import { Prose } from "@/components/Prose";
+import SectionNav, { sectionId } from "@/components/SectionNav";
 import {
   ScrollIcon, HomeIcon, LinkIcon, MountainsIcon,
   TargetIcon, ScaleIcon, XCircleIcon, TrendingUpIcon,
@@ -25,7 +26,7 @@ function AnalysisSection({
   content: string;
 }) {
   return (
-    <div className="card p-6">
+    <div className="card p-6" id={sectionId(title)} style={{ scrollMarginTop: "6rem" }}>
       <div className="analysis-section">
         <h3 className="flex items-center gap-2">
           <Icon className="w-[1.05em] h-[1.05em] flex-shrink-0" />
@@ -54,10 +55,13 @@ export function ThesisResults({ analysis, animate = true }: { analysis: Analysis
   ];
 
   return (
-    <div className={`${animate ? "stagger-in" : ""} space-y-6`}>
-      {sections.map((section) => (
-        <AnalysisSection key={section.title} {...section} />
-      ))}
-    </div>
+    <>
+      <SectionNav sections={sections.map((sec) => ({ id: sectionId(sec.title), label: sec.title.replace(/^RQ(\d) — /, "RQ$1 ") }))} />
+      <div className={`${animate ? "stagger-in" : ""} space-y-6`}>
+        {sections.map((section) => (
+          <AnalysisSection key={section.title} {...section} />
+        ))}
+      </div>
+    </>
   );
 }

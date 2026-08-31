@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo, Suspense, type ComponentType } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef, Suspense, type ComponentType } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { fetchJson } from "@/lib/fetch-json";
 import { formatDateTime, dayOf } from "@/lib/format";
-import type { AdhdAnalysis, Rollup } from "@/lib/adhd";
+import type { AdhdAnalysis, Rollup, RollupPlanStep } from "@/lib/adhd";
 import type { DayConvoOutput } from "@/lib/rollup";
 import type { RollupJobState } from "@/lib/rollup-job";
 import {
-  getAdhdAnalysis, saveAdhdAnalysis, getRollup, saveRollup, getPreviousRollup, getRollupDays,
+  getAdhdAnalysis, saveAdhdAnalysis, getRollup, saveRollup, getPreviousRollup, getRollupDays, togglePlanStepDone,
 } from "@/lib/adhd-storage";
 import { pullAndMerge } from "@/lib/sync";
 import { countOpen } from "@/lib/commitments";
@@ -17,10 +17,11 @@ import { exportRollupToObsidian, downloadRollupMarkdown } from "@/lib/obsidian";
 import {
   ArrowLeftIcon, CalendarIcon, WarningIcon, LoaderIcon, RefreshIcon,
   ExternalLinkIcon, DownloadIcon, CheckIcon, ZapIcon, ClipboardIcon,
-  UsersIcon, FileTextIcon, XCircleIcon, BellIcon,
+  UsersIcon, FileTextIcon, XCircleIcon, BellIcon, CheckSquareIcon, SquareIcon,
 } from "@/components/icons";
 import { isPushSupported, getPushSubscriptionState, subscribeToPush, unsubscribeFromPush } from "@/lib/push";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import PlanChecklist from "@/components/PlanChecklist";
 import { Prose } from "@/components/Prose";
 import { BUTTON_PRIMARY, BUTTON_GHOST, LINK_BACK, BUTTON_SECONDARY } from "@/lib/ui";
 
@@ -55,7 +56,7 @@ function groupByTimeOfDay(convos: ConvoLite[]): [string, ConvoLite[]][] {
   return TIME_OF_DAY_ORDER.filter((label) => map.has(label)).map((label) => [label, map.get(label)!]);
 }
 
-const ROLLUP_SECTIONS: { key: keyof Rollup; heading: string; icon: ComponentType<{ className?: string }> }[] = [
+const ROLLUP_SECTIONS: { key: Exclude<keyof Rollup, "plan_steps">; heading: string; icon: ComponentType<{ className?: string }> }[] = [
   { key: "tomorrow_plan", heading: "Tomorrow's plan", icon: ZapIcon },
   { key: "aging_commitments", heading: "Still open from before", icon: ClipboardIcon },
   { key: "conflicts_at_risk", heading: "Needs a decision", icon: WarningIcon },
@@ -99,6 +100,31 @@ function RollupSectionBlock({
 }
 
 
+function fmtElapsed(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return m ? `${m}m ${String(s).padStart(2, "0")}s` : `${s}s`;
+}
+
+/**
+ * A plain-language forecast of what pressing the button will spend.
+ *
+ * Deliberately a range and deliberately vague about money: the real figure
+ * depends on transcript length and is reconciled on /usage afterwards. The
+ * point is that the user knows the order of magnitude — one call or twenty —
+ * before committing, instead of finding out from the bill.
+ */
+function estimateRun(total: number, alreadyAnalyzed: number): string {
+  const toAnalyze = Math.max(0, total - alreadyAnalyzed);
+  const calls = toAnalyze + 1; // per-conversation passes, plus the rollup itself
+  const lowMin = Math.max(1, Math.round((calls * 12) / 60));
+  const highMin = Math.max(lowMin + 1, Math.round((calls * 30) / 60));
+  const reused = alreadyAnalyzed > 0
+    ? `${alreadyAnalyzed} already analysed and reused, `
+    : "";
+  return `${reused}${calls} API call${calls === 1 ? "" : "s"} to run — roughly ${lowMin}–${highMin} min.`;
+}
+
 function RollupPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -111,6 +137,19 @@ function RollupPageInner() {
   const [selectedDay, setSelectedDay] = useState<string | null>(
     dayParam && /^\d{4}-\d{2}-\d{2}$/.test(dayParam) ? dayParam : null
   );
+  const [planDone, setPlanDone] = useState<Set<string>>(new Set());
+  /* A day-close over 27 conversations is minutes of real time and real money,
+     and it used to be uninterruptible with no elapsed indication — the user
+     was asked to wait an unknown amount for an unstated cost. `startedAt`
+     drives the clock; the abort controller makes Stop actually stop. */
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const togglePlanStep = useCallback((key: string) => {
+    if (!selectedDay) return;
+    setPlanDone(new Set(togglePlanStepDone(selectedDay, key)));
+  }, [selectedDay]);
   const [rollup, setRollup] = useState<Rollup | null>(null);
   const [running, setRunning] = useState(false);
   // Whether the in-flight run is a server-side job (survives closing the
@@ -154,6 +193,12 @@ function RollupPageInner() {
   }, []);
 
   useEffect(() => {
+    if (startedAt === null) return;
+    const t = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 1000);
+    return () => clearInterval(t);
+  }, [startedAt]);
+
+  useEffect(() => {
     (async () => {
       try {
         const data = await fetchJson<ConvoLite[]>("/api/conversations");
@@ -194,10 +239,11 @@ function RollupPageInner() {
   const selectDay = useCallback((day: string) => {
     setSelectedDay(day);
     setProgress({ done: 0, total: 0, failed: 0 });
-    setRunning(false);
+    setRunning(false); setStartedAt(null);
     setViaServer(false);
     const existing = getRollup(day);
     setRollup(existing ? existing.rollup : null);
+    setPlanDone(new Set(existing?.planDoneKeys ?? []));
   }, []);
 
   // Mirror the open day into the URL so a reload or PWA relaunch returns to
@@ -231,6 +277,7 @@ function RollupPageInner() {
     const existing = getRollup(selectedDay);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is unavailable during SSR, so this can't be a lazy initializer
     setRollup(existing ? existing.rollup : null);
+    setPlanDone(new Set(existing?.planDoneKeys ?? []));
 
     let cancelled = false;
     (async () => {
@@ -261,12 +308,15 @@ function RollupPageInner() {
         if (cancelled || !job) return;
         setProgress({ done: job.done, total: job.total, failed: job.failed });
         if (job.status === "done") {
-          if (job.rollup) setRollup(job.rollup);
+          if (job.rollup) {
+            setRollup(job.rollup);
+            setPlanDone(new Set(getRollup(selectedDay)?.planDoneKeys ?? []));
+          }
           await pullAndMerge(true);
-          if (!cancelled) { setRunning(false); setViaServer(false); }
+          if (!cancelled) { setRunning(false); setStartedAt(null); setViaServer(false); }
         } else if (job.status === "error") {
           setError(job.error || "Rollup failed.");
-          if (!cancelled) { setRunning(false); setViaServer(false); }
+          if (!cancelled) { setRunning(false); setStartedAt(null); setViaServer(false); }
         }
       } catch {
         // Transient network hiccup — the job is server-side, so just retry
@@ -284,6 +334,8 @@ function RollupPageInner() {
   // request), i.e. local dev without DATABASE_URL, or a fork without it set.
   const generateLocally = useCallback(async (dayConvos: ConvoLite[], day: string) => {
     setError(null);
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     // 1. Ensure each conversation has an ADHD analysis. A single conversation
     // failing (most commonly: no transcript, which the route 404s on) must not
@@ -303,6 +355,7 @@ function RollupPageInner() {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ conversationId: c.id }),
+              signal: controller.signal,
             }
           );
           stored = saveAdhdAnalysis({
@@ -318,15 +371,19 @@ function RollupPageInner() {
           analysis: stored.analysis,
           doneKeys: stored.doneKeys,
         });
-      } catch {
+      } catch (e) {
+        // Stop is a decision, not a failure: keep every analysis already
+        // finished (they cost money and are saved), and leave quietly.
+        if (e instanceof DOMException && e.name === "AbortError") return;
         failed++;
       }
+      if (controller.signal.aborted) return;
       setProgress({ done: i + 1, total, failed });
     }
 
     if (outputs.length === 0) {
       setError("None of this day's conversations could be analyzed, so there is nothing to roll up.");
-      setRunning(false);
+      setRunning(false); setStartedAt(null);
       return;
     }
 
@@ -344,19 +401,30 @@ function RollupPageInner() {
       });
       saveRollup({ day, conversationIds: dayConvos.map((c) => c.id), rollup: data.rollup });
       setRollup(data.rollup);
+      setPlanDone(new Set(getRollup(day)?.planDoneKeys ?? []));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Rollup failed");
     } finally {
-      setRunning(false);
+      setRunning(false); setStartedAt(null);
     }
   }, []);
 
   // Entry point: hand the whole batch to a server-side job so it survives
   // this tab closing, and only fall back to running it here if no durable
   // store is configured to back that job (POST responds 501).
+  const stop = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setRunning(false);
+    setViaServer(false);
+    setStartedAt(null);
+  }, []);
+
   const generate = useCallback(async (dayConvos: ConvoLite[], day: string) => {
     setError(null);
     setRunning(true);
+    setStartedAt(Date.now());
+    setElapsed(0);
     setProgress({ done: 0, total: dayConvos.length, failed: 0 });
 
     let res: Response;
@@ -368,7 +436,7 @@ function RollupPageInner() {
       });
     } catch {
       setError("Network error — check your connection and try again.");
-      setRunning(false);
+      setRunning(false); setStartedAt(null);
       return;
     }
 
@@ -379,7 +447,7 @@ function RollupPageInner() {
 
     if (!res.ok) {
       setError(`Rollup job failed to start (error ${res.status}).`);
-      setRunning(false);
+      setRunning(false); setStartedAt(null);
       return;
     }
 
@@ -413,6 +481,9 @@ function RollupPageInner() {
   }, [selectedDay]);
 
   const selectedConvos = selectedDay ? (days.find((d) => d[0] === selectedDay)?.[1] ?? []) : [];
+  // Conversations already analysed are reused rather than re-billed, so the
+  // forecast has to net them off or it overstates the cost every time.
+  const analyzedCount = mounted ? selectedConvos.filter((c) => getAdhdAnalysis(c.id)).length : 0;
 
   return (
     <main className="max-w-3xl mx-auto px-4 py-8">
@@ -521,12 +592,20 @@ function RollupPageInner() {
 
           {rollup && (
             <div className="mb-6">
-              <RollupSectionBlock
-                icon={ROLLUP_SECTIONS[0].icon}
-                heading={ROLLUP_SECTIONS[0].heading}
-                content={rollup[ROLLUP_SECTIONS[0].key]}
-                lead
-              />
+              {rollup.plan_steps?.length ? (
+                <PlanChecklist
+                  steps={rollup.plan_steps}
+                  done={planDone}
+                  onToggle={togglePlanStep}
+                />
+              ) : (
+                <RollupSectionBlock
+                  icon={ROLLUP_SECTIONS[0].icon}
+                  heading={ROLLUP_SECTIONS[0].heading}
+                  content={rollup[ROLLUP_SECTIONS[0].key]}
+                  lead
+                />
+              )}
             </div>
           )}
 
@@ -586,6 +665,7 @@ function RollupPageInner() {
                   <>
                     <LoaderIcon className="w-4 h-4 animate-spin" />
                     {progress.total ? `Analyzing ${progress.done}/${progress.total}…` : "Generating…"}
+                    {elapsed > 0 && <span className="font-mono text-xs opacity-80">{fmtElapsed(elapsed)}</span>}
                   </>
                 ) : rollup ? (
                   <><RefreshIcon className="w-4 h-4" /> Regenerate rollup</>
@@ -593,6 +673,22 @@ function RollupPageInner() {
                   <><CalendarIcon className="w-4 h-4" /> Generate rollup</>
                 )}
               </button>
+              {running && (
+                <button
+                  onClick={stop}
+                  className="mt-2 w-full bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm px-3 py-2 min-h-[44px] rounded-lg transition-colors"
+                >
+                  Stop — keep what has finished
+                </button>
+              )}
+              {/* An analysis costs real money and real minutes, and until now
+                  neither was stated anywhere before the button was pressed —
+                  only reconciled afterwards on /usage. */}
+              {!running && selectedConvos.length > 0 && (
+                <p className="text-xs text-slate-400 mt-2 font-mono">
+                  {estimateRun(selectedConvos.length, analyzedCount)}
+                </p>
+              )}
               {!running && progress.total > 0 && progress.failed > 0 && (
                 <p className="text-amber-300/90 text-sm mt-2" role="status">
                   {progress.failed} of {progress.total} could not be analyzed and {progress.failed === 1 ? "was" : "were"} skipped.

@@ -85,7 +85,8 @@ export default function SearchPage() {
               setError(null);
             }
           }}
-          placeholder="Search thesis and group analyses…"
+          placeholder="Search inside analysis text…"
+          data-shortcut-search
           className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-9 pr-3 py-2.5 text-sm text-slate-200 placeholder:text-slate-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400"
         />
       </div>
@@ -115,7 +116,7 @@ export default function SearchPage() {
           <h2 className="text-slate-400 mb-3">Conversations</h2>
           <ul className="space-y-3 list-none">
             {result.conversationResults.map((r) => (
-              <li key={r.conversationId} className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+              <li key={r.conversationId} className="card p-4">
                 <Link href={`/conversation/${r.conversationId}`} className="block">
                   <div className="flex items-center justify-between gap-2 mb-2">
                     <span className="text-slate-200 font-serif font-medium">{r.title}</span>
@@ -141,7 +142,7 @@ export default function SearchPage() {
           <h2 className="text-slate-400 mb-3">Groups</h2>
           <ul className="space-y-3 list-none">
             {result.groupResults.map((r) => (
-              <li key={r.conversationIds.join(",")} className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+              <li key={r.conversationIds.join(",")} className="card p-4">
                 <Link href={`/analyze-group?ids=${r.conversationIds.map(encodeURIComponent).join(",")}`} className="block">
                   <div className="text-slate-200 font-serif font-medium mb-2">
                     {r.conversationTitles.length > 0 ? r.conversationTitles.join(", ") : `${r.conversationIds.length} conversations`}

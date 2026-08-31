@@ -17,7 +17,7 @@ function formatCost(costUsd: number | null): string {
 
 function StatTile({ title, summary }: { title: string; summary: UsagePeriodSummary }) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+    <div className="card p-4">
       <div className="font-mono text-[11px] uppercase tracking-[0.1em] text-slate-400 mb-1">{title}</div>
       <div className="font-mono text-2xl font-semibold text-white">{formatCost(summary.costUsd)}</div>
       <div className="font-mono text-sm text-slate-400 mt-1">
@@ -29,7 +29,7 @@ function StatTile({ title, summary }: { title: string; summary: UsagePeriodSumma
 
 function BreakdownTable({ title, rows }: { title: string; rows: UsageBreakdownRow[] }) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+    <div className="card p-4">
       <div className="font-mono text-[11px] uppercase tracking-[0.1em] text-slate-400 mb-3">{title} — this month</div>
       {rows.length === 0 ? (
         <div className="text-sm text-slate-400 font-serif italic">No calls yet this month.</div>

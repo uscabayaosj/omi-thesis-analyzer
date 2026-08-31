@@ -7,7 +7,11 @@ export async function fetchJson<T>(input: string, init?: RequestInit): Promise<T
   let res: Response;
   try {
     res = await fetch(input, init);
-  } catch {
+  } catch (e) {
+    // A caller-initiated abort is not a failure and must not be reported as
+    // one: it is the user pressing Stop. Rethrow it so callers can tell the
+    // two apart and stay silent for the deliberate case.
+    if (e instanceof DOMException && e.name === "AbortError") throw e;
     throw new Error("Network error — check your connection and try again.");
   }
 

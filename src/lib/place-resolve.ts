@@ -97,3 +97,23 @@ export function groupMeetingsByPlace(
   const rawGroups = [...byRaw.values()].sort((a, b) => b.meetings.length - a.meetings.length);
   return [...placeGroups, ...rawGroups]; // named places first
 }
+
+
+/**
+ * Shorten a reverse-geocoded address to something a person would say.
+ *
+ * Nominatim returns the full postal hierarchy — "Holy Family and St Michael,
+ * Sir William Court, Grange Farm, Kesgrave, East Suffolk, Suffolk, England,
+ * IP5 2QP, United Kingdom" — and rendering it whole meant the same place
+ * appeared as a clean name in one section and a 90-character string a few
+ * hundred pixels below. Keep the leading components, which are the specific
+ * ones; drop the administrative tail, which is the same for every meeting in
+ * the region and therefore carries no distinguishing information.
+ */
+export function shortPlaceLabel(raw: string, maxParts = 2): string {
+  const parts = raw.split(",").map((p) => p.trim()).filter(Boolean);
+  if (parts.length <= maxParts) return raw;
+  // A trailing postcode or country adds nothing once the specific name is
+  // present, so the head of the list is what survives.
+  return parts.slice(0, maxParts).join(", ");
+}

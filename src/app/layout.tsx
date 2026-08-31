@@ -11,6 +11,7 @@ const sourceSerif = Source_Serif_4({
 import ServiceWorkerRegistration from "@/components/sw-register";
 import AppVersion from "@/components/app-version";
 import AppBadgeSync from "@/components/app-badge-sync";
+import GlobalShortcuts from "@/components/shortcuts";
 
 export const metadata: Metadata = {
   // `template` lets each route name itself while keeping the product name in
@@ -55,6 +56,7 @@ export default function RootLayout({
       <body className="bg-slate-950 text-slate-100 antialiased min-h-screen">
         <ServiceWorkerRegistration />
         <AppBadgeSync />
+        <GlobalShortcuts />
         {children}
         <AppVersion />
       </body>

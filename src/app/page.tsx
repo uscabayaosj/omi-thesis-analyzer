@@ -11,7 +11,7 @@ import { fetchJson } from "@/lib/fetch-json";
 import { formatDateTime, dayOf } from "@/lib/format";
 import {
   TraceMark, SquareIcon, XIcon, CheckIcon, SparklesIcon, WarningIcon, MicIcon,
-  FolderIcon, RefreshIcon, ClipboardIcon, CalendarIcon, ChevronRightIcon, SearchIcon, MapPinIcon,
+  FolderIcon, RefreshIcon, ClipboardIcon, CalendarIcon, ChevronRightIcon, SearchIcon, MapPinIcon, HelpIcon,
   UsersIcon, TrendingUpIcon, DownloadIcon,
 } from "@/components/icons";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -384,6 +384,7 @@ function HomeInner() {
   const [exportError, setExportError] = useState<string | null>(null);
   const [exportNotice, setExportNotice] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "analyzed" | "unanalyzed">("all");
+  const [stale, setStale] = useState(false);
   const rovingFilter = useRovingRadioGroup(FILTER_VALUES, filter, setFilter);
   const [selectMode, setSelectMode] = useState(false);
   // Cross-day, cross-search selection: intentionally never reset when
@@ -433,6 +434,7 @@ function HomeInner() {
       const list = Array.isArray(data) ? data : [];
       setConversations(list);
       setError(null);
+      setStale(false);
       setLastSynced(new Date().toISOString());
       cacheSet(CONVERSATIONS_CACHE_KEY, list);
     } catch (e) {
@@ -440,6 +442,12 @@ function HomeInner() {
       // an error if there was no cached list to fall back on.
       if (mode === "refresh" || !cacheGet(CONVERSATIONS_CACHE_KEY)) {
         setError(e instanceof Error ? e.message : "Failed to reach Omi");
+      } else {
+        // Silently falling back to cache used to mean a whole day of stale rows
+        // rendered as if they were current — the list looked authoritative and
+        // wasn't. Mark it instead, so "no conversations today" can be read as
+        // "we couldn't ask" rather than "nothing happened".
+        setStale(true);
       }
     } finally {
       setLoading(false);
@@ -775,6 +783,13 @@ function HomeInner() {
               Open promises
             </Link>
             <Link
+              href="/help"
+              className={BUTTON_GHOST}
+            >
+              <HelpIcon className="w-4 h-4 flex-shrink-0" />
+              How this works
+            </Link>
+            <Link
               href="/people"
               className={BUTTON_GHOST}
             >
@@ -800,11 +815,16 @@ function HomeInner() {
 
         {/* Sync status + its two utilities — quiet meta row, read once per visit */}
         <div className="flex items-center justify-between gap-2 mt-1 pb-3 border-b border-slate-800">
-          <span className="text-sm text-slate-400 min-w-0 truncate" aria-live="polite">
+          <span
+            className={`text-sm min-w-0 truncate ${stale ? "text-amber-400" : "text-slate-400"}`}
+            aria-live="polite"
+          >
             {refreshing
               ? "Refreshing from Omi…"
               : loading
               ? "Loading…"
+              : stale
+              ? `Couldn't reach Omi — showing saved copy${lastSynced ? ` from ${getAnalysisAge(lastSynced).label}` : ""}`
               : lastSynced
               ? `Synced ${getAnalysisAge(lastSynced).label}`
               : "Not synced yet"}
@@ -851,15 +871,16 @@ function HomeInner() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search conversations by title or topic…"
-              aria-label="Search all conversations"
+              placeholder="Search this list by title or topic…"
+              data-shortcut-search
+              aria-label="Search conversations on this device by title or topic"
               className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-10 py-2.5 text-sm text-slate-200 placeholder-slate-400 focus:border-cyan-500 focus:outline-none transition-colors min-h-[44px]"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
                 aria-label="Clear search"
-                className="absolute right-2 top-1/2 -translate-y-1/2 min-h-[32px] min-w-[32px] flex items-center justify-center text-slate-400 hover:text-white transition-colors"
+                className="absolute right-2 top-1/2 -translate-y-1/2 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-white transition-colors"
               >
                 <XIcon className="w-3.5 h-3.5" />
               </button>

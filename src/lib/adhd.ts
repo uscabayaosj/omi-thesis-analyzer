@@ -75,10 +75,38 @@ export interface AdhdAnalysis {
   reflection?: AdhdReflection;
 }
 
-/** Daily rollup shape. Prose blocks by design (a 60-second plan, not a table).
+/** One step of tomorrow's plan, as an object rather than a sentence.
+ *
+ *  The rollup's six supporting sections are genuinely prose — narrative is the
+ *  right form for "today in one paragraph". The plan is not: a plan is a list
+ *  of things you either do or move, and returning it as a paragraph meant the
+ *  one section the user is supposed to *act* on was the one section the UI
+ *  could do nothing with. It could not be ticked, deferred, or counted, so the
+ *  day-close ritual ended in reading. These carry the same shape as a
+ *  commitment key so done-state survives a regeneration of the same day. */
+export interface RollupPlanStep {
+  /** Deterministic hash of the step text, so ticking survives a re-run. */
+  key: string;
+  /** The action, phrased as its smallest first step. */
+  what: string;
+  /** Suggested time of day, e.g. "9:00 AM" or "morning". Optional. */
+  when?: string;
+  /** Rough minutes to allow. Optional — the model omits it when unknown. */
+  minutes?: number;
+  /** Hard deadline if one exists, e.g. "August 31". Optional. */
+  deadline?: string;
+  /** Why this ranks where it does. One short clause. Optional. */
+  why?: string;
+}
+
+/** Daily rollup shape. The supporting sections stay prose by design (a
+ *  60-second read, not a table); the plan is structured so it can be acted on.
  *  Defined here so both adhd-storage and rollup.ts can import it. */
 export interface Rollup {
   tomorrow_plan: string;
+  /** Structured form of `tomorrow_plan`. Optional: rollups saved before this
+   *  existed have prose only, and the UI falls back to rendering that. */
+  plan_steps?: RollupPlanStep[];
   aging_commitments: string;
   conflicts_at_risk: string;
   social_ledger: string;

@@ -122,6 +122,7 @@ export default function PeoplePage() {
   const [addError, setAddError] = useState<string | null>(null);
   const [reassigning, setReassigning] = useState<string | null>(null); // pending suggestion id
   const [acceptErrorId, setAcceptErrorId] = useState<string | null>(null); // pending suggestion id
+  const [batchResult, setBatchResult] = useState<string | null>(null);
   // Collapsed by default so the directory, search, and view toggle aren't
   // buried under the full review queue on first paint — the count banner keeps
   // it one tap away without owning the whole first screen.
@@ -279,6 +280,32 @@ export default function PeoplePage() {
     resolve(s, () => ignoreName(s.extractedName));
   };
 
+  /* A 43-item queue with only per-item buttons is a queue that does not get
+     cleared: every accept re-renders the list and slides the next card under
+     the thumb, and there is no way to dispatch the easy ones in one go. The
+     confident matches — where extraction already resolved the name to an
+     existing person — are exactly the subset that needs no judgment, so they
+     get one action. Ambiguous ones are deliberately left for the per-card
+     flow, because those are the ones where a wrong merge costs something. */
+  const confidentMatches = pending.filter((s) => s.matchedPersonId);
+
+  const acceptAllConfident = () => {
+    let failed = 0;
+    for (const s of confidentMatches) {
+      const target = s.matchedPersonId;
+      if (!target) continue;
+      const ok = appendToPerson(target, factsFrom(s), meetingFrom(s), s.extractedName);
+      if (ok) removePending(s.id);
+      else failed++;
+    }
+    setBatchResult(
+      failed === 0
+        ? `${confidentMatches.length} added.`
+        : `${confidentMatches.length - failed} added, ${failed} kept for review.`
+    );
+    refresh();
+  };
+
   // ── add person ──
 
   const creatingRef = useRef(false);
@@ -377,6 +404,23 @@ export default function PeoplePage() {
               <span className="text-sm font-semibold uppercase tracking-wide">Review ({pending.length})</span>
               <ChevronRightIcon className="w-4 h-4 -rotate-90 flex-shrink-0" />
             </button>
+            {confidentMatches.length > 1 && (
+              <div className="card p-4 mb-3 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-slate-200">
+                  <strong className="font-semibold">{confidentMatches.length}</strong> already match a
+                  person you have. Nothing to decide on these.
+                </p>
+                <button
+                  onClick={acceptAllConfident}
+                  className={`${BUTTON_PRIMARY} py-2 px-4`}
+                >
+                  Add all {confidentMatches.length}
+                </button>
+              </div>
+            )}
+            {batchResult && (
+              <p role="status" className="text-sm text-slate-300 mb-3">{batchResult}</p>
+            )}
             <div className="space-y-3">
               {pending.map((s) => (
                 <PendingCard

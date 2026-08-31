@@ -30,7 +30,7 @@ import {
   RELATIONSHIP_TYPES, RELATIONSHIP_LABEL, type Relationship,
 } from "@/lib/relationships";
 import { getPlaces } from "@/lib/places";
-import { groupMeetingsByPlace, effectiveMeetingLocation } from "@/lib/place-resolve";
+import { groupMeetingsByPlace, effectiveMeetingLocation, shortPlaceLabel } from "@/lib/place-resolve";
 import { getMeetingLocations } from "@/lib/meeting-location";
 import MeetingLocationEditor from "@/components/MeetingLocationEditor";
 import {
@@ -65,6 +65,27 @@ function initials(name: string): string {
 /** Native option text can't wrap or ellipsize, so clip it before it renders. */
 function optionLabel(name: string): string {
   return name.length > 48 ? `${name.slice(0, 47)}…` : name;
+}
+
+/**
+ * A merge is irreversible, and a directory that has accumulated duplicates
+ * shows the picker "Ray", "Ray", "Ray Kessler" — three identical-looking
+ * options guarding an unrecoverable action, which makes choosing a coin flip.
+ * Append whatever actually distinguishes them: their role, how much is
+ * recorded against them, and when they were last met.
+ */
+function mergeOptionLabel(p: Person): string {
+  const bits: string[] = [];
+  if (p.role) bits.push(p.role);
+  if (p.aliases.length) bits.push(`aka ${p.aliases.slice(0, 2).join(", ")}`);
+  const counts: string[] = [];
+  if (p.facts.length) counts.push(`${p.facts.length} fact${p.facts.length === 1 ? "" : "s"}`);
+  if (p.meetings.length) counts.push(`${p.meetings.length} meeting${p.meetings.length === 1 ? "" : "s"}`);
+  if (counts.length) bits.push(counts.join(", "));
+  else bits.push("nothing recorded");
+  const last = p.meetings.map((m) => m.date).sort().at(-1);
+  if (last) bits.push(`last ${formatDate(last)}`);
+  return optionLabel(`${p.name} — ${bits.join(" · ")}`);
 }
 
 function formatDate(d: string): string {
@@ -785,7 +806,7 @@ export default function PersonDetailPage() {
                     {g.place.name}
                   </Link>
                 ) : (
-                  <span className="font-serif text-slate-300">{g.rawName}</span>
+                  <span className="font-serif text-slate-300" title={g.rawName}>{g.rawName ? shortPlaceLabel(g.rawName) : "Unknown place"}</span>
                 )}
                 <span className="font-mono text-slate-400">{g.meetings.length}×</span>
               </li>
@@ -809,13 +830,14 @@ export default function PersonDetailPage() {
               {sortedMeetings.map((m) => {
                 const eff = effectiveMeetingLocation(m, meetingOverrides);
                 const pinnedPlace = eff.placeId ? places.find((p) => p.id === eff.placeId) : null;
-                const label = pinnedPlace?.name ?? eff.placeName ?? "Unknown place";
+                const rawLabel = pinnedPlace?.name ?? eff.placeName ?? "Unknown place";
+                const label = pinnedPlace?.name ? rawLabel : shortPlaceLabel(rawLabel);
                 const isEditing = editingMeetingId === m.conversationId;
                 return (
                   <li key={m.conversationId} className="card p-3">
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="font-serif text-sm text-slate-200 truncate">{label}</p>
+                        <p className="font-serif text-sm text-slate-200 truncate" title={rawLabel}>{label}</p>
                         <p className="font-mono text-xs text-slate-400">
                           {getAnalysisAge(m.date).label} · {formatDate(m.date)}
                         </p>
@@ -884,7 +906,7 @@ export default function PersonDetailPage() {
                 <option value="">Select person…</option>
                 {otherPeople.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {optionLabel(p.name)}
+                    {mergeOptionLabel(p)}
                   </option>
                 ))}
               </select>

@@ -1,5 +1,6 @@
 import { chatCompletion, extractJsonObject } from "./analysis";
-import type { AdhdAnalysis, Rollup } from "./adhd";
+import type { AdhdAnalysis, Rollup, RollupPlanStep } from "./adhd";
+import { commitmentKey } from "./adhd";
 
 export interface DayConvoOutput {
   title: string;
@@ -8,7 +9,10 @@ export interface DayConvoOutput {
   doneKeys: string[];
 }
 
-const ROLLUP_FIELDS: (keyof Rollup)[] = [
+/** The prose sections only — `plan_steps` is structured and parsed separately. */
+type RollupProseField = Exclude<keyof Rollup, "plan_steps">;
+
+const ROLLUP_FIELDS: RollupProseField[] = [
   "tomorrow_plan",
   "aging_commitments",
   "conflicts_at_risk",
@@ -18,14 +22,44 @@ const ROLLUP_FIELDS: (keyof Rollup)[] = [
   "dropped",
 ];
 
+function toPlanStep(raw: unknown): RollupPlanStep | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const r = raw as Record<string, unknown>;
+  const what = typeof r.what === "string" ? r.what.trim() : "";
+  if (!what) return null;
+  const str = (v: unknown): string | undefined => {
+    const t = typeof v === "string" ? v.trim() : "";
+    return t ? t : undefined;
+  };
+  // The model is told to send a number, but a "30" or "about 30 minutes"
+  // slips through often enough to be worth parsing rather than dropping.
+  const rawMin = typeof r.minutes === "number" ? r.minutes : Number.parseInt(String(r.minutes ?? ""), 10);
+  const minutes = Number.isFinite(rawMin) && rawMin > 0 ? Math.round(rawMin) : undefined;
+  return {
+    key: commitmentKey("plan", what),
+    what,
+    when: str(r.when),
+    minutes,
+    deadline: str(r.deadline),
+    why: str(r.why),
+  };
+}
+
 export function toRollup(raw: Record<string, unknown>): Rollup {
-  const result = {} as Record<keyof Rollup, string>;
+  const result = {} as Rollup;
   for (const field of ROLLUP_FIELDS) {
     const v = raw[field];
     result[field] = typeof v === "string" && v.trim()
       ? v
       : "The AI did not return this section. Re-run the rollup to fill it in.";
   }
+  // Structured plan is best-effort: a model that returns nothing usable leaves
+  // this undefined and the UI falls back to the prose, exactly as it does for
+  // rollups saved before plan_steps existed.
+  const steps = Array.isArray(raw.plan_steps)
+    ? raw.plan_steps.map(toPlanStep).filter((s): s is RollupPlanStep => s !== null).slice(0, 5)
+    : [];
+  if (steps.length) result.plan_steps = steps;
   return result;
 }
 
@@ -59,10 +93,27 @@ You MUST respond with valid JSON matching this exact schema:
   "social_ledger": "At most 3 quick, kind things worth doing for people (a reply, a thank-you); below that, anyone who has been waiting more than a few days, one line each.",
   "tomorrow_events": "Tomorrow's events in time order, each with whether it's ready or what still needs doing. 'None.' if none.",
   "today_paragraph": "3-4 sentences: what got decided, what moved, the drift observation — written so reading only this a week later reconstructs the day.",
-  "dropped": "Loops and items closed or killed today, one line each, so the user trusts nothing vanished silently. 'None.' if none."
+  "dropped": "Loops and items closed or killed today, one line each, so the user trusts nothing vanished silently. 'None.' if none.",
+  "plan_steps": [
+    {
+      "what": "The action, phrased as its smallest first step. One short sentence, no bullet marker, no bold.",
+      "when": "Suggested time of day, e.g. '9:00 AM' or 'morning'. Omit the field if there is no sensible suggestion.",
+      "minutes": 30,
+      "deadline": "Hard deadline if one genuinely exists, e.g. 'August 31'. Omit the field otherwise.",
+      "why": "One short clause on why it ranks here. Omit if it would just restate the action."
+    }
+  ]
 }
 
-Each field is a prose string (may contain newlines and simple markdown like bold or hyphen bullets). Do not return arrays or nested objects.`;
+Every field except "plan_steps" is a prose string (may contain newlines and simple markdown like bold or hyphen bullets); do not return arrays or nested objects for those.
+
+"plan_steps" is the SAME plan as "tomorrow_plan", in the same order, broken into objects so the app can let the user tick items off. Rules for it:
+- Same cap as the plan: at most 5 steps, first one being the "first block".
+- "what" is plain text only — no markdown, no leading "- ", no bold. The other fields carry the structure.
+- "minutes" is a plain number, not a string, and is omitted entirely when unknown. Use the same 1.5x estimate as the prose.
+- Omit any optional field rather than returning an empty string or null.
+- Return an empty array only when "tomorrow_plan" is genuinely "Nothing time-sensitive for tomorrow."
+- The two must agree: never put an item in one and not the other.`;
 
 function fmtCommitment(c: AdhdAnalysis["commitments"][number], doneSet: Set<string>): string {
   const dir = c.direction === "other_to_user" ? `${c.who} owes me` : `I owe ${c.who}`;

@@ -21,6 +21,9 @@ export interface StoredRollup {
   timestamp: string;
   conversationIds: string[];
   rollup: Rollup;
+  /** Plan-step keys the user has ticked. Keyed by content hash, so ticking
+   *  survives regenerating the same day as long as the step's text is stable. */
+  planDoneKeys?: string[];
 }
 
 const ANALYSES_KEY = "omi-adhd-analyses";
@@ -137,6 +140,18 @@ export function toggleCommitmentDone(id: string, key: string): string[] {
   return stored.doneKeys;
 }
 
+export function togglePlanStepDone(day: string, key: string): string[] {
+  const map = readMap<StoredRollup>(ROLLUPS_KEY);
+  const stored = map[day];
+  if (!stored) return [];
+  const set = new Set(Array.isArray(stored.planDoneKeys) ? stored.planDoneKeys : []);
+  if (set.has(key)) set.delete(key);
+  else set.add(key);
+  stored.planDoneKeys = Array.from(set);
+  writeMap(ROLLUPS_KEY, map);
+  return stored.planDoneKeys;
+}
+
 // ── rollups ──
 
 export function getRollup(day: string): StoredRollup | null {
@@ -154,11 +169,19 @@ export function saveRollup(record: {
   rollup: Rollup;
 }): StoredRollup {
   const map = readMap<StoredRollup>(ROLLUPS_KEY);
+  // Carry ticked plan steps across a regeneration. The key is a hash of the
+  // step's text, so a step the model rewords is correctly treated as new
+  // while an unchanged one keeps its state — the same contract commitments
+  // already have. Keys with no surviving step are pruned rather than kept
+  // forever, since the done-count is rendered against the new step list.
+  const surviving = new Set((record.rollup.plan_steps ?? []).map((st) => st.key));
+  const carried = (map[record.day]?.planDoneKeys ?? []).filter((k) => surviving.has(k));
   const stored: StoredRollup = {
     day: record.day,
     timestamp: new Date().toISOString(),
     conversationIds: record.conversationIds,
     rollup: record.rollup,
+    ...(carried.length ? { planDoneKeys: carried } : {}),
   };
   map[record.day] = stored;
   writeMap(ROLLUPS_KEY, map);

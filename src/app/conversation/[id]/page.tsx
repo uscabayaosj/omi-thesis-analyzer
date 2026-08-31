@@ -1,7 +1,7 @@
 "use client";
 
 import { Prose } from "@/components/Prose";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -58,6 +58,12 @@ import { getMeetingLocation } from "@/lib/meeting-location";
 import { getPlace } from "@/lib/places";
 
 const LENS_VALUES = ["thesis", "adhd", "both"] as const;
+
+function fmtElapsed(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const r = sec % 60;
+  return m ? `${m}m ${String(r).padStart(2, "0")}s` : `${r}s`;
+}
 
 interface TranscriptSegment {
   text: string;
@@ -176,6 +182,11 @@ export default function ConversationPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  /* An analysis is a minute-scale, paid operation that used to run with a bare
+     spinner and no way out. */
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  const analysisAbortRef = useRef<AbortController | null>(null);
   const [customAnalyzing, setCustomAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Keyed per export target, not one shared flag: Obsidian and the .md
@@ -336,15 +347,26 @@ export default function ConversationPage() {
     loadConversation("initial");
   }, [loadConversation]);
 
+  useEffect(() => {
+    if (startedAt === null) return;
+    const t = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 1000);
+    return () => clearInterval(t);
+  }, [startedAt]);
+
   const executeAnalysis = useCallback(async () => {
     setAnalyzing(true);
+    setStartedAt(Date.now());
+    setElapsed(0);
     setError(null);
     setViewingVersion(null);
+    const controller = new AbortController();
+    analysisAbortRef.current = controller;
     try {
       const data = await fetchJson<{ analysis: Analysis; conversation?: Conversation }>("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conversationId: id }),
+        signal: controller.signal,
       });
       setAnalysis(data.analysis);
       if (data.conversation) {
@@ -367,12 +389,24 @@ export default function ConversationPage() {
       setTranscriptOpen(false);
       setShowCustom(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Analysis failed");
+      // A deliberate stop is not an error and gets no error card.
+      if (!(e instanceof DOMException && e.name === "AbortError")) {
+        setError(e instanceof Error ? e.message : "Analysis failed");
+      }
     } finally {
       setAnalyzing(false);
+      setStartedAt(null);
+      analysisAbortRef.current = null;
       setShowRerunConfirm(false);
     }
   }, [id, conversation]);
+
+  const stopAnalysis = useCallback(() => {
+    analysisAbortRef.current?.abort();
+    analysisAbortRef.current = null;
+    setAnalyzing(false);
+    setStartedAt(null);
+  }, []);
 
   const handleAnalyzeClick = useCallback(() => {
     if (storedAnalysis) {
@@ -697,28 +731,42 @@ export default function ConversationPage() {
 
           {/* Analyze button */}
           {(lens === "thesis" || lens === "both") && !analysis && (
-            <button
-              onClick={handleAnalyzeClick}
-              disabled={analyzing}
-              aria-label="Run Pioneer Sovereignty analysis on this conversation"
-              className="w-full card p-6 text-center hover:border-cyan-500/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mb-8 min-h-[44px]"
-            >
-              {analyzing ? (
-                <div className="flex items-center justify-center gap-3">
-                  <LoaderIcon className="w-6 h-6 text-cyan-400 animate-spin flex-shrink-0" />
-                  <div>
-                    <p className="font-semibold text-white">Analyzing conversation...</p>
-                    <p className="text-slate-400 font-serif italic text-sm mt-1">Running 8-dimension Pioneer Sovereignty analysis</p>
+            <div className="mb-8">
+              <button
+                onClick={handleAnalyzeClick}
+                disabled={analyzing}
+                aria-label="Run Pioneer Sovereignty analysis on this conversation"
+                className="w-full card p-6 text-center hover:border-cyan-500/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+              >
+                {analyzing ? (
+                  <div className="flex items-center justify-center gap-3">
+                    <LoaderIcon className="w-6 h-6 text-cyan-400 animate-spin flex-shrink-0" />
+                    <div>
+                      <p className="font-semibold text-white">
+                        Analyzing conversation…{elapsed > 0 && <span className="font-mono text-sm text-slate-400"> {fmtElapsed(elapsed)}</span>}
+                      </p>
+                      <p className="text-slate-400 font-serif italic text-sm mt-1">Running 8-dimension Pioneer Sovereignty analysis</p>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div>
-                  <CompassIcon className="w-7 h-7 mx-auto mb-2 text-cyan-400" />
-                  <p className="font-semibold text-white">Run Pioneer Sovereignty Analysis</p>
-                  <p className="text-slate-400 font-serif italic text-sm mt-1">4 research questions + conditions + rival hypothesis + refutation</p>
-                </div>
+                ) : (
+                  <div>
+                    <CompassIcon className="w-7 h-7 mx-auto mb-2 text-cyan-400" />
+                    <p className="font-semibold text-white">Run Pioneer Sovereignty Analysis</p>
+                    <p className="text-slate-400 font-serif italic text-sm mt-1">4 research questions + conditions + rival hypothesis + refutation</p>
+                    {/* Cost and duration were stated nowhere before the spend. */}
+                    <p className="text-slate-400 font-mono text-xs mt-2">1 API call · usually under a minute</p>
+                  </div>
+                )}
+              </button>
+              {analyzing && (
+                <button
+                  onClick={stopAnalysis}
+                  className="mt-2 w-full bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm px-3 py-2 min-h-[44px] rounded-lg transition-colors"
+                >
+                  Stop
+                </button>
               )}
-            </button>
+            </div>
           )}
 
           {/* Analysis results */}

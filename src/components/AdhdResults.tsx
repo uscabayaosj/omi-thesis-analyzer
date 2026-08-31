@@ -3,6 +3,7 @@
 import type { ComponentType, ReactNode } from "react";
 import { confidenceLabel, type AdhdAnalysis } from "@/lib/adhd";
 import { Inline } from "@/components/Prose";
+import SectionNav, { sectionId } from "@/components/SectionNav";
 import {
   ZapIcon, ClipboardIcon, CogIcon, UsersIcon, RefreshIcon,
   CalendarIcon, CheckSquareIcon, SquareIcon, ScaleIcon, FeatherIcon,
@@ -17,7 +18,7 @@ function Block({
   children: ReactNode;
 }) {
   return (
-    <div className="card p-6">
+    <div className="card p-6" id={sectionId(title)} style={{ scrollMarginTop: "6rem" }}>
       <div className="analysis-section">
         <h3 className="flex items-center gap-2">
           <Icon className="w-[1.05em] h-[1.05em] flex-shrink-0" />
@@ -78,8 +79,22 @@ export function AdhdResults({
     );
   }
 
+  // Mirrors each block's own render guard, so the strip never offers an
+  // anchor that isn't on the page. The reflection blocks are individually
+  // conditional — an absent observation is the good outcome, not a gap.
+  const r = analysis.reflection;
+  const navSections = [
+    "Do today", "Promises", "Worth remembering", "People",
+    "Unfinished threads", "Coming up",
+    ...(r?.social_balance?.length ? ["How the conversation went"] : []),
+    ...(r?.emotional_check?.length ? ["Feelings check"] : []),
+    ...(r?.capacity_check?.length ? ["Promised too much?"] : []),
+    ...(r?.strategic_takeaway?.length ? ["Bigger picture"] : []),
+  ].map((label) => ({ id: sectionId(label), label }));
+
   return (
     <div className={`${animate ? "stagger-in" : ""} space-y-6`}>
+      <SectionNav sections={navSections} />
       {/* One-line summary */}
       <div className="card p-5 border-cyan-500/30">
         <p className="text-sm text-slate-200">{analysis.summary}</p>

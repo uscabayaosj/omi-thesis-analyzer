@@ -9,6 +9,7 @@ import {
   getRollup, getWeeklyRollup, saveWeeklyRollup, type StoredWeeklyRollup,
 } from "@/lib/adhd-storage";
 import { pullAndMerge } from "@/lib/sync";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import type { WeeklyRollup } from "@/lib/weekly-rollup";
 import {
   ArrowLeftIcon, CalendarIcon, FileTextIcon, TrendingUpIcon, WarningIcon,
@@ -78,6 +79,7 @@ function WeekPageInner() {
   // from by throwing away the server tree. Holding the first client render to
   // the server's view and filling in after mount keeps the two in agreement.
   const [mounted, setMounted] = useState(false);
+  const [showRegenConfirm, setShowRegenConfirm] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -225,6 +227,25 @@ function WeekPageInner() {
         </div>
       )}
 
+      {showRegenConfirm && (
+        <ConfirmDialog
+          title="Replace this week's rollup?"
+          tone="danger"
+          body={
+            <>
+              This week already has a saved rollup. Regenerating replaces it — weekly rollups keep no
+              version history, so the current one will be gone.
+            </>
+          }
+          confirmLabel="Replace it"
+          onCancel={() => setShowRegenConfirm(false)}
+          onConfirm={() => {
+            setShowRegenConfirm(false);
+            generate();
+          }}
+        />
+      )}
+
       {stored && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -232,7 +253,7 @@ function WeekPageInner() {
               Synthesized from {stored.dayCount} of 7 days
             </p>
             <button
-              onClick={generate}
+              onClick={() => setShowRegenConfirm(true)}
               disabled={generating || dayRollups.length === 0}
               className="text-sm text-slate-400 hover:text-white min-h-[44px] px-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
