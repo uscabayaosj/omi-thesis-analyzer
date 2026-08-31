@@ -3,7 +3,7 @@
 import { UndoIcon } from "@/components/icons";
 
 /**
- * The visible half of `useUndo`. Announced politely rather than assertively:
+ * The visible half of `UndoProvider`. Announced politely rather than assertively:
  * an undo offer is worth mentioning, never worth interrupting a screen reader
  * mid-sentence — the destructive action itself already succeeded.
  */

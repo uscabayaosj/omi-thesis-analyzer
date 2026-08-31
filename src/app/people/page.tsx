@@ -6,7 +6,10 @@ import { useRouter } from "next/navigation";
 import {
   appendToPerson,
   createPerson,
+  deletePerson,
   getExtractedConversationIds,
+  getPerson,
+  updatePerson,
   getPeople,
   getPending,
   ignoreName,
@@ -19,8 +22,7 @@ import {
   type PersonFact,
 } from "@/lib/people";
 import { runExtraction } from "@/lib/people-pipeline";
-import UndoBar from "@/components/UndoBar";
-import { useUndo } from "@/lib/use-undo";
+import { useUndoOffer } from "@/components/UndoProvider";
 import { getAnalyzedIds, getAnalysisAge } from "@/lib/storage";
 import { getAdhdAnalyzedIds } from "@/lib/adhd-storage";
 import { pullAndMerge } from "@/lib/sync";
@@ -127,7 +129,7 @@ export default function PeoplePage() {
   const [reassigning, setReassigning] = useState<string | null>(null); // pending suggestion id
   const [acceptErrorId, setAcceptErrorId] = useState<string | null>(null); // pending suggestion id
   const [batchResult, setBatchResult] = useState<string | null>(null);
-  const { offer: undoOffer, offerUndo, undo, clear: clearUndo } = useUndo();
+  const { offerUndo } = useUndoOffer();
   // Collapsed by default so the directory, search, and view toggle aren't
   // buried under the full review queue on first paint — the count banner keeps
   // it one tap away without owning the whole first screen.
@@ -268,17 +270,45 @@ export default function PeoplePage() {
   };
 
   const acceptAsNew = (s: PendingSuggestion) => {
+    let created: Person | null = null;
     resolveAccept(s, () => {
       const p = createPerson({ name: s.extractedName });
       // A null here means the write didn't land (quota) or the name was empty.
       // Returning it keeps the suggestion queued rather than losing it.
       if (!p) return null;
+      created = p;
       return appendToPerson(p.id, factsFrom(s), meetingFrom(s));
     });
+    // Accepting was the last irreversible mis-tap left on a 43-item queue:
+    // it created a person and merged facts with neither a confirm nor a way
+    // back. Undo deletes the person this created outright, since it did not
+    // exist a moment ago.
+    if (created) {
+      const newId = (created as Person).id;
+      offerUndo(`Added “${s.extractedName}” as a new person.`, () => {
+        deletePerson(newId);
+        restorePending(s);
+        refresh();
+      });
+    }
   };
 
   const acceptInto = (s: PendingSuggestion, personId: string) => {
+    // Snapshot before the merge: undo restores the exact prior facts, meetings
+    // and aliases rather than trying to subtract what was added.
+    const before = getPerson(personId);
     resolveAccept(s, () => appendToPerson(personId, factsFrom(s), meetingFrom(s), s.extractedName));
+    if (before) {
+      offerUndo(`Added to “${before.name}”.`, () => {
+        updatePerson(personId, {
+          facts: before.facts,
+          meetings: before.meetings,
+          aliases: before.aliases,
+        });
+        restorePending(s);
+        refresh();
+      });
+    }
   };
 
   const doIgnore = (s: PendingSuggestion) => {
@@ -304,18 +334,40 @@ export default function PeoplePage() {
 
   const acceptAllConfident = () => {
     let failed = 0;
+    // One snapshot per distinct target before anything is written, so undo can
+    // put every touched person back exactly as they were. A bulk action is the
+    // one that most needs a way back: it is the largest thing a single tap can
+    // do in this app.
+    const snapshots = new Map<string, Person>();
+    const applied: PendingSuggestion[] = [];
     for (const s of confidentMatches) {
       const target = s.matchedPersonId;
       if (!target) continue;
+      if (!snapshots.has(target)) {
+        const before = getPerson(target);
+        if (before) snapshots.set(target, before);
+      }
       const ok = appendToPerson(target, factsFrom(s), meetingFrom(s), s.extractedName);
-      if (ok) removePending(s.id);
-      else failed++;
+      if (ok) {
+        removePending(s.id);
+        applied.push(s);
+      } else failed++;
     }
     setBatchResult(
       failed === 0
         ? `${confidentMatches.length} added.`
         : `${confidentMatches.length - failed} added, ${failed} kept for review.`
     );
+    if (applied.length) {
+      offerUndo(`Added ${applied.length} ${applied.length === 1 ? "suggestion" : "suggestions"}.`, () => {
+        for (const [id, before] of snapshots) {
+          updatePerson(id, { facts: before.facts, meetings: before.meetings, aliases: before.aliases });
+        }
+        for (const s of applied) restorePending(s);
+        setBatchResult(null);
+        refresh();
+      });
+    }
     refresh();
   };
 
@@ -402,10 +454,6 @@ export default function PeoplePage() {
       <p className="text-slate-400 font-serif italic text-[0.95rem] mb-6">
         Everyone mentioned in your conversations — who they are, where you met, and what you learned.
       </p>
-
-      {undoOffer && (
-        <UndoBar label={undoOffer.label} onUndo={undo} onDismiss={clearUndo} />
-      )}
 
       {/* Review queue — collapsed to a count banner by default so the search,
           view toggle, and directory stay reachable without scrolling past every

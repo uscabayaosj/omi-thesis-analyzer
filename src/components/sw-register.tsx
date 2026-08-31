@@ -117,6 +117,12 @@ export default function ServiceWorkerRegistration() {
   if (!waiting || dismissed) return null;
 
   return (
+    <>
+    {/* Reserve the space the fixed banner occupies. Without this it sat on top
+        of the last ~200px of every page — the tail of the rollup plan on a
+        phone, the last row of /people and /usage on a desktop — and there was
+        no way to scroll that content clear of it. */}
+    <div aria-hidden="true" className="h-28" />
     <div
       // polite, not assertive: an available update is worth mentioning, never
       // worth interrupting a screen reader mid-sentence.
@@ -154,5 +160,6 @@ export default function ServiceWorkerRegistration() {
         </div>
       </div>
     </div>
+    </>
   );
 }

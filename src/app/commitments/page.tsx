@@ -23,6 +23,49 @@ import { pullAndMerge } from "@/lib/sync";
 import { ArrowLeftIcon, CheckSquareIcon, SquareIcon, ClipboardIcon } from "@/components/icons";
 import { LINK_BACK } from "@/lib/ui";
 
+type AgeFilter = "all" | "overdue" | "stale";
+type DirFilter = "all" | "mine" | "theirs";
+
+const AGE_FILTERS: { key: AgeFilter; label: string }[] = [
+  { key: "all", label: "Any age" },
+  { key: "overdue", label: "3+ days" },
+  { key: "stale", label: "A week+" },
+];
+
+const DIR_FILTERS: { key: DirFilter; label: string }[] = [
+  { key: "all", label: "Both ways" },
+  { key: "mine", label: "I owe" },
+  { key: "theirs", label: "Owed to me" },
+];
+
+function FilterRow<T extends string>({
+  label, options, value, onChange,
+}: {
+  label: string;
+  options: { key: T; label: string }[];
+  value: T;
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1" role="group" aria-label={label}>
+      {options.map((o) => (
+        <button
+          key={o.key}
+          onClick={() => onChange(o.key)}
+          aria-pressed={value === o.key}
+          className={`px-3 py-2 min-h-[44px] rounded-full text-sm transition-colors ${
+            value === o.key
+              ? "border border-cyan-500/50 bg-cyan-950/40 text-cyan-200"
+              : "bg-slate-800 text-slate-300 hover:text-white"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /**
  * Normalise the three shapes a deadline arrives in.
  *
@@ -50,6 +93,8 @@ function ageBand(days: number): { label: string; tone: string } | null {
 export default function CommitmentsPage() {
   const [items, setItems] = useState<OpenCommitment[]>([]);
   const [showDone, setShowDone] = useState(false);
+  const [age, setAge] = useState<AgeFilter>("all");
+  const [dir, setDir] = useState<DirFilter>("all");
   // Held to the server's view on the first render — this reads localStorage,
   // which the server cannot see (same hydration trap fixed on /rollup/week).
   const [mounted, setMounted] = useState(false);
@@ -78,9 +123,24 @@ export default function CommitmentsPage() {
     );
   }, []);
 
-  const groups = useMemo(() => groupByPerson(items), [items]);
-  const openCount = items.filter((i) => !i.done).length;
-  const doneCount = items.length - openCount;
+  /* Fifty promises across thirty-seven person-groups in one flat scroll is
+     the highest-cognitive-load screen in an app whose fourth principle is low
+     cognitive load — and it is the screen you open when you are already
+     behind. Two filters cut it to the set you actually mean: how overdue, and
+     which direction the promise runs. The age bands are the same ones the
+     badges already use, so the control and the mark agree. */
+  const filtered = useMemo(() => items.filter((it) => {
+    if (age === "overdue" && it.ageDays < 3) return false;
+    if (age === "stale" && it.ageDays < 7) return false;
+    if (dir === "mine" && it.commitment.direction !== "user_to_other") return false;
+    if (dir === "theirs" && it.commitment.direction !== "other_to_user") return false;
+    return true;
+  }), [items, age, dir]);
+
+  const groups = useMemo(() => groupByPerson(filtered), [filtered]);
+  const openCount = filtered.filter((i) => !i.done).length;
+  const doneCount = filtered.length - openCount;
+  const hiddenByFilter = items.length - filtered.length;
 
   return (
     <main id="main" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-8">
@@ -122,6 +182,28 @@ export default function CommitmentsPage() {
               {showDone ? "Hide closed" : "Show closed"}
             </button>
           </div>
+
+          <div className="card p-4 mb-4 space-y-2">
+            <FilterRow label="Filter by age" options={AGE_FILTERS} value={age} onChange={setAge} />
+            <FilterRow label="Filter by direction" options={DIR_FILTERS} value={dir} onChange={setDir} />
+            {hiddenByFilter > 0 && (
+              <p className="text-xs text-slate-400 font-mono pt-1" role="status">
+                {hiddenByFilter} hidden by these filters
+              </p>
+            )}
+          </div>
+
+          {groups.length === 0 && (
+            <div className="card p-8 text-center">
+              <p className="text-slate-200 mb-1">Nothing matches these filters.</p>
+              <button
+                onClick={() => { setAge("all"); setDir("all"); }}
+                className="text-sm text-cyan-400 hover:underline min-h-[44px] px-2"
+              >
+                Clear filters
+              </button>
+            </div>
+          )}
 
           <div className="space-y-6">
             {groups.map((g) => (

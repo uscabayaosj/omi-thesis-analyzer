@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
+import { useModalFocus } from "@/lib/use-modal-focus";
 import { WarningIcon } from "@/components/icons";
 
 /** Accent for the warning icon and panel border. "danger" is for actions that
@@ -74,50 +75,10 @@ export default function ConfirmDialog({
     });
   }, []);
 
-  useEffect(() => {
-    // Remember what had focus so it can be handed back on close: cancelling
-    // from deep in a list otherwise dumped the user at document start.
-    const opener = document.activeElement as HTMLElement | null;
-    // Captured now: reading panelRef.current in the cleanup would consult a ref
-    // that has almost certainly changed by the time the dialog unmounts.
-    const panelAtMount = panelRef.current;
-    cancelRef.current?.focus();
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        requestClose(onCancel);
-        return;
-      }
-      if (e.key === "Tab") {
-        const panel = panelRef.current;
-        if (!panel) return;
-        const focusable = Array.from(
-          panel.querySelectorAll<HTMLElement>(
-            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-          )
-        ).filter((el) => !el.hasAttribute("disabled"));
-        if (focusable.length === 0) return;
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      // Only if focus is still inside the dialog (or lost to <body>) — never
-      // steal it back from something the confirmed action itself focused.
-      const active = document.activeElement;
-      if (!active || active === document.body || panelAtMount?.contains(active)) {
-        opener?.focus?.();
-      }
-    };
-  }, [onCancel, requestClose]);
+  // Focus contract lives in a shared hook so this dialog and the shortcut
+  // overlay cannot drift apart on it again.
+  const handleEscape = useCallback(() => requestClose(onCancel), [requestClose, onCancel]);
+  useModalFocus({ panelRef, initialFocusRef: cancelRef, onEscape: handleEscape });
 
   return (
     <div

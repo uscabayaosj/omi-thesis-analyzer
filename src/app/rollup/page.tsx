@@ -21,8 +21,7 @@ import {
 } from "@/components/icons";
 import { isPushSupported, getPushSubscriptionState, subscribeToPush, unsubscribeFromPush } from "@/lib/push";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import UndoBar from "@/components/UndoBar";
-import { useUndo } from "@/lib/use-undo";
+import { useUndoOffer } from "@/components/UndoProvider";
 import PlanChecklist from "@/components/PlanChecklist";
 import { Prose } from "@/components/Prose";
 import { BUTTON_PRIMARY, BUTTON_GHOST, LINK_BACK, BUTTON_SECONDARY } from "@/lib/ui";
@@ -134,7 +133,7 @@ function RollupPageInner() {
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [restOpen, setRestOpen] = useState(false);
-  const { offer: undoOffer, offerUndo, undo, clear: clearUndo } = useUndo();
+  const { offerUndo } = useUndoOffer();
   const [error, setError] = useState<string | null>(null);
   const dayParam = searchParams.get("day");
   const [selectedDay, setSelectedDay] = useState<string | null>(
@@ -515,16 +514,18 @@ function RollupPageInner() {
           at y=668 behind an eyebrow, a title, a three-line subtitle and two
           nav rows. With a plan open the header collapses to the title alone;
           the picker view keeps the full treatment, where it orients. */}
-      {undoOffer && (
-        <UndoBar label={undoOffer.label} onUndo={undo} onDismiss={clearUndo} />
-      )}
 
       <header className={planOpen ? "mb-4" : "mb-6"}>
-        {!planOpen && (
-          <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
-            Planning
-          </p>
-        )}
+        {/* With a day open the eyebrow carries the date rather than the generic
+            section name. The day used to appear only in the card *below* the
+            plan — roughly 1300px down at 375px — so the screen never said
+            which day you were reading until you had scrolled past its whole
+            contents. The running head is exactly where that belongs. */}
+        <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
+          {selectedDay
+            ? formatDateTime(`${selectedDay}T12:00:00`, { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+            : "Planning"}
+        </p>
         <h1 className="font-bold text-white mb-2 flex items-center gap-2">
           <CalendarIcon className="w-6 h-6 text-cyan-400 flex-shrink-0" />
           Daily Rollup

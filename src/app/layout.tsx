@@ -12,6 +12,7 @@ import ServiceWorkerRegistration from "@/components/sw-register";
 import AppVersion from "@/components/app-version";
 import AppBadgeSync from "@/components/app-badge-sync";
 import GlobalShortcuts from "@/components/shortcuts";
+import UndoProvider from "@/components/UndoProvider";
 
 export const metadata: Metadata = {
   // `template` lets each route name itself while keeping the product name in
@@ -68,8 +69,10 @@ export default function RootLayout({
         <ServiceWorkerRegistration />
         <AppBadgeSync />
         <GlobalShortcuts />
-        {children}
-        <AppVersion />
+        <UndoProvider>
+          {children}
+          <AppVersion />
+        </UndoProvider>
       </body>
     </html>
   );

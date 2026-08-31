@@ -33,8 +33,7 @@ import { getPlaces } from "@/lib/places";
 import { groupMeetingsByPlace, effectiveMeetingLocation, shortPlaceLabel } from "@/lib/place-resolve";
 import { getMeetingLocations } from "@/lib/meeting-location";
 import MeetingLocationEditor from "@/components/MeetingLocationEditor";
-import UndoBar from "@/components/UndoBar";
-import { useUndo } from "@/lib/use-undo";
+import { useUndoOffer } from "@/components/UndoProvider";
 import {
   ArrowLeftIcon,
   CheckIcon,
@@ -129,7 +128,7 @@ export default function PersonDetailPage() {
      action, the delete is reversible. Uses the shared undo primitive so this
      route is no longer the only place in the app where a mistake is
      recoverable. */
-  const { offer: undoOffer, offerUndo, undo, clear: clearUndo } = useUndo();
+  const { offerUndo } = useUndoOffer();
 
   const [showMergeDialog, setShowMergeDialog] = useState(false);
   const [mergeTargetId, setMergeTargetId] = useState("");
@@ -630,10 +629,6 @@ export default function PersonDetailPage() {
           )}
         </div>
       </div>
-
-      {undoOffer && (
-        <UndoBar label={undoOffer.label} onUndo={undo} onDismiss={clearUndo} />
-      )}
 
       {/* Facts */}
       <section className="mb-6">

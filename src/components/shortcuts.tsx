@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useModalFocus } from "@/lib/use-modal-focus";
 import { useRouter } from "next/navigation";
 import { SHORTCUTS, isTypingTarget } from "@/lib/shortcuts";
 
@@ -17,6 +18,11 @@ export default function GlobalShortcuts() {
   const router = useRouter();
   const [pendingG, setPendingG] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const closeRef = useRef<HTMLButtonElement | null>(null);
+
+  const closeHelp = useCallback(() => setShowHelp(false), []);
+  useModalFocus({ panelRef, initialFocusRef: closeRef, onEscape: closeHelp, enabled: showHelp });
 
   const focusSearch = useCallback(() => {
     const el = document.querySelector<HTMLInputElement>(
@@ -41,12 +47,10 @@ export default function GlobalShortcuts() {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
       if (e.key === "Escape") {
-        if (showHelp) {
-          e.preventDefault();
-          setShowHelp(false);
-          return;
-        }
-        // Blur a field so the next keystroke reaches the shortcuts again.
+        // The overlay's own Escape is owned by useModalFocus; here Escape only
+        // has the job of leaving a text field so the next keystroke reaches
+        // the shortcuts again.
+        if (showHelp) return;
         if (isTypingTarget(e.target)) (e.target as HTMLElement).blur();
         return;
       }
@@ -98,7 +102,12 @@ export default function GlobalShortcuts() {
         if (e.target === e.currentTarget) setShowHelp(false);
       }}
     >
+      {/* Declares role="dialog" aria-modal="true", so it owes the same focus
+          contract ConfirmDialog honours: Tab used to walk straight out of this
+          panel into the page behind it. */}
       <div
+        ref={panelRef}
+        tabIndex={-1}
         className="overlay-panel card max-w-md w-full p-6"
         role="dialog"
         aria-modal="true"
@@ -116,8 +125,8 @@ export default function GlobalShortcuts() {
           ))}
         </ul>
         <button
+          ref={closeRef}
           onClick={() => setShowHelp(false)}
-          autoFocus
           className="mt-5 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm px-4 py-2 min-h-[44px] rounded-lg transition-colors w-full"
         >
           Close
