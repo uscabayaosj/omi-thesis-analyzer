@@ -541,7 +541,7 @@ export default function ConversationPage() {
   const backHref = conversation ? `/?day=${dayOf(conversation.created_at)}` : "/";
 
   return (
-    <main className="max-w-3xl mx-auto px-4 py-8">
+    <main id="main" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
         <Link href={backHref} className="text-slate-400 hover:text-white text-sm inline-flex items-center gap-1.5 min-h-[44px] py-2">
           <ArrowLeftIcon className="w-4 h-4" />

@@ -27,12 +27,22 @@ export interface OpenCommitment {
 }
 
 function dayOf(a: StoredAdhdAnalysis): string {
-  return a.date ?? a.timestamp.slice(0, 10);
+  // `date` is a full ISO timestamp in practice ("2026-08-07T16:09:22.919767Z"),
+  // not the YYYY-MM-DD its type comment implies. Appending "T00:00:00" to that
+  // produced an unparseable string, so every age silently computed as NaN and
+  // clamped to 0 — the ageing bands never rendered and the sort was inert on a
+  // ledger whose entire premise is that a promise gets older.
+  return (a.date ?? a.timestamp).slice(0, 10);
 }
 
-function daysBetween(iso: string, now: number): number {
-  const t = new Date(`${iso}T00:00:00`).getTime();
-  if (Number.isNaN(t)) return 0;
+function daysBetween(day: string, now: number): number {
+  const t = new Date(`${day}T00:00:00`).getTime();
+  // A NaN here means the input was not a bare date. Returning 0 hid exactly
+  // that bug once already, so it is surfaced rather than swallowed.
+  if (Number.isNaN(t)) {
+    console.warn(`commitments: unparseable day "${day}" — age will show as 0`);
+    return 0;
+  }
   return Math.max(0, Math.floor((now - t) / 86_400_000));
 }
 
@@ -81,7 +91,9 @@ export function groupByPerson(items: OpenCommitment[]): { who: string; items: Op
     .sort((a, b) => {
       const oldestA = Math.max(...a.items.map((i) => i.ageDays));
       const oldestB = Math.max(...b.items.map((i) => i.ageDays));
-      return oldestB - oldestA || b.items.length - a.items.length;
+      // Oldest-owed person first, so the page reads oldest-first overall and
+      // not merely within each group.
+      return oldestB - oldestA || b.items.length - a.items.length || a.who.localeCompare(b.who);
     });
 }
 

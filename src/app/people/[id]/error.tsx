@@ -17,7 +17,7 @@ export default function PersonError({
   }, [error]);
 
   return (
-    <main className="max-w-3xl mx-auto px-4 py-16 text-center">
+    <main id="main" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-16 text-center">
       <div className="card p-8 border-red-500/30">
         <UsersIcon className="w-10 h-10 mx-auto mb-4 text-red-400" />
         <h1 className="font-bold text-white mb-2">This person&rsquo;s page failed to load</h1>

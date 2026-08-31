@@ -384,7 +384,7 @@ export default function PersonDetailPage() {
 
   if (loading) {
     return (
-      <main className="max-w-3xl mx-auto px-4 py-8">
+      <main id="main" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-8">
         <div className="space-y-4" role="status" aria-label="Loading person">
           <div className="skeleton h-8 w-1/2" />
           <div className="skeleton h-24 w-24 rounded-full" />

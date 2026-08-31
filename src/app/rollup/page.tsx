@@ -483,27 +483,37 @@ function RollupPageInner() {
   const selectedConvos = selectedDay ? (days.find((d) => d[0] === selectedDay)?.[1] ?? []) : [];
   // Conversations already analysed are reused rather than re-billed, so the
   // forecast has to net them off or it overstates the cost every time.
+  const planOpen = Boolean(selectedDay && rollup);
   const analyzedCount = mounted ? selectedConvos.filter((c) => getAdhdAnalysis(c.id)).length : 0;
 
   return (
-    <main className="max-w-3xl mx-auto px-4 py-8">
+    <main id="main" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-8">
       <Link href="/" className={LINK_BACK}>
         <ArrowLeftIcon className="w-4 h-4" />
         Back to conversations
       </Link>
 
-      <header className="mb-6">
-        <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
-          Planning
-        </p>
+      {/* Once a day's plan is on screen, the masthead has done its job and is
+          only pushing the answer down: on a 375x812 phone the plan heading sat
+          at y=668 behind an eyebrow, a title, a three-line subtitle and two
+          nav rows. With a plan open the header collapses to the title alone;
+          the picker view keeps the full treatment, where it orients. */}
+      <header className={planOpen ? "mb-4" : "mb-6"}>
+        {!planOpen && (
+          <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
+            Planning
+          </p>
+        )}
         <h1 className="font-bold text-white mb-2 flex items-center gap-2">
           <CalendarIcon className="w-6 h-6 text-cyan-400 flex-shrink-0" />
           Daily Rollup
         </h1>
-        <p className="text-slate-400 font-serif italic text-[0.95rem]">
-          Pick a day to turn its conversations into one short plan for tomorrow. Anything still open carries over on its own.
-        </p>
-        {pushSupported ? (
+        {!planOpen && (
+          <p className="text-slate-400 font-serif italic text-[0.95rem]">
+            Pick a day to turn its conversations into one short plan for tomorrow. Anything still open carries over on its own.
+          </p>
+        )}
+        {!planOpen && (pushSupported ? (
           <div className="mt-3 flex items-center gap-2">
             <button
               onClick={togglePush}
@@ -520,14 +530,16 @@ function RollupPageInner() {
           <p className="text-xs text-slate-400 mt-3">
             Push reminders aren&apos;t supported in this browser.
           </p>
+        ))}
+        {!planOpen && (
+          <Link
+            href="/rollup/week"
+            className={`${BUTTON_GHOST} -ml-3 mt-1 w-fit`}
+          >
+            <CalendarIcon className="w-4 h-4 flex-shrink-0" />
+            This Week
+          </Link>
         )}
-        <Link
-          href="/rollup/week"
-          className={`${BUTTON_GHOST} -ml-3 mt-1 w-fit`}
-        >
-          <CalendarIcon className="w-4 h-4 flex-shrink-0" />
-          This Week
-        </Link>
       </header>
 
       {error && (
@@ -785,7 +797,7 @@ export default function RollupPage() {
   return (
     <Suspense
       fallback={
-        <main className="max-w-3xl mx-auto px-4 py-8">
+        <main id="main" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-8">
           <div className="space-y-3" aria-label="Loading rollup" role="status">
             {[1, 2, 3].map((i) => <div key={i} className="skeleton h-20 w-full" />)}
           </div>

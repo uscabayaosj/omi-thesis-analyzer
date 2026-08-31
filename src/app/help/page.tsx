@@ -19,8 +19,12 @@ import { SHORTCUTS } from "@/lib/shortcuts";
 function Answer({ q, children }: { q: string; children: React.ReactNode }) {
   return (
     <details className="card overflow-hidden group">
+      {/* The question is a real heading, not a styled span: it is this page's
+          structure, and a screen-reader user navigating by heading found an h1
+          and nothing else. The h2 sits inside the summary so the disclosure
+          still owns the click target. */}
       <summary className="cursor-pointer list-none px-5 py-4 min-h-[44px] flex items-center justify-between gap-3 hover:bg-slate-800/40 transition-colors">
-        <span className="font-serif font-semibold text-slate-100">{q}</span>
+        <h2 className="font-serif font-semibold text-slate-100 text-base">{q}</h2>
         <span className="font-mono text-xs text-slate-400 flex-shrink-0 group-open:hidden">Open</span>
         <span className="font-mono text-xs text-slate-400 flex-shrink-0 hidden group-open:inline">Close</span>
       </summary>
@@ -31,7 +35,7 @@ function Answer({ q, children }: { q: string; children: React.ReactNode }) {
 
 export default function HelpPage() {
   return (
-    <main className="max-w-3xl mx-auto px-4 py-8">
+    <main id="main" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-8">
       <Link href="/" className={LINK_BACK}>
         <ArrowLeftIcon className="w-4 h-4" />
         Back to conversations

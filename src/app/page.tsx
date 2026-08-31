@@ -207,14 +207,20 @@ function CalendarMonth({
               }`}
             >
               {day}
+              {/* "Some still unanalysed" vs "all analysed" was carried by the
+                  dot's hue alone at 4px — invisible to a colour-blind or
+                  low-vision reader, though the parent button's aria-label
+                  spells both states out. The two states now differ in shape
+                  as well: a hollow ring for work outstanding, a filled dot for
+                  a day that is done. */}
               <span
-                className={`w-1 h-1 rounded-full ${
+                className={`w-1.5 h-1.5 rounded-full ${
                   !hasEntries
                     ? "bg-transparent"
                     : isSelected
                     ? "bg-white"
                     : needsAttention
-                    ? "bg-slate-500"
+                    ? "border border-slate-400 bg-transparent"
                     : "bg-emerald-500"
                 }`}
                 aria-hidden="true"
@@ -728,7 +734,7 @@ function HomeInner() {
   };
 
   return (
-    <main className="max-w-3xl mx-auto px-4 py-8">
+    <main id="main" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-8">
       <header className="mb-6">
         {/* Dateline — the masthead's one signature touch: today's date set
             like a journal entry's opening line, mono-tracked and quiet. It's
@@ -1299,7 +1305,7 @@ export default function Home() {
   return (
     <Suspense
       fallback={
-        <main className="max-w-3xl mx-auto px-4 py-8">
+        <main id="main" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-8">
           <div className="space-y-4" aria-label="Loading conversations" role="status">
             {[1, 2, 3].map((i) => <div key={i} className="skeleton h-24 w-full" />)}
           </div>

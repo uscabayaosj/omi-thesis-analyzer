@@ -18,9 +18,25 @@ import { getAllCommitments, groupByPerson, type OpenCommitment } from "@/lib/com
 import { toggleCommitmentDone, getAllAdhdAnalyses } from "@/lib/adhd-storage";
 import { notifyAnalysesChanged, syncAppBadge } from "@/lib/badge";
 import { confidenceLabel } from "@/lib/adhd";
+import { Inline } from "@/components/Prose";
 import { pullAndMerge } from "@/lib/sync";
 import { ArrowLeftIcon, CheckSquareIcon, SquareIcon, ClipboardIcon } from "@/components/icons";
 import { LINK_BACK } from "@/lib/ui";
+
+/**
+ * Normalise the three shapes a deadline arrives in.
+ *
+ * "None." means there is no deadline and the row should simply not claim one;
+ * an "Estimated: " prefix means the model inferred it, which is worth saying
+ * once rather than twice.
+ */
+function formatDeadline(raw: string): { label: string; value: string } | null {
+  const t = (raw ?? "").trim();
+  if (!t || /^none\.?$/i.test(t)) return null;
+  const est = t.match(/^estimated:\s*(.+)$/i);
+  if (est) return { label: "Estimated deadline:", value: est[1] };
+  return { label: "Deadline:", value: t };
+}
 
 /** Ageing bands. A promise that has carried for a week is a different object
  *  from one made this morning, and the ledger's whole job is to say so. */
@@ -66,7 +82,7 @@ export default function CommitmentsPage() {
   const doneCount = items.length - openCount;
 
   return (
-    <main className="max-w-3xl mx-auto px-4 py-8">
+    <main id="main" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-8">
       <Link href="/" className={LINK_BACK}>
         <ArrowLeftIcon className="w-4 h-4" />
         Back to conversations
@@ -78,7 +94,7 @@ export default function CommitmentsPage() {
         </p>
         <h1 className="font-bold text-white">Open promises</h1>
         <p className="font-serif italic text-slate-400 mt-1">
-          Everything still owed, in either direction, oldest first.
+          Everything still owed, in either direction. Whoever has waited longest is first.
         </p>
       </header>
 
@@ -141,10 +157,21 @@ export default function CommitmentsPage() {
                               </span>
                             )}
                           </div>
-                          <p className="text-slate-200 mt-1">{it.commitment.what}</p>
-                          <p className="text-xs text-slate-400 mt-0.5">
-                            Deadline: <strong className="text-slate-200">{it.commitment.deadline}</strong>
-                          </p>
+                          <p className="text-slate-200 mt-1"><Inline text={it.commitment.what} /></p>
+                          {/* The model returns deadlines three ways — a bare
+                              date, an "Estimated: " prefix when it inferred
+                              one, and the literal string "None". Rendering the
+                              raw value behind a fixed "Deadline:" label
+                              produced "Deadline: Estimated: 2026-08-15" and
+                              "Deadline: None", and leaked ** markdown. */}
+                          {formatDeadline(it.commitment.deadline) && (
+                            <p className="text-xs text-slate-400 mt-0.5">
+                              {formatDeadline(it.commitment.deadline)!.label}{" "}
+                              <strong className="text-slate-200">
+                                <Inline text={formatDeadline(it.commitment.deadline)!.value} />
+                              </strong>
+                            </p>
+                          )}
                           <Link
                             href={`/conversation/${it.conversationId}`}
                             className="text-xs text-cyan-400 hover:underline mt-1 inline-block"

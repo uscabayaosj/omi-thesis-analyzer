@@ -370,13 +370,13 @@ export default function PeoplePage() {
   const railVisible = view === "grid" && !loading && groups.length > 1;
 
   return (
-    <main className={`max-w-3xl mx-auto py-8 pl-4 ${railVisible ? "pr-9" : "pr-4"}`}>
+    <main id="main" tabIndex={-1} className={`max-w-3xl mx-auto py-8 pl-4 ${railVisible ? "pr-9" : "pr-4"}`}>
       <Link
         href="/"
         className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors mb-4"
       >
         <ArrowLeftIcon className="w-4 h-4" />
-        All conversations
+        Back to conversations
       </Link>
 
       <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">

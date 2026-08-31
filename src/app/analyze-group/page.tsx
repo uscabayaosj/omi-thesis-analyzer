@@ -368,7 +368,7 @@ function GroupAnalysisContent() {
 
   if (ids.length < 2) {
     return (
-      <main className="max-w-3xl mx-auto px-4 py-8">
+      <main id="main" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-8">
         <Link href="/" className={LINK_BACK}>
           <ArrowLeftIcon className="w-4 h-4" />
           Back to conversations

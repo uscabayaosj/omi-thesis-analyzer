@@ -52,7 +52,7 @@ export default function PlaceDetailPage() {
   }, [people, place]);
 
   if (loading) {
-    return <main className="max-w-3xl mx-auto px-4 py-8"><div className="skeleton h-24 w-full" /></main>;
+    return <main id="main" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-8"><div className="skeleton h-24 w-full" /></main>;
   }
   if (!place) {
     return (

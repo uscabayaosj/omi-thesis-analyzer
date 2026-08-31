@@ -56,13 +56,13 @@ export default function SearchPage() {
   const hasResults = result.conversationResults.length > 0 || result.groupResults.length > 0;
 
   return (
-    <main className="max-w-3xl mx-auto px-4 py-8">
+    <main id="main" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-8">
       <Link
         href="/"
         className={LINK_BACK}
       >
         <ArrowLeftIcon className="w-4 h-4" />
-        Back
+        Back to conversations
       </Link>
 
       <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">

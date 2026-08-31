@@ -146,7 +146,7 @@ function WeekPageInner() {
   const weekLabel = `${weekStartLabel} – ${weekEndLabel}`;
 
   return (
-    <main className="max-w-3xl mx-auto px-4 py-8">
+    <main id="main" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-8">
       <Link href="/rollup" className={LINK_BACK}>
         <ArrowLeftIcon className="w-4 h-4" />
         Back to Daily Rollup
@@ -222,7 +222,15 @@ function WeekPageInner() {
             className={`${BUTTON_PRIMARY} py-2.5 px-6 inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             {generating ? <LoaderIcon className="w-4 h-4 animate-spin" /> : <CalendarIcon className="w-4 h-4" />}
-            {generating ? "Generating…" : "Generate weekly rollup"}
+            {/* The screen used to say "run at least one daily first" and then
+                offer an enabled button directly beneath it — inviting the
+                action it had just declared impossible. The reason now lives in
+                the control's own label, where it is unmissable. */}
+            {generating
+              ? "Generating…"
+              : dayRollups.length === 0
+              ? "Nothing to synthesize yet"
+              : `Generate weekly rollup from ${dayRollups.length} day${dayRollups.length === 1 ? "" : "s"}`}
           </button>
         </div>
       )}
@@ -276,7 +284,7 @@ export default function WeekPage() {
   return (
     <Suspense
       fallback={
-        <main className="max-w-3xl mx-auto px-4 py-8">
+        <main id="main" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-8">
           <div className="space-y-3" aria-label="Loading weekly rollup" role="status">
             {[1, 2, 3].map((i) => <div key={i} className="skeleton h-20 w-full" />)}
           </div>

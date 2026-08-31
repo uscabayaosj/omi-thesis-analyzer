@@ -54,6 +54,17 @@ export default function RootLayout({
     <html lang="en" className={`dark ${sourceSerif.variable}`}>
       <head />
       <body className="bg-slate-950 text-slate-100 antialiased min-h-screen">
+        {/* Bypass block (WCAG 2.4.1). Every route repeats a back link, an
+            eyebrow, a title, a subtitle and a nav row before its content, and
+            a keyboard user had to tab through all of it on every navigation. */}
+        <a
+          href="#main"
+          // slate-950 (#14100d) on cyan-400 (copper #d99a5e) = 7.87:1 — the same
+          // near-black-on-copper pair every primary uses, not washed-out gray.
+          className="sr-only focus:not-sr-only focus:fixed focus:z-[100] focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:min-h-[44px] focus:inline-flex focus:items-center focus:rounded-lg focus:bg-cyan-400 focus:text-slate-950 focus:font-medium" // impeccable-disable-line gray-on-color
+        >
+          Skip to content
+        </a>
         <ServiceWorkerRegistration />
         <AppBadgeSync />
         <GlobalShortcuts />

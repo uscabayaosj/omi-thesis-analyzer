@@ -11,7 +11,12 @@ import { LINK_BACK } from "@/lib/ui";
 const USAGE_TZ_STORAGE_KEY = "omi-usage-tz";
 
 function formatCost(costUsd: number | null): string {
+  // An em-dash for a real zero read as "no data" rather than "nothing spent",
+  // which is a materially different claim on a page about money. Null (the
+  // store genuinely has nothing to report) keeps the dash; a measured zero
+  // says so.
   if (costUsd === null) return "—";
+  if (costUsd === 0) return "$0.00";
   return `$${costUsd.toFixed(costUsd < 1 ? 4 : 2)}`;
 }
 
@@ -78,13 +83,13 @@ export default function UsagePage() {
   }
 
   return (
-    <main className="max-w-3xl mx-auto px-4 py-8">
+    <main id="main" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-8">
       <Link
         href="/"
         className={LINK_BACK}
       >
         <ArrowLeftIcon className="w-4 h-4" />
-        Back
+        Back to conversations
       </Link>
 
       <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
