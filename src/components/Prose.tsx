@@ -76,14 +76,14 @@ export function Prose({ text, className = "" }: { text: string; className?: stri
       {chunks.map((chunk, i) => {
         if (chunk.kind === "ul") {
           return (
-            <ul key={i} className="list-disc pl-5 space-y-1.5 marker:text-slate-600">
+            <ul key={i} className="list-disc pl-5 space-y-1.5 marker:text-slate-500">
               {chunk.items.map((item, j) => <li key={j}>{renderInline(item)}</li>)}
             </ul>
           );
         }
         if (chunk.kind === "ol") {
           return (
-            <ol key={i} className="list-decimal pl-5 space-y-1.5 marker:text-slate-500">
+            <ol key={i} className="list-decimal pl-5 space-y-1.5 marker:text-slate-400">
               {chunk.items.map((item, j) => <li key={j}>{renderInline(item)}</li>)}
             </ol>
           );

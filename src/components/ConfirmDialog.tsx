@@ -10,15 +10,24 @@ type Tone = "caution" | "danger";
 
 const TONE: Record<Tone, { border: string; icon: string; confirm: string }> = {
   caution: {
+    // Amber is reserved for the custom-analysis lens under the design system's
+    // own rule, and an amber-filled confirm made this the app's second-most
+    // prominent primary-looking button in a colour that is not the primary.
+    // The caution tone keeps an amber *icon* (a marginal warning mark) but its
+    // confirm button is the copper primary like every other primary action.
     border: "border-amber-500/30",
     icon: "text-amber-400",
-    // slate-950 on amber-500 measures 9.7:1; white would be 2.4:1 and fail AA.
-    confirm: "bg-amber-500 hover:bg-amber-400 text-slate-950", // impeccable-disable-line gray-on-color
+    // slate-950 on cyan-400 (copper #d99a5e) measures 7.87:1.
+    confirm: "bg-cyan-400 hover:bg-cyan-300 text-slate-950", // impeccable-disable-line gray-on-color
   },
   danger: {
     border: "border-red-500/30",
     icon: "text-red-400",
-    confirm: "bg-red-600 hover:bg-red-500 text-white",
+    // red-600 (#b04a2e) with lamp-paper text is 4.83:1. The old hover stepped
+    // up to red-500, which dropped the pair to 3.55:1 — a destructive button
+    // that failed AA precisely while the pointer was on it. Hover now darkens
+    // instead of lightening, so the contrast improves under the cursor.
+    confirm: "bg-red-600 hover:bg-red-700 text-white",
   },
 };
 
@@ -66,6 +75,9 @@ export default function ConfirmDialog({
   }, []);
 
   useEffect(() => {
+    // Remember what had focus so it can be handed back on close: cancelling
+    // from deep in a list otherwise dumped the user at document start.
+    const opener = document.activeElement as HTMLElement | null;
     cancelRef.current?.focus();
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -93,7 +105,15 @@ export default function ConfirmDialog({
       }
     };
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      // Only if focus is still inside the dialog (or lost to <body>) — never
+      // steal it back from something the confirmed action itself focused.
+      const active = document.activeElement;
+      if (!active || active === document.body || panelRef.current?.contains(active)) {
+        opener?.focus?.();
+      }
+    };
   }, [onCancel, requestClose]);
 
   return (

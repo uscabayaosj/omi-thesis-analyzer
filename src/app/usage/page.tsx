@@ -32,7 +32,7 @@ function BreakdownTable({ title, rows }: { title: string; rows: UsageBreakdownRo
     <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
       <div className="font-mono text-[11px] uppercase tracking-[0.1em] text-slate-400 mb-3">{title} — this month</div>
       {rows.length === 0 ? (
-        <div className="text-sm text-slate-500 font-serif italic">No calls yet this month.</div>
+        <div className="text-sm text-slate-400 font-serif italic">No calls yet this month.</div>
       ) : (
         <table className="w-full font-mono text-sm">
           <tbody>
@@ -53,11 +53,18 @@ function BreakdownTable({ title, rows }: { title: string; rows: UsageBreakdownRo
 export default function UsagePage() {
   const [summary, setSummary] = useState<UsageSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tz, setTz] = useState<UsageTimezoneKey>(() => {
-    if (typeof window === "undefined") return DEFAULT_USAGE_TIMEZONE;
+  // Same shape as the hydration bug fixed on /rollup/week: reading
+  // localStorage in the initializer made the client's first render disagree
+  // with the server's. It never threw here only because the divergence landed
+  // on a <select> value, which React does not hydration-check as text — so the
+  // page silently rendered the default while already fetching the stored
+  // timezone. Restore the preference after mount instead.
+  const [tz, setTz] = useState<UsageTimezoneKey>(DEFAULT_USAGE_TIMEZONE);
+
+  useEffect(() => {
     const stored = window.localStorage.getItem(USAGE_TZ_STORAGE_KEY);
-    return isUsageTimezoneKey(stored) ? stored : DEFAULT_USAGE_TIMEZONE;
-  });
+    if (isUsageTimezoneKey(stored)) setTz(stored);
+  }, []);
 
   useEffect(() => {
     fetchJson<UsageSummary>(`/api/usage?tz=${tz}`)
@@ -80,16 +87,23 @@ export default function UsagePage() {
         Back
       </Link>
 
-      <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-500">
+      <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
         System
       </p>
-      <h1 className="text-2xl font-bold text-white mb-2">Usage</h1>
+      <h1 className="font-bold text-white mb-2">Usage</h1>
 
       <div className="mb-4">
+        {/* This was a bare dropdown reading "London" under the page title —
+            no visible label and no accessible name, so neither a sighted nor
+            a screen-reader user was told what it controls. */}
+        <label htmlFor="usage-tz" className="block text-sm text-slate-400 mb-1">
+          Day boundary timezone
+        </label>
         <select
+          id="usage-tz"
           value={tz}
           onChange={(e) => handleTzChange(e.target.value as UsageTimezoneKey)}
-          className="bg-slate-900 border border-slate-800 rounded-lg text-sm text-slate-200 px-2 py-1.5"
+          className="bg-slate-900 border border-slate-800 rounded-lg text-sm text-slate-200 px-2 py-1.5 min-h-[44px]"
         >
           {(Object.keys(USAGE_TIMEZONES) as UsageTimezoneKey[]).map((key) => (
             <option key={key} value={key}>
@@ -99,11 +113,11 @@ export default function UsagePage() {
         </select>
       </div>
 
-      <p className="text-xs text-slate-500 font-serif italic mb-4">
+      <p className="text-xs text-slate-400 font-serif italic mb-4">
         Estimates are approximate — they don&apos;t account for prompt-caching discounts.
       </p>
 
-      {error && <p className="text-sm text-red-400 mb-4">{error}</p>}
+      {error && <p role="alert" className="text-sm text-red-400 mb-4">{error}</p>}
 
       {!summary && !error && <p className="text-sm text-slate-400 font-mono">Loading…</p>}
 

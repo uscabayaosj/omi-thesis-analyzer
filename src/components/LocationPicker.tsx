@@ -159,11 +159,19 @@ export default function LocationPicker({ value, onChange, initialCenter, onResol
           onResolveName?.(r.label);
         }}
       />
+      {/* `role="application"` used to sit here. It tells a screen reader to stop
+          intercepting keystrokes and hand them to the widget — but the only
+          ways to move this pin are a map click and a marker drag, so the role
+          surrendered browse mode to a region that answered to nothing. The
+          address search above is the real keyboard path; the map is the
+          pointer enhancement, and `role="img"` describes it honestly. The
+          label is input-agnostic now: it previously said "Tap the map", which
+          is not an instruction a keyboard user can follow. */}
       <div
         ref={containerRef}
         className={`rounded-lg overflow-hidden border border-slate-700 h-64 ${className ?? ""}`}
-        role="application"
-        aria-label="Tap the map to set the location, or drag the pin to move it"
+        role="img"
+        aria-label="Map showing the selected location. Use the address search above to move the pin, or drag it directly."
       />
     </div>
   );
@@ -209,7 +217,7 @@ function AddressSearch({ onPick }: { onPick: (r: GeocodeResult) => void }) {
       } catch {
         if (run !== runRef.current) return;
         setResults([]);
-        setMessage("Address search is unavailable right now. Tap the map instead.");
+        setMessage("Address search is unavailable right now. You can still drag the pin on the map, or try again in a moment.");
       } finally {
         if (run === runRef.current) setSearching(false);
       }
@@ -237,6 +245,17 @@ function AddressSearch({ onPick }: { onPick: (r: GeocodeResult) => void }) {
         )}
       </div>
 
+      {/* The spinner and the result list are both silent to assistive tech on
+          their own, and this search is the only keyboard route to placing a
+          pin — so the outcome has to be announced, not just drawn. */}
+      <p role="status" aria-live="polite" className="sr-only">
+        {searching
+          ? "Searching for addresses…"
+          : results.length > 0
+          ? `${results.length} ${results.length === 1 ? "match" : "matches"} found.`
+          : ""}
+      </p>
+
       {results.length > 0 && (
         <ul className="mt-1 space-y-1 max-h-40 overflow-auto">
           {results.map((r) => (
@@ -256,7 +275,7 @@ function AddressSearch({ onPick }: { onPick: (r: GeocodeResult) => void }) {
         </ul>
       )}
 
-      {message && <p className="text-xs text-slate-400 mt-1">{message}</p>}
+      {message && <p role="status" className="text-xs text-slate-400 mt-1">{message}</p>}
     </div>
   );
 }

@@ -33,6 +33,10 @@
   --color-emerald-400: #a9bd8f;
 
   --color-red-600: #b04a2e;
+  /* Darker clay for the destructive hover: lightening to red-500 dropped
+     lamp-paper text to 3.55:1, so the confirm button failed AA exactly while
+     the pointer was on it. Darkening keeps the warm remap and raises it. */
+  --color-red-700: #8f3a22;
   --color-red-500: #cf5c3c;
   --color-red-400: #e98d72;
 
@@ -46,9 +50,17 @@
   --card-hover: #2e261e;
   --accent: #b96d33;
   --accent-light: #d99a5e;
-  --brand-navy: #2a1c10;
-  --muted: #7a6b58;
-  --border: #332a21;
+  /* One resting border value for the whole app. This previously disagreed
+     three ways — `--border: #332a21` here, `border-slate-700` (#352c22) at 29
+     call sites, and `ink-panel-raised` (#2e261e) in DESIGN.md — so the most
+     repeated visual decision in the product had no single source of truth.
+     Settled on the slate-700 value the call sites already use, so `.card` and
+     every hand-written border now render identically. */
+  --border: #352c22;
+  /* Hover/pressed step for panels. Lifted from #2e261e, which was a 1.13:1
+     change against the card and effectively invisible; the border shift in
+     `.card:hover` below carries most of the signal now. */
+  --border-hover: #4d4133;
   --custom-analysis-bg: rgba(245, 158, 11, 0.06);
   --custom-analysis-text: #fbbf24;
   /* Result-block wash — re-derived from the copper accent. */
@@ -105,11 +117,22 @@ button:not(:disabled):active, [role="button"]:active {
   transform: scale(0.97);
 }
 
-/* Focus indicators — visible on keyboard nav, hidden on mouse */
+/* Focus indicators — visible on keyboard nav, hidden on mouse.
+
+   This rule is unlayered while every Tailwind utility sits in the `utilities`
+   layer, and unlayered author styles beat every layer regardless of
+   specificity. That is load-bearing in two directions:
+     - it is why the ring survives the 22 `focus:outline-none` utilities in the
+       codebase (mouse rings stay suppressed, keyboard rings render), and
+     - it is why this block must NOT be wrapped in `@layer base` — doing so
+       would silently delete every focus indicator in the app at once.
+   It also means any `border-radius` declared here would override the focused
+   element's own radius: a `rounded-full` pill or a 12px `.card` visibly
+   snapped to 4px the moment it took keyboard focus. `outline` already follows
+   the element's border-radius on its own, so there is nothing to declare. */
 *:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: 4px;
 }
 
 /* Fluid typography — scales between mobile and desktop. Headings are set in
@@ -126,7 +149,8 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 12px;
-  transition: background var(--dur-base) ease, transform var(--dur-fast) var(--ease-out);
+  transition: background var(--dur-base) ease, border-color var(--dur-base) ease,
+    transform var(--dur-fast) var(--ease-out);
 }
 
 /* Skip layout/paint for rows scrolled out of view, so a long conversation
@@ -139,6 +163,7 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
 
 .card:active {
   background: var(--card-hover);
+  border-color: var(--border-hover);
   transform: scale(0.98);
 }
 
@@ -146,6 +171,7 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
 @media (hover: hover) {
   .card:hover {
     background: var(--card-hover);
+    border-color: var(--border-hover);
   }
 }
 
@@ -169,12 +195,25 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
   select, textarea, summary {
     min-height: 44px;
   }
+  /* Third miss in this rule's history: it constrained height only, so the
+     icon-only square controls — the ones that most need a thumb-sized target —
+     kept their 32–40px *width* while satisfying the 44px floor on paper.
+     Width is scoped to the button-like roles: `a` is excluded because inline
+     links wrap mid-sentence (the padding rule below is their lever), and form
+     controls are excluded because they are already full-width and a floor
+     would only fight narrow layouts. */
+  button, [role="button"], [role="option"], [role="radio"], summary {
+    min-width: 44px;
+  }
   /* Inline links can't grow via min-height, and forcing a flex box on every
      link would stop long ones wrapping mid-sentence. Vertical padding is the
      one lever that enlarges an inline element's hit area without touching
      line layout — the padded box overflows the line box instead of pushing
-     lines apart. `:where()` keeps this at zero specificity so any explicit
-     padding utility still wins. */
+     lines apart. `:where()` keeps this at zero specificity — note that this
+     alone does NOT let a `py-*` utility win: globals.css is unlayered and
+     Tailwind's utilities are in the `utilities` layer, so unlayered wins on
+     layer order before specificity is ever consulted. The zero specificity
+     matters only against other unlayered rules and inline styles. */
   :where(a:not(.block):not(.flex):not(.inline-flex):not(.grid):not(.inline-block)) {
     padding-block: 0.375rem;
   }
@@ -200,12 +239,22 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
   margin-bottom: 0;
 }
 
+.analysis-section h2,
 .analysis-section h3 {
   color: var(--accent-light);
   font-weight: 600;
   margin-bottom: 0.5rem;
   /* Size comes from the h3 ramp above — this is the Title role, not a
      one-off. Overriding it here is what put 1.1rem off the scale. */
+}
+
+/* A rollup section is semantically a level-2 heading (it sits directly under
+   the page h1, and starting the outline at h3 left /rollup and /rollup/week
+   unnavigable by heading). Visually it is still the Title role, so it is
+   pinned to the h3 step rather than inheriting the larger Headline clamp —
+   the fix is to the document outline, not to the type scale. */
+.analysis-section h2 {
+  font-size: clamp(1rem, 2.5vw, 1.25rem);
 }
 
 .analysis-section p {
@@ -358,4 +407,42 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
   body {
     padding-bottom: env(safe-area-inset-bottom);
   }
+}
+
+/* Leaflet popups — `leaflet/dist/leaflet.css` ships a white popup surface, so
+   every colour the app injects into a popup was a dark-theme colour on white:
+   the meeting link measured 1.81:1 and the muted meta 2.75:1. Since tapping a
+   pin is the whole point of the map (it is how you get from a place to the
+   person you met there), the popup is re-grounded on the panel surface where
+   the app's existing colours already clear AA. */
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: var(--card);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.leaflet-popup-content-wrapper a {
+  color: var(--accent-light);
+}
+
+.leaflet-container a.leaflet-popup-close-button {
+  color: #a89a88;
+}
+
+.leaflet-container a.leaflet-popup-close-button:hover {
+  color: var(--foreground);
+}
+
+/* The attribution bar keeps Leaflet's own light chrome by default, which reads
+   as a bright seam under a dark map. */
+.leaflet-control-attribution {
+  background: rgba(22, 19, 17, 0.85);
+  color: #a89a88;
+}
+
+.leaflet-control-attribution a {
+  color: var(--accent-light);
 }

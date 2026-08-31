@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, Suspense, type ComponentType } from "react";
+import { useEffect, useState, useCallback, useMemo, Suspense, type ComponentType } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { fetchJson } from "@/lib/fetch-json";
@@ -9,9 +9,10 @@ import type { AdhdAnalysis, Rollup } from "@/lib/adhd";
 import type { DayConvoOutput } from "@/lib/rollup";
 import type { RollupJobState } from "@/lib/rollup-job";
 import {
-  getAdhdAnalysis, saveAdhdAnalysis, getRollup, saveRollup, getPreviousRollup,
+  getAdhdAnalysis, saveAdhdAnalysis, getRollup, saveRollup, getPreviousRollup, getRollupDays,
 } from "@/lib/adhd-storage";
 import { pullAndMerge } from "@/lib/sync";
+import { countOpen } from "@/lib/commitments";
 import { exportRollupToObsidian, downloadRollupMarkdown } from "@/lib/obsidian";
 import {
   ArrowLeftIcon, CalendarIcon, WarningIcon, LoaderIcon, RefreshIcon,
@@ -67,20 +68,26 @@ const ROLLUP_SECTIONS: { key: keyof Rollup; heading: string; icon: ComponentType
 // A rollup section's model output is a prose string; "None." (or empty) is a
 // real empty state and needs to read as one, not as unstyled leftover text.
 function RollupSectionBlock({
-  icon: Icon, heading, content,
+  icon: Icon, heading, content, lead = false,
 }: {
   icon: ComponentType<{ className?: string }>;
   heading: string;
   content: string;
+  /** The day's answer. Rendered on the copper treatment so it does not sit at
+   *  the same visual weight as the six supporting sections. */
+  lead?: boolean;
 }) {
   const isEmpty = !content || !content.trim() || content.trim().toLowerCase() === "none.";
   return (
-    <div className="card p-6">
+    <div className={`card p-6${lead ? " border-cyan-500/40" : ""}`}>
       <div className="analysis-section">
-        <h3 className="flex items-center gap-2">
+        {/* h2, not h3: this is the first heading level under the page h1, and
+            jumping straight to h3 left /rollup and /rollup/week with a broken
+            outline on the two routes that have the most to skim. */}
+        <h2 className="flex items-center gap-2">
           <Icon className="w-[1.05em] h-[1.05em] flex-shrink-0" />
           {heading}
-        </h3>
+        </h2>
         {isEmpty ? (
           <p className="text-sm text-slate-400 mt-3">None.</p>
         ) : (
@@ -97,6 +104,8 @@ function RollupPageInner() {
   const searchParams = useSearchParams();
   const [convos, setConvos] = useState<ConvoLite[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
+  const [restOpen, setRestOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dayParam = searchParams.get("day");
   const [selectedDay, setSelectedDay] = useState<string | null>(
@@ -141,6 +150,10 @@ function RollupPageInner() {
   };
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
     (async () => {
       try {
         const data = await fetchJson<ConvoLite[]>("/api/conversations");
@@ -154,13 +167,29 @@ function RollupPageInner() {
   }, []);
 
   // Group conversations by calendar day, newest day first.
-  const days = Array.from(
-    convos.reduce((m, c) => {
+  /* The day list used to be built purely from /api/conversations, so when Omi
+     was unreachable the page showed an error AND "No conversations to roll up
+     yet." — the app claiming nothing was recorded when the truth was that it
+     could not ask. Worse, rollups live in localStorage and render perfectly at
+     /rollup?day=…, so a saved day-close was present on the device and simply
+     had no link. Days that already hold a saved rollup are unioned in, so the
+     artifact is always reachable offline; they carry an empty conversation
+     list and are labelled accordingly. */
+  /* Read from tracked done-state rather than the model's "Still open from
+     before" prose, so the closing line agrees with the ledger and the badge. */
+  const carriedCount = useMemo(() => (mounted ? countOpen() : 0), [mounted]);
+
+  const days = useMemo(() => {
+    const m = new Map<string, ConvoLite[]>();
+    for (const c of convos) {
       const d = dayOf(c.created_at);
       (m.get(d) ?? m.set(d, []).get(d)!).push(c);
-      return m;
-    }, new Map<string, ConvoLite[]>())
-  ).sort((a, b) => (a[0] < b[0] ? 1 : -1));
+    }
+    if (mounted) {
+      for (const d of getRollupDays()) if (!m.has(d)) m.set(d, []);
+    }
+    return Array.from(m).sort((a, b) => (a[0] < b[0] ? 1 : -1));
+  }, [convos, mounted]);
 
   const selectDay = useCallback((day: string) => {
     setSelectedDay(day);
@@ -393,7 +422,7 @@ function RollupPageInner() {
       </Link>
 
       <header className="mb-6">
-        <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-500">
+        <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
           Planning
         </p>
         <h1 className="font-bold text-white mb-2 flex items-center gap-2">
@@ -414,10 +443,10 @@ function RollupPageInner() {
               <BellIcon className="w-4 h-4 flex-shrink-0" />
               {pushEnabled ? "Reminders on" : "Remind me if I forget today's rollup"}
             </button>
-            {pushError && <span className="text-xs text-red-400">{pushError}</span>}
+            {pushError && <span role="alert" className="text-xs text-red-400">{pushError}</span>}
           </div>
         ) : (
-          <p className="text-xs text-slate-500 mt-3">
+          <p className="text-xs text-slate-400 mt-3">
             Push reminders aren&apos;t supported in this browser.
           </p>
         )}
@@ -459,7 +488,11 @@ function RollupPageInner() {
                 >
                   <div>
                     <p className="font-serif font-semibold text-white">{formatDateTime(`${day}T12:00:00`, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
-                    <p className="text-slate-400 font-mono text-sm mt-1">{list.length} conversation{list.length === 1 ? "" : "s"}</p>
+                    <p className="text-slate-400 font-mono text-sm mt-1">
+                      {list.length === 0
+                        ? "saved on this device"
+                        : `${list.length} conversation${list.length === 1 ? "" : "s"}`}
+                    </p>
                   </div>
                   {hasRollup && (
                     <span className="font-mono text-xs bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 px-2 py-0.5 rounded-full">rollup saved</span>
@@ -470,7 +503,11 @@ function RollupPageInner() {
           })}
           {days.length === 0 && (
             <li className="card p-8 text-center">
-              <p className="text-slate-400">No conversations to roll up yet.</p>
+              <p className="text-slate-400">
+                {error
+                  ? "Couldn’t reach Omi, and no rollups are saved on this device yet."
+                  : "No conversations to roll up yet."}
+              </p>
             </li>
           )}
         </ul>
@@ -482,9 +519,24 @@ function RollupPageInner() {
             <ArrowLeftIcon className="w-4 h-4" /> All days
           </button>
 
+          {rollup && (
+            <div className="mb-6">
+              <RollupSectionBlock
+                icon={ROLLUP_SECTIONS[0].icon}
+                heading={ROLLUP_SECTIONS[0].heading}
+                content={rollup[ROLLUP_SECTIONS[0].key]}
+                lead
+              />
+            </div>
+          )}
+
           <div className="card p-5 mb-6">
             <p className="font-serif font-semibold text-white">{formatDateTime(`${selectedDay}T12:00:00`, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
-            <p className="text-slate-400 font-mono text-sm mt-1">{selectedConvos.length} conversation{selectedConvos.length === 1 ? "" : "s"} this day</p>
+            <p className="text-slate-400 font-mono text-sm mt-1">
+              {selectedConvos.length === 0
+                ? "Saved rollup — source conversations unavailable offline"
+                : `${selectedConvos.length} conversation${selectedConvos.length === 1 ? "" : "s"} this day`}
+            </p>
 
             {/* One list per time-of-day group rather than a single outer list:
                 a role="list" may only own listitems, and the group wrappers in
@@ -584,10 +636,44 @@ function RollupPageInner() {
                   <DownloadIcon className="w-3.5 h-3.5" /> Download .md
                 </button>
               </div>
+              {/* The seven sections used to render as one flat stack of
+                  identical cards, so "Tomorrow's plan" and "Let go today" had
+                  exactly equal visual claim and the plan's first line sat below
+                  the fold on a phone. The plan is the answer this page exists
+                  to give: it leads, on the copper treatment, and the remaining
+                  six sit behind one disclosure. */}
               <div className="stagger-in space-y-6">
-                {ROLLUP_SECTIONS.map(({ key, heading, icon }) => (
-                  <RollupSectionBlock key={key} icon={icon} heading={heading} content={rollup[key]} />
-                ))}
+                <details className="card p-0 overflow-hidden" open={restOpen} onToggle={(e) => setRestOpen((e.target as HTMLDetailsElement).open)}>
+                  <summary className="cursor-pointer list-none px-6 py-4 min-h-[44px] flex items-center justify-between gap-3 text-slate-200 hover:bg-slate-800/40 transition-colors">
+                    <span className="font-serif font-semibold">The rest of the day</span>
+                    <span className="font-mono text-xs text-slate-400">
+                      {restOpen ? "Hide" : `${ROLLUP_SECTIONS.length - 1} sections`}
+                    </span>
+                  </summary>
+                  <div className="px-2 pb-2 space-y-4">
+                    {ROLLUP_SECTIONS.slice(1).map(({ key, heading, icon }) => (
+                      <RollupSectionBlock key={key} icon={icon} heading={heading} content={rollup[key]} />
+                    ))}
+                  </div>
+                </details>
+
+                {/* Peak-end: the ritual used to finish on "Let go today" —
+                    the last thing a day-close said was what got dropped —
+                    followed by a dev version footer. It ends on completion
+                    now, and on the one number that carries into tomorrow. */}
+                <div className="card p-5 border-cyan-500/30 text-center">
+                  <p className="font-serif text-slate-200">Day closed.</p>
+                  <p className="text-sm text-slate-400 mt-1">
+                    {carriedCount === 0
+                      ? "Nothing outstanding carries into tomorrow."
+                      : <>
+                          <Link href="/commitments" className="text-cyan-400 hover:underline">
+                            {carriedCount} promise{carriedCount === 1 ? "" : "s"}
+                          </Link>{" "}
+                          carried into tomorrow.
+                        </>}
+                  </p>
+                </div>
               </div>
             </section>
           )}

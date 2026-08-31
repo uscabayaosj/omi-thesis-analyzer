@@ -91,6 +91,13 @@ export function getAdhdAnalyzedIds(): Set<string> {
   return new Set(Object.keys(readMap<StoredAdhdAnalysis>(ANALYSES_KEY)));
 }
 
+/** Every stored ADHD analysis. The open-promises ledger reads across all of
+ *  them, since a commitment's home is the person it is owed to, not the one
+ *  conversation it happened to be spoken in. */
+export function getAllAdhdAnalyses(): StoredAdhdAnalysis[] {
+  return Object.values(readMap<StoredAdhdAnalysis>(ANALYSES_KEY));
+}
+
 export function saveAdhdAnalysis(record: {
   conversationId: string;
   title: string;

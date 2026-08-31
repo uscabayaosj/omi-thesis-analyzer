@@ -21,8 +21,12 @@ export default function Error({
       <div className="card p-8 border-red-500/30">
         <WarningIcon className="w-10 h-10 mx-auto mb-4 text-red-400" />
         <h1 className="font-bold text-white mb-2">Something went wrong</h1>
+        {/* The raw error.message is a developer string — it leaked stack-ish
+            detail into a page the user is meant to recover from. The message
+            still reaches the console via the effect above; the screen gets a
+            sentence that names a next step instead. */}
         <p className="text-slate-400 mb-6 text-sm">
-          {error.message || "An unexpected error occurred while loading this page."}
+          This page couldn&apos;t load. Your saved analyses are stored on this device and are unaffected.
         </p>
         <div className="flex gap-3 justify-center">
           <button

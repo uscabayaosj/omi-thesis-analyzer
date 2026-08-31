@@ -95,8 +95,9 @@ export default function RelationshipEditor({ selfId, selfName, people, editing, 
 
   return (
     <div className="enter-rise card p-4 border-cyan-500/30 mt-3">
-      <label className="block text-sm text-slate-400 mb-1">Person</label>
+      <label htmlFor="rel-person" className="block text-sm text-slate-400 mb-1">Person</label>
       <input
+        id="rel-person"
         type="text"
         value={query}
         onChange={(e) => { setQuery(e.target.value); setChosenId(undefined); }}
@@ -135,7 +136,7 @@ export default function RelationshipEditor({ selfId, selfName, people, editing, 
               onClick={() => setType(t)}
               className={`px-4 py-2 min-h-[44px] rounded-full text-sm transition-colors ${
                 // Detector cross-pairs mutually-exclusive ternary branches. Real pairs, both AA-clear:
-                // slate-950 on cyan-400 = 11.16:1; slate-300 on slate-800 = 8.59:1.
+                // slate-950 on cyan-400 = 7.87:1; slate-300 on slate-800 = 8.35:1.
                 type === t ? "bg-cyan-400 text-slate-950" : "bg-slate-800 text-slate-300 hover:text-white" // impeccable-disable-line gray-on-color
               }`}
             >
@@ -152,14 +153,14 @@ export default function RelationshipEditor({ selfId, selfName, people, editing, 
       {showRoles && (
         <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
           <div>
-            <label className="block text-sm text-slate-400 mb-1 truncate" title={otherRoleLabel}>{otherRoleLabel}</label>
-            <input value={otherRole} onChange={(e) => setOtherRole(e.target.value)} placeholder="e.g. daughter"
+            <label htmlFor="rel-other-role" className="block text-sm text-slate-400 mb-1 truncate" title={otherRoleLabel}>{otherRoleLabel}</label>
+            <input id="rel-other-role" value={otherRole} onChange={(e) => setOtherRole(e.target.value)} placeholder="e.g. daughter"
               aria-label={otherRoleLabel}
               className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-400 focus:border-cyan-500 focus:outline-none min-h-[44px]" />
           </div>
           <div>
-            <label className="block text-sm text-slate-400 mb-1 truncate" title={selfRoleLabel}>{selfRoleLabel}</label>
-            <input value={selfRole} onChange={(e) => setSelfRole(e.target.value)} placeholder="e.g. father"
+            <label htmlFor="rel-self-role" className="block text-sm text-slate-400 mb-1 truncate" title={selfRoleLabel}>{selfRoleLabel}</label>
+            <input id="rel-self-role" value={selfRole} onChange={(e) => setSelfRole(e.target.value)} placeholder="e.g. father"
               aria-label={selfRoleLabel}
               className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-400 focus:border-cyan-500 focus:outline-none min-h-[44px]" />
           </div>
@@ -167,8 +168,8 @@ export default function RelationshipEditor({ selfId, selfName, people, editing, 
       )}
 
       <div className="mt-3">
-        <label className="block text-sm text-slate-400 mb-1">Note (optional)</label>
-        <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. leases her east pasture"
+        <label htmlFor="rel-note" className="block text-sm text-slate-400 mb-1">Note (optional)</label>
+        <input id="rel-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. leases her east pasture"
           className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-400 focus:border-cyan-500 focus:outline-none min-h-[44px]" />
       </div>
 

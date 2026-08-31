@@ -5,7 +5,7 @@ import { confidenceLabel, type AdhdAnalysis } from "@/lib/adhd";
 import { Inline } from "@/components/Prose";
 import {
   ZapIcon, ClipboardIcon, CogIcon, UsersIcon, RefreshIcon,
-  CalendarIcon, CheckSquareIcon, ScaleIcon, FeatherIcon,
+  CalendarIcon, CheckSquareIcon, SquareIcon, ScaleIcon, FeatherIcon,
   TargetIcon, CompassIcon,
 } from "@/components/icons";
 
@@ -112,11 +112,22 @@ export function AdhdResults({
                     aria-label={isDone ? "Mark commitment not done" : "Mark commitment done"}
                     className="flex-shrink-0 mt-0.5 min-h-[44px] min-w-[44px] flex items-start justify-center text-slate-400 hover:text-emerald-400 transition-colors"
                   >
+                    {/* The unchecked box used to be the same glyph at
+                        opacity-40, which composited to 2.08:1 — below the 3:1
+                        floor for a control's own state indicator, on the one
+                        checklist this product exists to make tickable. State
+                        is carried by two different glyphs now (empty vs
+                        checked), not by transparency. */}
                     {isDone
                       ? <CheckSquareIcon className="w-5 h-5 text-emerald-400" />
-                      : <CheckSquareIcon className="w-5 h-5 opacity-40" />}
+                      : <SquareIcon className="w-5 h-5" />}
                   </button>
-                  <div className={`min-w-0 ${isDone ? "opacity-50 line-through" : ""}`}>
+                  {/* `opacity-50` on a done item dropped its text to 3.81:1 and
+                      its meta line to 2.54:1 — a completed promise became the
+                      hardest thing on the page to re-read, which is exactly
+                      backwards when you are checking what you already did.
+                      The line-through already says "done". */}
+                  <div className={`min-w-0 ${isDone ? "line-through decoration-slate-500" : ""}`}>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-xs font-mono text-slate-400">{dir}</span>
                       <span className="text-xs px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-300">{confidenceLabel(c.confidence)}</span>
@@ -134,7 +145,7 @@ export function AdhdResults({
 
       <Block icon={CogIcon} title="Worth remembering">
         {analysis.remember.length ? (
-          <ul className="list-disc pl-5 space-y-1.5 marker:text-slate-600">
+          <ul className="list-disc pl-5 space-y-1.5 marker:text-slate-500">
             {analysis.remember.map((item, i) => <li key={i}><Inline text={item} /></li>)}
           </ul>
         ) : <Empty />}
@@ -157,7 +168,7 @@ export function AdhdResults({
 
       <Block icon={RefreshIcon} title="Unfinished threads">
         {analysis.open_loops.length ? (
-          <ul className="list-disc pl-5 space-y-1.5 marker:text-slate-600">
+          <ul className="list-disc pl-5 space-y-1.5 marker:text-slate-500">
             {analysis.open_loops.map((item, i) => <li key={i}><Inline text={item} /></li>)}
           </ul>
         ) : <Empty />}
@@ -187,7 +198,7 @@ export function AdhdResults({
           absent observation is the good outcome, not a gap worth a card. */}
       {analysis.reflection?.social_balance?.length ? (
         <Block icon={ScaleIcon} title="How the conversation went">
-          <ul className="list-disc pl-5 space-y-1.5 marker:text-slate-600">
+          <ul className="list-disc pl-5 space-y-1.5 marker:text-slate-500">
             {analysis.reflection.social_balance.map((item, i) => <li key={i}><Inline text={item} /></li>)}
           </ul>
         </Block>
@@ -195,7 +206,7 @@ export function AdhdResults({
 
       {analysis.reflection?.emotional_check?.length ? (
         <Block icon={FeatherIcon} title="Feelings check">
-          <ul className="list-disc pl-5 space-y-1.5 marker:text-slate-600">
+          <ul className="list-disc pl-5 space-y-1.5 marker:text-slate-500">
             {analysis.reflection.emotional_check.map((item, i) => <li key={i}><Inline text={item} /></li>)}
           </ul>
         </Block>
@@ -203,7 +214,7 @@ export function AdhdResults({
 
       {analysis.reflection?.capacity_check?.length ? (
         <Block icon={TargetIcon} title="Promised too much?">
-          <ul className="list-disc pl-5 space-y-1.5 marker:text-slate-600">
+          <ul className="list-disc pl-5 space-y-1.5 marker:text-slate-500">
             {analysis.reflection.capacity_check.map((item, i) => <li key={i}><Inline text={item} /></li>)}
           </ul>
         </Block>
@@ -211,7 +222,7 @@ export function AdhdResults({
 
       {analysis.reflection?.strategic_takeaway?.length ? (
         <Block icon={CompassIcon} title="Bigger picture">
-          <ul className="list-disc pl-5 space-y-1.5 marker:text-slate-600">
+          <ul className="list-disc pl-5 space-y-1.5 marker:text-slate-500">
             {analysis.reflection.strategic_takeaway.map((item, i) => <li key={i}><Inline text={item} /></li>)}
           </ul>
         </Block>

@@ -16,8 +16,11 @@ import {
 } from "@/components/icons";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { pullAndMerge } from "@/lib/sync";
+import { useRovingRadioGroup } from "@/lib/roving";
 import { exportAllData } from "@/lib/export";
 import { BUTTON_GHOST, BUTTON_SECONDARY } from "@/lib/ui";
+
+const FILTER_VALUES = ["all", "analyzed", "unanalyzed"] as const;
 
 const CONVERSATIONS_CACHE_KEY = "conversations";
 
@@ -34,13 +37,13 @@ const CONVERSATIONS_CACHE_KEY = "conversations";
 // flash on :active, so the moment of an actual tap still reads distinctly
 // from just having a selection ready.
 // disabled:bg-slate-700, not slate-800: this toolbar is itself a .card
-// (Ink Panel, #1e293b === bg-slate-800), so slate-800 here would repeat the
+// (Ink Panel, #262019 === bg-slate-800), so slate-800 here would repeat the
 // exact "invisible against its own container" bug the Secondary Button rule
 // exists to prevent (see DESIGN.md's Buttons section).
 // Detector waiver below: it pairs the disabled/active slate values with the
 // cyan tints in the same string. Real pairs, all measured — cyan-200 on the
-// cyan-950/40 wash 12.20:1, slate-950 on the active cyan-400 fill 11.16:1,
-// and slate-400 on the disabled slate-700 fill 4.04:1 (disabled controls are
+// cyan-950/40 wash 12.20:1, slate-950 on the active cyan-400 fill 7.87:1,
+// and slate-400 on the disabled slate-700 fill 4.98:1 (disabled controls are
 // exempt from 1.4.3, and this matches the app's existing disabled treatment).
 const TOOLBAR_ACTION_CLASS =
   "flex items-center gap-1.5 rounded-lg border border-cyan-500/50 bg-cyan-950/40 px-4 py-2 min-h-[44px] text-sm font-medium text-cyan-200 transition-colors hover:border-cyan-500/70 hover:bg-cyan-950/60 hover:text-cyan-100 active:border-cyan-400 active:bg-cyan-400 active:text-slate-950 disabled:border-transparent disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed whitespace-nowrap"; // impeccable-disable-line gray-on-color
@@ -65,7 +68,7 @@ function LensBadges({ thesis, adhd }: { thesis: boolean; adhd: boolean }) {
       className={`min-w-[40px] px-1.5 py-0.5 rounded-full border text-[10px] font-semibold leading-none whitespace-nowrap text-center ${
         // False positive below: the scanner pairs the "off" branch's text-slate-400 with the "on"
         // branch's bg-emerald-500 since both live in one ternary string. Real pairs, both verified:
-        // emerald-400/emerald-wash (5.93:1) and slate-400/slate-800 (5.71:1).
+        // emerald-400/emerald-wash (6.73:1) and slate-400/slate-800 (5.87:1).
         on ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400" : "bg-slate-800/60 border-slate-700 text-slate-400" // impeccable-disable-line gray-on-color
       }`}
     >
@@ -192,8 +195,8 @@ function CalendarMonth({
               aria-pressed={isSelected}
               className={`aspect-square min-h-[44px] rounded-md flex flex-col items-center justify-center gap-0.5 text-sm transition-colors ${
                 isSelected
-                  // slate-950 is near-black (#020617), not washed-out gray: it
-                  // clears 11.16:1 on cyan-400. Detector cross-pairs the other
+                  // slate-950 is near-black (#14100d), not washed-out gray: it
+                  // clears 7.87:1 on cyan-400. Detector cross-pairs the other
                   // mutually-exclusive branches' slate text with this fill.
                   ? "bg-cyan-400 text-slate-950 font-semibold" // impeccable-disable-line gray-on-color
                   : isToday
@@ -274,15 +277,18 @@ const ConversationRow = memo(function ConversationRow({
             <div className="flex items-center gap-3 mt-2 text-xs text-slate-400 flex-wrap">
               <span className="font-mono whitespace-nowrap">{formatDateTime(convo.created_at)}</span>
               {convo.structured?.category && (
-                <span className="bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap">{convo.structured.category}</span>
+                <span className="bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap max-w-[16ch] truncate" title={convo.structured.category}>{convo.structured.category}</span>
               )}
-              <span title={hasLocation ? "Location attached" : "No location attached"}>
-                <span className="sr-only">{hasLocation ? "Location attached" : "No location attached"}</span>
-                <MapPinIcon
-                  aria-hidden="true"
-                  className={`w-3.5 h-3.5 flex-shrink-0 ${hasLocation ? "text-cyan-300" : "text-slate-700"}`}
-                />
-              </span>
+              {/* Only drawn when a location exists. It used to render either
+                  way — the absent state at ~1.3:1 (invisible) while still
+                  announcing "No location attached" on every row. Absence is
+                  now just the absence of the mark. */}
+              {hasLocation && (
+                <span title="Location attached">
+                  <span className="sr-only">Location attached</span>
+                  <MapPinIcon aria-hidden="true" className="w-3.5 h-3.5 flex-shrink-0 text-cyan-300" />
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -312,7 +318,7 @@ const ConversationRow = memo(function ConversationRow({
           <div className="flex items-center gap-3 mt-2 text-xs text-slate-400 flex-wrap">
             <span className="font-mono whitespace-nowrap">{formatDateTime(convo.created_at)}</span>
             {convo.structured?.category && (
-              <span className="bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap">{convo.structured.category}</span>
+              <span className="bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap max-w-[16ch] truncate" title={convo.structured.category}>{convo.structured.category}</span>
             )}
             {convo.folder_name && (
               <span className="flex items-center gap-1 bg-cyan-900/50 text-cyan-300 px-2 py-0.5 rounded-full whitespace-nowrap">
@@ -378,6 +384,7 @@ function HomeInner() {
   const [exportError, setExportError] = useState<string | null>(null);
   const [exportNotice, setExportNotice] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "analyzed" | "unanalyzed">("all");
+  const rovingFilter = useRovingRadioGroup(FILTER_VALUES, filter, setFilter);
   const [selectMode, setSelectMode] = useState(false);
   // Cross-day, cross-search selection: intentionally never reset when
   // selectedDate or searchQuery change, so picking conversations from
@@ -719,14 +726,14 @@ function HomeInner() {
             like a journal entry's opening line, mono-tracked and quiet. It's
             what makes the page read as "today's page in the journal" rather
             than a static app title, without adding any new color or icon. */}
-        <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-500" aria-hidden={!todayDateline}>
+        <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400" aria-hidden={!todayDateline}>
           {todayDateline || " "}
         </p>
 
         {/* Wordmark: the mark carries the brand's navy/cyan two-tone, so it is
             sized to the cap-height of TRACE and tracked wide to match the logo
             lockup rather than sitting as a generic leading icon. */}
-        <h1 className="mb-2 flex items-center gap-3 text-4xl font-bold text-white">
+        <h1 className="mb-2 flex items-center gap-3 font-bold text-white">
           <TraceMark className="w-10 h-10 flex-shrink-0 text-white" />
           <span className="tracking-[0.18em]">TRACE</span>
         </h1>
@@ -743,16 +750,29 @@ function HomeInner() {
             (small caps "Contents" + hairline) rather than plain ghost pills,
             so it reads as a journal's table of contents, not app-shell nav. */}
         <nav aria-label="Sections" className="mt-5 -mx-3">
-          <p className="mb-1.5 px-3 font-mono text-[10px] uppercase tracking-[0.16em] text-slate-500">
+          {/* 11px, not 10px: the Micro step (10px) is reserved for a single
+              glyph inside a circular badge. This is a running head and belongs
+              on the Eyebrow step like every other one in the app. */}
+          <p className="mb-1.5 px-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
             Contents
           </p>
           <div className="flex flex-wrap items-center gap-x-1 gap-y-0">
+            {/* Carries the day you are browsing. `href="/rollup"` dropped it,
+                so jumping to the rollup from 25 Aug landed on a day picker and
+                you had to find the date again. */}
             <Link
-              href="/rollup"
+              href={selectedDate ? `/rollup?day=${selectedDate}` : "/rollup"}
               className={BUTTON_GHOST}
             >
               <CalendarIcon className="w-4 h-4 flex-shrink-0" />
               Daily Rollup
+            </Link>
+            <Link
+              href="/commitments"
+              className={BUTTON_GHOST}
+            >
+              <ClipboardIcon className="w-4 h-4 flex-shrink-0" />
+              Open promises
             </Link>
             <Link
               href="/people"
@@ -924,13 +944,12 @@ function HomeInner() {
                   <button
                     key={f}
                     onClick={() => setFilter(f)}
-                    role="radio"
-                    aria-checked={filter === f}
+                    {...rovingFilter(f)}
                     aria-label={`Show ${f} conversations`}
                     className={`px-4 py-2 min-h-[44px] rounded-full text-sm transition-colors ${
                       filter === f
-                        // slate-950 on cyan-400 = 11.16:1; slate-300 on
-                        // slate-800 = 8.59:1. Branches are mutually exclusive.
+                        // slate-950 on cyan-400 = 7.87:1; slate-300 on
+                        // slate-800 = 8.35:1. Branches are mutually exclusive.
                         ? "bg-cyan-400 text-slate-950" // impeccable-disable-line gray-on-color
                         : "bg-slate-800 text-slate-300 hover:text-white"
                     }`}
@@ -1048,7 +1067,7 @@ function HomeInner() {
                     {batchFailures.length === 1 ? "was" : "were"} skipped:
                   </span>
                 </p>
-                <ul className="mt-2 ml-6 list-disc space-y-1 text-sm text-slate-300 marker:text-slate-600">
+                <ul className="mt-2 ml-6 list-disc space-y-1 text-sm text-slate-300 marker:text-slate-500">
                   {batchFailures.map((f) => <li key={f.id}>{f.title}</li>)}
                 </ul>
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -1159,7 +1178,11 @@ function HomeInner() {
       <div className="space-y-3 conversation-list" role={selectMode ? "listbox" : "list"} aria-label="Conversations" aria-multiselectable={selectMode || undefined}>
         {filteredByDay && filteredByDay.length > 1
           ? filteredByDay.map(([day, items]) => (
-              <div key={day}>
+              <div
+                key={day}
+                role={selectMode ? "group" : undefined}
+                aria-label={selectMode ? formatDateTime(`${day}T12:00:00`, { weekday: "long", day: "numeric", month: "long" }) : undefined}
+              >
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 mt-4 first:mt-0">
                   {formatDateTime(`${day}T12:00:00`, { weekday: "long", day: "numeric", month: "long" })}
                 </p>

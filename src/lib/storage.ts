@@ -121,8 +121,13 @@ export function getAnalysisAge(timestamp: string): {
   else if (hours < 24) label = `${hours}h ago`;
   else if (days === 1) label = "yesterday";
   else if (days < 7) label = `${days} days ago`;
-  else if (days < 30) label = `${Math.floor(days / 7)} weeks ago`;
-  else label = `${Math.floor(days / 30)} months ago`;
+  else if (days < 30) {
+    const w = Math.floor(days / 7);
+    label = w === 1 ? "1 week ago" : `${w} weeks ago`;
+  } else {
+    const mo = Math.floor(days / 30);
+    label = mo === 1 ? "1 month ago" : `${mo} months ago`;
+  }
 
   return { label, days, isStale: days >= 7 };
 }

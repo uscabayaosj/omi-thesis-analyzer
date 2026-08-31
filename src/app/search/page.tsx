@@ -65,14 +65,15 @@ export default function SearchPage() {
         Back
       </Link>
 
-      <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-500">
+      <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
         Archive
       </p>
-      <h1 className="text-2xl font-bold text-white mb-6">Search Analyses</h1>
+      <h1 className="font-bold text-white mb-6">Search Analyses</h1>
 
       <div className="relative mb-6">
         <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
         <input
+          aria-label="Search thesis and group analyses"
           type="text"
           value={query}
           onChange={(e) => {
@@ -85,11 +86,11 @@ export default function SearchPage() {
             }
           }}
           placeholder="Search thesis and group analyses…"
-          className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-9 pr-3 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400"
+          className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-9 pr-3 py-2.5 text-sm text-slate-200 placeholder:text-slate-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400"
         />
       </div>
 
-      {error && <p className="text-sm text-red-400 mb-4">{error}</p>}
+      {error && <p role="alert" className="text-sm text-red-400 mb-4">{error}</p>}
 
       {!hasQuery && !error && (
         <p className="text-sm text-slate-400 font-serif italic">
@@ -111,14 +112,14 @@ export default function SearchPage() {
 
       {result.conversationResults.length > 0 && (
         <section className="mb-8">
-          <h2 className="font-mono text-xs uppercase tracking-[0.1em] font-medium text-slate-400 mb-3">Conversations</h2>
+          <h2 className="text-slate-400 mb-3">Conversations</h2>
           <ul className="space-y-3 list-none">
             {result.conversationResults.map((r) => (
               <li key={r.conversationId} className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
                 <Link href={`/conversation/${r.conversationId}`} className="block">
                   <div className="flex items-center justify-between gap-2 mb-2">
                     <span className="text-slate-200 font-serif font-medium">{r.title}</span>
-                    <span className="text-xs font-mono text-slate-500 flex-shrink-0">{formatDate(r.date)}</span>
+                    <span className="text-xs font-mono text-slate-400 flex-shrink-0">{formatDate(r.date)}</span>
                   </div>
                   <div className="space-y-1.5">
                     {r.matches.map((m) => (
@@ -137,7 +138,7 @@ export default function SearchPage() {
 
       {result.groupResults.length > 0 && (
         <section>
-          <h2 className="font-mono text-xs uppercase tracking-[0.1em] font-medium text-slate-400 mb-3">Groups</h2>
+          <h2 className="text-slate-400 mb-3">Groups</h2>
           <ul className="space-y-3 list-none">
             {result.groupResults.map((r) => (
               <li key={r.conversationIds.join(",")} className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">

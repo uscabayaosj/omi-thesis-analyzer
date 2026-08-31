@@ -83,8 +83,10 @@ self.addEventListener("fetch", (event) => {
   // Skip non-GET
   if (request.method !== "GET") return;
 
-  // API calls — network first, no cache (these need fresh data)
-  if (url.pathname.startsWith("/api/") || url.hostname !== location.hostname) {
+  // Our own API calls — network first, no cache (these need fresh data). On a
+  // network failure, synthesize the JSON offline body the app's fetch layer
+  // knows how to render.
+  if (url.pathname.startsWith("/api/")) {
     event.respondWith(
       fetch(request).catch(() =>
         new Response(JSON.stringify({ error: "Offline — check your connection" }), {
@@ -95,6 +97,15 @@ self.addEventListener("fetch", (event) => {
     );
     return;
   }
+
+  // Cross-origin requests (map tiles, and anything else third-party) — pass
+  // through untouched. This branch used to be folded in with /api/ above,
+  // which meant ANY failing cross-origin GET — a script, a font, an image —
+  // came back as a synthetic 503 carrying a JSON body claiming the user was
+  // offline. That is a lie in two directions: it masks the real network error
+  // from whatever issued the request, and it hands a JSON error object to
+  // consumers expecting a script or an image. Let the genuine failure surface.
+  if (url.hostname !== location.hostname) return;
 
   // Page navigations — network first so the app shell never goes stale,
   // falling back to the cached shell only when offline

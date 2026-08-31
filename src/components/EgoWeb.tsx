@@ -39,27 +39,55 @@ export default function EgoWeb({ self, rels, people, onNavigate }: EgoWebProps) 
   });
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-md mx-auto block" aria-hidden="true">
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      className="w-full max-w-md mx-auto block"
+      role="group"
+      aria-label={`Relationship web for ${self.name}, ${rels.length} ${rels.length === 1 ? "person" : "people"}`}
+    >
       {nodes.map((n) => (
         <line key={`e-${n.rel.id}`} x1={CX} y1={CY} x2={n.x} y2={n.y}
-          stroke="#4d4133" strokeWidth={1.5} strokeDasharray={REL_DASH[n.rel.type]} />
+          stroke="#7a6b58" strokeWidth={1.5} strokeDasharray={REL_DASH[n.rel.type]} />
       ))}
       {nodes.map((n) => {
         const { otherRole } = roleFor(n.rel, self.id);
         const label = otherRole || RELATIONSHIP_LABEL[n.rel.type];
         return (
           <text key={`l-${n.rel.id}`} x={(CX + n.x) / 2} y={(CY + n.y) / 2 - 3}
-            textAnchor="middle" fill="#a89a88" fontSize={8}>{label}</text>
+            textAnchor="middle" fill="#a89a88" fontSize={9}>{label}</text>
         );
       })}
-      {nodes.map((n) => (
-        <g key={`n-${n.rel.id}`} onClick={() => onNavigate(n.oid)} style={{ cursor: "pointer" }}>
-          <circle cx={n.x} cy={n.y} r={20} fill="#262019" stroke="#4d4133" />
-          <text x={n.x} y={n.y + 3} textAnchor="middle" fill="#dcd2bf" fontSize={9}>
-            {nameOf(n.oid).split(" ")[0].slice(0, 8)}
-          </text>
-        </g>
-      ))}
+      {nodes.map((n) => {
+        const { otherRole } = roleFor(n.rel, self.id);
+        const label = otherRole || RELATIONSHIP_LABEL[n.rel.type];
+        return (
+          <g
+            key={`n-${n.rel.id}`}
+            onClick={() => onNavigate(n.oid)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onNavigate(n.oid);
+              }
+            }}
+            tabIndex={0}
+            role="button"
+            aria-label={`Open ${nameOf(n.oid)} — ${label}`}
+            style={{ cursor: "pointer" }}
+          >
+            {/* The visible node is r=20, which lands near 16px once the viewBox
+                is scaled down to a phone. A transparent, larger concentric
+                circle carries the hit area so the target stays thumb-sized
+                without inflating the drawing. `min-height` cannot do this job:
+                it has no effect on SVG elements. */}
+            <circle cx={n.x} cy={n.y} r={30} fill="transparent" />
+            <circle cx={n.x} cy={n.y} r={20} fill="#262019" stroke="#7a6b58" />
+            <text x={n.x} y={n.y + 3} textAnchor="middle" fill="#dcd2bf" fontSize={10}>
+              {nameOf(n.oid).split(" ")[0].slice(0, 8)}
+            </text>
+          </g>
+        );
+      })}
       <circle cx={CX} cy={CY} r={26} fill="#b96d33" />
       <text x={CX} y={CY + 4} textAnchor="middle" fill="#14100d" fontSize={11} fontWeight={700}>
         {self.name.split(" ")[0].slice(0, 8)}

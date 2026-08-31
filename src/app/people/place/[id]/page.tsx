@@ -80,7 +80,7 @@ export default function PlaceDetailPage() {
 
       {!editing ? (
         <div className="mb-4">
-          <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-500">
+          <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
             Location
           </p>
           <div className="flex items-start justify-between gap-3">
@@ -91,16 +91,18 @@ export default function PlaceDetailPage() {
         </div>
       ) : (
         <div className="card p-4 mb-4">
-          <label className="block text-sm text-slate-400 mb-1">Name</label>
-          <input value={nameDraft} onChange={(e) => setNameDraft(e.target.value)}
+          <label htmlFor="place-name" className="block text-sm text-slate-400 mb-1">Name</label>
+          <input id="place-name" value={nameDraft} onChange={(e) => setNameDraft(e.target.value)}
             className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none min-h-[44px]" />
-          <label className="block text-sm text-slate-400 mb-1 mt-3">Location — tap the map or drag the pin to move it</label>
+          {/* Not a <label>: its control is a map, which cannot be a label
+              target. It is a caption; LocationPicker carries its own name. */}
+          <p className="block text-sm text-slate-400 mb-1 mt-3">Location — search an address, or drag the pin to move it</p>
           <LocationPicker
             value={pinDraft}
             onChange={(lat, lng) => setPinDraft({ lat, lng })}
           />
-          <label className="block text-sm text-slate-400 mb-1 mt-3">Notes</label>
-          <textarea value={notesDraft} onChange={(e) => setNotesDraft(e.target.value)} rows={4}
+          <label htmlFor="place-notes" className="block text-sm text-slate-400 mb-1 mt-3">Notes</label>
+          <textarea id="place-notes" value={notesDraft} onChange={(e) => setNotesDraft(e.target.value)} rows={4}
             className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none resize-none" />
           {error && <p className="text-sm text-red-400 mt-2" role="alert">{error}</p>}
           <div className="flex gap-2 mt-3">
@@ -117,7 +119,7 @@ export default function PlaceDetailPage() {
       )}
 
       <section className="card p-5 mb-4">
-        <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">Met here</h2>
+        <h2 className="text-slate-400 mb-3">Met here</h2>
         {metHere.length === 0 ? (
           <p className="text-slate-400 text-sm">No meetings resolve to this place yet.</p>
         ) : (
@@ -134,7 +136,7 @@ export default function PlaceDetailPage() {
 
       {place.notes && !editing && (
         <section className="card p-5 mb-4">
-          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-2">Notes</h2>
+          <h2 className="text-slate-400 mb-2">Notes</h2>
           <p className="text-slate-300 text-sm whitespace-pre-wrap">{place.notes}</p>
         </section>
       )}

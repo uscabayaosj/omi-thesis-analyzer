@@ -43,11 +43,21 @@ import {
 import { BUTTON_PRIMARY, BUTTON_GHOST, BUTTON_SECONDARY } from "@/lib/ui";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { pullAndMerge } from "@/lib/sync";
+import { useRovingRadioGroup } from "@/lib/roving";
 import { runExtraction, suggestFromAdhdPeople } from "@/lib/people-pipeline";
-import MeetingMap, { type MapMarker } from "@/components/MeetingMap";
+import dynamic from "next/dynamic";
+import { type MapMarker } from "@/components/MeetingMap";
+
+// Leaflet's JS was already deferred, but `import "leaflet/dist/leaflet.css"`
+// at module scope pulled its stylesheet into this route's render-blocking CSS
+// even though the map usually draws nothing here. Loading the component
+// lazily moves both into a chunk that only arrives when a map actually renders.
+const MeetingMap = dynamic(() => import("@/components/MeetingMap"), { ssr: false });
 import MeetingLocationEditor from "@/components/MeetingLocationEditor";
 import { getMeetingLocation } from "@/lib/meeting-location";
 import { getPlace } from "@/lib/places";
+
+const LENS_VALUES = ["thesis", "adhd", "both"] as const;
 
 interface TranscriptSegment {
   text: string;
@@ -193,6 +203,7 @@ export default function ConversationPage() {
 
   type Lens = "thesis" | "adhd" | "both";
   const [lens, setLens] = useState<Lens>("thesis");
+  const rovingLens = useRovingRadioGroup(LENS_VALUES, lens, setLens);
   const [adhd, setAdhd] = useState<AdhdAnalysis | null>(null);
   const [adhdDoneKeys, setAdhdDoneKeys] = useState<string[]>([]);
   const [adhdAnalyzing, setAdhdAnalyzing] = useState(false);
@@ -569,7 +580,7 @@ export default function ConversationPage() {
       {conversation && (
         <>
           <header className="mb-6">
-            <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-500">
+            <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
               {conversation.structured?.category || "Entry"}
             </p>
             <h1 className="font-bold text-white mb-2">
@@ -594,7 +605,7 @@ export default function ConversationPage() {
               invitation to add the location that's missing. */}
           <section className="mb-6" aria-label="Where this conversation happened">
             <div className="flex items-center justify-between gap-2 mb-2">
-              <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-slate-500">
+              <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
                 Location
               </p>
               {!editingLocation && (
@@ -613,7 +624,7 @@ export default function ConversationPage() {
                   <p className="text-slate-400 font-serif italic text-sm mb-2">
                     {effectiveLocation.label}
                     {effectiveLocation.corrected && (
-                      <span className="not-italic font-mono text-xs text-slate-500"> · corrected</span>
+                      <span className="not-italic font-mono text-xs text-slate-400"> · corrected</span>
                     )}
                   </p>
                 )}
@@ -670,12 +681,11 @@ export default function ConversationPage() {
                   if (adhd) setAdhdSeen(adhd);
                   setLens(l);
                 }}
-                role="radio"
-                aria-checked={lens === l}
+                {...rovingLens(l)}
                 className={`px-4 py-2 min-h-[44px] rounded-md text-sm transition-colors ${
                   // False positive below: the scanner pairs the unselected branch's text-slate-300
                   // with the selected branch's bg-cyan-400, but the two are mutually exclusive.
-                  // Real pairs, both verified: slate-950/cyan-400 (10.66:1) and slate-300/slate-900
+                  // Real pairs, both verified: slate-950/cyan-400 (7.87:1) and slate-300/slate-900
                   // (11.35:1) — the unselected pill has no fill and sits on the toggle's own track.
                   lens === l ? "bg-cyan-400 text-slate-950" : "text-slate-300 hover:text-white" // impeccable-disable-line gray-on-color
                 }`}

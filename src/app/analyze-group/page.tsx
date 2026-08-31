@@ -418,7 +418,7 @@ function GroupAnalysisContent() {
       </Link>
 
       <header className="mb-6">
-        <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-500">
+        <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
           Synthesis
         </p>
         <h1 className="font-bold text-white mb-2 flex items-center gap-2">

@@ -24,7 +24,14 @@ import { getPlaces, createPlace, type Place } from "@/lib/places";
 import LocationPicker from "@/components/LocationPicker";
 import { groupMeetingsByPlace, resolvePlaceFrom } from "@/lib/place-resolve";
 import { getMeetingLocations } from "@/lib/meeting-location";
-import MeetingMap, { type MapMarker } from "@/components/MeetingMap";
+import dynamic from "next/dynamic";
+import { type MapMarker } from "@/components/MeetingMap";
+
+// Leaflet's JS was already deferred, but `import "leaflet/dist/leaflet.css"`
+// at module scope pulled its stylesheet into this route's render-blocking CSS
+// even though the map usually draws nothing here. Loading the component
+// lazily moves both into a chunk that only arrives when a map actually renders.
+const MeetingMap = dynamic(() => import("@/components/MeetingMap"), { ssr: false });
 import RelationshipGraph from "@/components/RelationshipGraph";
 import {
   ArrowLeftIcon,
@@ -345,10 +352,10 @@ export default function PeoplePage() {
         All conversations
       </Link>
 
-      <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-500">
+      <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
         Directory
       </p>
-      <h1 className="mb-2 flex items-center gap-2.5 text-3xl font-bold text-white">
+      <h1 className="mb-2 flex items-center gap-2.5 font-bold text-white">
         <UsersIcon className="w-8 h-8 flex-shrink-0" />
         People
       </h1>
@@ -414,7 +421,7 @@ export default function PeoplePage() {
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search people…"
             aria-label="Search people"
-            className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-3 py-2 min-h-[44px] text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-400"
+            className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-3 py-2 min-h-[44px] text-sm text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-400"
           />
         </div>
 
@@ -508,7 +515,7 @@ export default function PeoplePage() {
               placeholder="Full name"
               aria-label="New person's name"
               aria-invalid={addError ? true : undefined}
-              className="flex-1 min-w-0 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 min-h-[44px] text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-400"
+              className="flex-1 min-w-0 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 min-h-[44px] text-sm text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-400"
             />
             <button onClick={submitNewPerson} className={`${BUTTON_PRIMARY} px-4 flex-shrink-0`}>
               Create
@@ -546,7 +553,7 @@ export default function PeoplePage() {
         <div>
           {groups.map(({ letter, people: bucket }, gi) => (
             <section key={letter} id={`people-letter-${letter}`} className={gi > 0 ? "mt-6" : undefined}>
-              <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wide mb-2">
+              <h2 className="text-slate-300 mb-2">
                 {letter}
               </h2>
               <div className="space-y-2">
@@ -563,6 +570,8 @@ export default function PeoplePage() {
                         <img
                           src={p.photo}
                           alt=""
+                          decoding="async"
+                          loading="lazy"
                           className="w-11 h-11 rounded-full object-cover flex-shrink-0"
                         />
                       ) : (
@@ -610,7 +619,7 @@ export default function PeoplePage() {
             markers={mapMarkers}
             places={placeMarkers}
             onNameLocation={(lat, lng, raw) => { setPrefill({ lat, lng, raw }); setAddingPlace(true); setView("places"); }}
-            className="h-[60vh] w-full rounded-xl overflow-hidden"
+            className="h-[60dvh] w-full rounded-xl overflow-hidden"
           />
         )
       ) : (
@@ -685,12 +694,21 @@ export default function PeoplePage() {
 // zero — identical to `right-0` — so the two regimes meet with no seam.
 function LetterRail({ present, onJump }: { present: Set<string>; onJump: (letter: string) => void }) {
   return (
+    /* The rail is `fixed` and centred, so anything taller than the viewport
+       spills equally off the top and bottom with no way to scroll it — and it
+       grows with the directory, so the failure arrives exactly when the rail
+       becomes useful. Under `(pointer: coarse)` each present letter is a 44px
+       button, so 16 present letters already exceed an iPhone 14 Pro. Capping
+       the height and letting it scroll internally keeps every letter
+       reachable; `overscroll-contain` stops that scroll chaining to the page. */
     <nav
       aria-label="Jump to letter"
-      className="fixed right-0 md:right-[calc(50%-384px)] top-1/2 -translate-y-1/2 z-10 flex flex-col items-center rounded-l-lg bg-slate-950/85 py-2 pl-1 pr-[max(0.25rem,env(safe-area-inset-right))]"
+      className="fixed right-0 md:right-[calc(50%-384px)] top-1/2 -translate-y-1/2 z-10 flex flex-col items-center rounded-l-lg bg-slate-950/85 py-2 pl-1 pr-[max(0.25rem,env(safe-area-inset-right))] max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain"
     >
       {ALPHABET.map((letter) => {
         const has = present.has(letter);
+        // Absent letters used to render at 1.35:1 — invisible placeholders that
+        // still consumed rail height. Omitted entirely instead.
         return has ? (
           <button
             key={letter}
@@ -699,15 +717,7 @@ function LetterRail({ present, onJump }: { present: Set<string>; onJump: (letter
           >
             {letter}
           </button>
-        ) : (
-          <span
-            key={letter}
-            aria-hidden="true"
-            className="text-[10px] leading-[14px] font-semibold text-slate-700 px-1"
-          >
-            {letter}
-          </span>
-        );
+        ) : null;
       })}
     </nav>
   );
@@ -757,7 +767,7 @@ function PendingCard({
               sentence and a place as a paragraph, so both wrap rather than
               stretching the card. */}
           <div className="text-white font-medium break-words">{s.extractedName}</div>
-          <div className="text-slate-500 text-xs break-words">
+          <div className="text-slate-400 text-xs break-words">
             {[s.placeName, getAnalysisAge(s.date).label].filter(Boolean).join(" · ")}
           </div>
         </div>
@@ -833,7 +843,7 @@ function PendingCard({
         )}
         <button
           onClick={onIgnore}
-          className="text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800 transition-colors"
+          className="text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
         >
           Ignore
         </button>
@@ -915,8 +925,8 @@ function AddPlacePanel({
 
   return (
     <div className="enter-rise card p-4 mb-3">
-      <label className="block text-sm text-slate-400 mb-1">Name</label>
-      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Dry Fork Ranch"
+      <label htmlFor="new-place-name" className="block text-sm text-slate-400 mb-1">Name</label>
+      <input id="new-place-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Dry Fork Ranch"
         className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-400 focus:border-cyan-500 focus:outline-none min-h-[44px]" />
 
       {options.length > 0 && (
@@ -951,11 +961,11 @@ function AddPlacePanel({
         initialCenter={anchor ? { lat: anchor.lat, lng: anchor.lng } : undefined}
       />
 
-      <label className="block text-sm text-slate-400 mb-1 mt-3">Notes (optional)</label>
-      <input value={notes} onChange={(e) => setNotes(e.target.value)}
+      <label htmlFor="new-place-notes" className="block text-sm text-slate-400 mb-1 mt-3">Notes (optional)</label>
+      <input id="new-place-notes" value={notes} onChange={(e) => setNotes(e.target.value)}
         className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-400 focus:border-cyan-500 focus:outline-none min-h-[44px]" />
 
-      {error && <p className="text-sm text-red-400 mt-2" role="alert">{error}</p>}
+      {error && <p id="person-name-error" className="text-sm text-red-400 mt-2" role="alert">{error}</p>}
       <div className="flex gap-2 mt-4">
         <button onClick={save} className={`${BUTTON_PRIMARY} py-2 px-5`}>Create place</button>
         <button onClick={onCancel} className={BUTTON_SECONDARY_CARD}>Cancel</button>

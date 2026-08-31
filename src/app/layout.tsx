@@ -13,7 +13,13 @@ import AppVersion from "@/components/app-version";
 import AppBadgeSync from "@/components/app-badge-sync";
 
 export const metadata: Metadata = {
-  title: "TRACE — Personal & Research Assistant",
+  // `template` lets each route name itself while keeping the product name in
+  // the tab. Every route previously shipped this exact string, so tabs, back
+  // history and bookmarks were indistinguishable across the whole app.
+  title: {
+    default: "TRACE — Personal & Research Assistant",
+    template: "%s · TRACE",
+  },
   description:
     "Turns Omi wearable conversations into thesis evidence and daily executive-function structure.",
   manifest: "/manifest.json",

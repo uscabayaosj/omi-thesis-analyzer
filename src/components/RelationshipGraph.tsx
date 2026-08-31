@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { computeLayout } from "@/lib/graph-layout";
+import { useRovingRadioGroup } from "@/lib/roving";
 import {
   getRelationships, RELATIONSHIP_TYPES, RELATIONSHIP_LABEL,
   type RelationshipType,
@@ -10,6 +11,8 @@ import { REL_DASH } from "@/components/EgoWeb";
 import { getPlaces } from "@/lib/places";
 import { getMeetingLocations } from "@/lib/meeting-location";
 import { groupMeetingsByPlace } from "@/lib/place-resolve";
+
+const FILTER_VALUES = ["all", ...RELATIONSHIP_TYPES] as const;
 import type { Person } from "@/lib/people";
 
 interface RelationshipGraphProps {
@@ -29,6 +32,7 @@ const placeKey = (id: string) => `pl:${id}`;
 
 export default function RelationshipGraph({ people, onOpen, onOpenPlace }: RelationshipGraphProps) {
   const [filter, setFilter] = useState<RelationshipType | "all">("all");
+  const rovingFilter = useRovingRadioGroup(FILTER_VALUES, filter, setFilter);
   const [showPlaces, setShowPlaces] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
 
@@ -145,12 +149,12 @@ export default function RelationshipGraph({ people, onOpen, onOpenPlace }: Relat
     <div>
       <div className="flex flex-wrap items-center gap-1 mb-3">
         <div className="flex flex-wrap gap-1" role="radiogroup" aria-label="Filter by relationship type">
-          {(["all", ...RELATIONSHIP_TYPES] as const).map((t) => (
-            <button key={t} role="radio" aria-checked={filter === t}
+          {FILTER_VALUES.map((t) => (
+            <button key={t} {...rovingFilter(t)}
               onClick={() => setFilter(t)}
               className={`px-4 py-2 min-h-[44px] rounded-full text-sm transition-colors ${
                 // Detector cross-pairs mutually-exclusive ternary branches. Real pairs, both AA-clear:
-                // slate-950 on cyan-400 = 11.16:1; slate-300 on slate-800 = 8.59:1.
+                // slate-950 on cyan-400 = 7.87:1; slate-300 on slate-800 = 8.35:1.
                 filter === t ? "bg-cyan-400 text-slate-950" : "bg-slate-800 text-slate-300 hover:text-white" // impeccable-disable-line gray-on-color
               }`}>
               {t === "all" ? "All" : RELATIONSHIP_LABEL[t as RelationshipType]}
@@ -177,7 +181,7 @@ export default function RelationshipGraph({ people, onOpen, onOpenPlace }: Relat
             const dim = selected != null && e.a !== selected && e.b !== selected;
             return (
               <line key={e.kind === "rel" ? e.rel.id : e.id} x1={pa.x} y1={pa.y} x2={pb.x} y2={pb.y}
-                stroke="#4d4133" strokeOpacity={dim ? 0.25 : e.kind === "place" ? 0.6 : 1} strokeWidth={1.4}
+                stroke="#7a6b58" strokeOpacity={dim ? 0.25 : e.kind === "place" ? 0.6 : 1} strokeWidth={1.4}
                 strokeDasharray={e.kind === "rel" ? REL_DASH[e.rel.type] : undefined} />
             );
           })}
@@ -197,7 +201,8 @@ export default function RelationshipGraph({ people, onOpen, onOpenPlace }: Relat
                 }}
                 tabIndex={0}
                 role="button" aria-label={isSel ? `Open ${nameOf(pid)}` : `Highlight ${nameOf(pid)}`}>
-                <circle cx={p.x} cy={p.y} r={18} fill={isSel ? "#b96d33" : "#262019"} stroke="#4d4133" />
+                <circle cx={p.x} cy={p.y} r={28} fill="transparent" />
+                <circle cx={p.x} cy={p.y} r={18} fill={isSel ? "#b96d33" : "#262019"} stroke="#7a6b58" />
                 <text x={p.x} y={p.y + 3} textAnchor="middle" fontSize={9}
                   fill={isSel ? "#14100d" : "#dcd2bf"}>{nameOf(pid).split(" ")[0].slice(0, 8)}</text>
               </g>
@@ -224,6 +229,7 @@ export default function RelationshipGraph({ people, onOpen, onOpenPlace }: Relat
                 }}
                 tabIndex={0}
                 role="button" aria-label={isSel ? `Open ${placeNameOf(plid)}` : `Highlight ${placeNameOf(plid)}`}>
+                <circle cx={p.x} cy={p.y} r={26} fill="transparent" />
                 <polygon points={points} fill={isSel ? "#b96d33" : "#221c17"} stroke="#7a6b58" />
                 <text x={p.x} y={p.y + 3} textAnchor="middle" fontSize={9}
                   fill={isSel ? "#14100d" : "#c6b9a5"}>{placeNameOf(plid).split(" ")[0].slice(0, 8)}</text>

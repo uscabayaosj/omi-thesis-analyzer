@@ -125,7 +125,12 @@ export default function ServiceWorkerRegistration() {
       className="enter-rise fixed inset-x-0 bottom-0 z-50 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pointer-events-none"
     >
       <div className="card pointer-events-auto mx-auto max-w-3xl border-cyan-500/40 p-4 flex flex-wrap items-center gap-3">
-        <div className="min-w-0 flex-1">
+        {/* `flex-1 min-w-0` alone let this column shrink toward zero instead of
+            forcing the wrap that `flex-wrap` exists to provide — at 375px the
+            copy collapsed to roughly one word per line and the banner grew into
+            a full-screen block. A real flex-basis makes the button group wrap
+            beneath the text once there isn't room for both. */}
+        <div className="min-w-0 flex-1 basis-64">
           <p className="text-sm font-semibold text-white">A new version of TRACE is ready.</p>
           <p className="mt-0.5 text-sm text-slate-400">
             Reloading may discard anything you have typed but not yet run.

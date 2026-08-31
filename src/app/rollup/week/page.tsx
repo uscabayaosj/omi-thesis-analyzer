@@ -71,6 +71,17 @@ function WeekPageInner() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dataVersion, setDataVersion] = useState(0);
+  // `dayRollups` below derives from localStorage, which the server cannot see.
+  // Deriving it during the first client render made that render disagree with
+  // the server's HTML ("No daily rollups yet this week" vs "1 of 7 days have a
+  // rollup ready"), which React reports as a hydration failure and recovers
+  // from by throwing away the server tree. Holding the first client render to
+  // the server's view and filling in after mount keeps the two in agreement.
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -84,12 +95,14 @@ function WeekPageInner() {
   }, [weekStart]);
 
   const dayRollups = useMemo(
-    () => days
-      .map((day) => ({ day, stored: getRollup(day) }))
-      .filter((d): d is { day: string; stored: NonNullable<ReturnType<typeof getRollup>> } => d.stored !== null),
+    () => !mounted
+      ? []
+      : days
+        .map((day) => ({ day, stored: getRollup(day) }))
+        .filter((d): d is { day: string; stored: NonNullable<ReturnType<typeof getRollup>> } => d.stored !== null),
     // dataVersion is intentionally included so a completed pullAndMerge re-derives this from localStorage.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [days, dataVersion]
+    [days, dataVersion, mounted]
   );
 
   const daysWithRollup = useMemo(() => new Set(dayRollups.map((d) => d.day)), [dayRollups]);
@@ -138,7 +151,7 @@ function WeekPageInner() {
       </Link>
 
       <header className="mb-6">
-        <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-500">
+        <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
           Planning
         </p>
         <h1 className="font-bold text-white mb-2 flex items-center gap-2">
@@ -215,7 +228,7 @@ function WeekPageInner() {
       {stored && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <p className="font-mono text-xs text-slate-500">
+            <p className="font-mono text-xs text-slate-400">
               Synthesized from {stored.dayCount} of 7 days
             </p>
             <button

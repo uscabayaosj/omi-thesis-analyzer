@@ -107,7 +107,7 @@ export default function MeetingLocationEditor({
 
   return (
     <div className="enter-rise card p-4 border-cyan-500/30 mt-3">
-      <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-slate-500 mb-2">
+      <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400 mb-2">
         {hasOverride ? "Edit location" : "Set location"}
       </p>
 
@@ -125,7 +125,7 @@ export default function MeetingLocationEditor({
       />
 
       {coord && (
-        <p className="font-mono text-xs text-slate-500 mt-2">
+        <p className="font-mono text-xs text-slate-400 mt-2">
           {coord.lat.toFixed(5)}, {coord.lng.toFixed(5)}
           {autoPlace && !placeId ? ` · links to ${autoPlace.name}` : ""}
         </p>
