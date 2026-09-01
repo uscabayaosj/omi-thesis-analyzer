@@ -28,7 +28,10 @@ import { getAnalyzedIds, getAnalysisAge } from "@/lib/storage";
 import { getAdhdAnalyzedIds } from "@/lib/adhd-storage";
 import { pullAndMerge } from "@/lib/sync";
 import { getPlaces, createPlace, type Place } from "@/lib/places";
-import LocationPicker from "@/components/LocationPicker";
+// Same treatment as MeetingMap: `leaflet/dist/leaflet.css` is imported at this
+// component's module scope, so a static import pulls the stylesheet into the
+// route bundle whether or not a picker is ever opened.
+const LocationPicker = dynamic(() => import("@/components/LocationPicker"), { ssr: false });
 import { groupMeetingsByPlace, resolvePlaceFrom } from "@/lib/place-resolve";
 import { getMeetingLocations } from "@/lib/meeting-location";
 import dynamic from "next/dynamic";

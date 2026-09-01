@@ -387,7 +387,7 @@ export default function PersonDetailPage() {
 
   if (notFound || !person) {
     return (
-      <main className="max-w-3xl mx-auto px-4 py-16 text-center">
+      <main id="main" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-16 text-center">
         <div className="card p-8">
           <UsersIcon className="w-10 h-10 mx-auto mb-4 text-slate-500" />
           <h1 className="font-bold text-white mb-2">This person no longer exists</h1>
@@ -409,7 +409,7 @@ export default function PersonDetailPage() {
   const targetPerson = people.find((p) => p.id === mergeTargetId);
 
   return (
-    <main className="max-w-3xl mx-auto px-4 py-8">
+    <main id="main" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-8">
       <Link
         href="/people"
         className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors mb-4"

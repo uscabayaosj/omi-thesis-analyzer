@@ -107,6 +107,25 @@ export function getAdhdAnalyzedIds(): Set<string> {
   return new Set(Object.keys(readMap<StoredAdhdAnalysis>(ANALYSES_KEY)));
 }
 
+/**
+ * conversationId → the analysis's one-line summary.
+ *
+ * Omi returns an empty `structured.title` for most recordings, so the
+ * conversation list rendered every row as "Untitled" and the only thing
+ * separating one from another was its timestamp. The ADHD pass already
+ * produces a human sentence about each conversation; this exposes it as a map
+ * so the list can be titled by what was said rather than by what Omi failed to
+ * name. Built once by the caller and passed down — never read per row.
+ */
+export function getAdhdSummaries(): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const a of Object.values(readMap<StoredAdhdAnalysis>(ANALYSES_KEY))) {
+    const s = a.analysis?.summary?.trim();
+    if (s) out.set(a.conversationId, s);
+  }
+  return out;
+}
+
 /** Every stored ADHD analysis. The open-promises ledger reads across all of
  *  them, since a commitment's home is the person it is owed to, not the one
  *  conversation it happened to be spoken in. */

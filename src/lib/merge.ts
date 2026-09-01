@@ -7,6 +7,30 @@
  * product's third principle forbids.
  */
 
+/**
+ * Order-independent structural comparison.
+ *
+ * `sync.ts` decides whether to push by comparing `JSON.stringify(merged)` with
+ * `JSON.stringify(remote)`. That comparison is unsound across this app's
+ * storage boundary: the browser writes objects in source order, while the
+ * server stores them as Postgres `jsonb`, which normalises keys by length then
+ * bytewise. A record written as
+ *   conversationId, timestamp, title, date, analysis, doneKeys
+ * comes back as
+ *   date, title, analysis, doneKeys, timestamp, conversationId
+ * — identical content, different string. So the inequality was permanently
+ * true and every page load scheduled a PUT of the entire namespace, whether or
+ * not anything had changed. Comparing with sorted keys makes the check mean
+ * what it was always meant to mean.
+ */
+export function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+  const obj = value as Record<string, unknown>;
+  const keys = Object.keys(obj).sort();
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify(obj[k])}`).join(",")}}`;
+}
+
 export type TimestampedRecord = { timestamp?: string } & Record<string, unknown>;
 export type RecordMap = Record<string, TimestampedRecord>;
 export type ArrayRecord = Record<string, unknown>;

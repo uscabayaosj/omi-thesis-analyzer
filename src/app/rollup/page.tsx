@@ -635,12 +635,31 @@ function RollupPageInner() {
                   onToggle={togglePlanStep}
                 />
               ) : (
-                <RollupSectionBlock
-                  icon={ROLLUP_SECTIONS[0].icon}
-                  heading={ROLLUP_SECTIONS[0].heading}
-                  content={rollup[ROLLUP_SECTIONS[0].key]}
-                  lead
-                />
+                <>
+                  <RollupSectionBlock
+                    icon={ROLLUP_SECTIONS[0].icon}
+                    heading={ROLLUP_SECTIONS[0].heading}
+                    content={rollup[ROLLUP_SECTIONS[0].key]}
+                    lead
+                  />
+                  {/* Say so. This branch renders a plan that cannot be ticked,
+                      under the same heading as one that can — so a rollup
+                      saved before checklists existed looked identical to a
+                      broken one, and the user had no way to tell which he was
+                      looking at. Naming it turns a silent degradation into a
+                      stated limitation with a way out. */}
+                  <p className="text-xs text-slate-400 mt-2 px-1">
+                    Saved before plans became tickable, so this one is read-only.{" "}
+                    <button
+                      onClick={() => setShowRegenConfirm(true)}
+                      disabled={running || selectedConvos.length === 0}
+                      className="text-cyan-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
+                    >
+                      Regenerate this day
+                    </button>{" "}
+                    to get checkboxes.
+                  </p>
+                </>
               )}
             </div>
           )}

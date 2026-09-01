@@ -205,6 +205,20 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
   button, [role="button"], [role="option"], [role="radio"], summary {
     min-width: 44px;
   }
+  /* The one place the width floor is geometrically impossible, and so the one
+     place it is lifted rather than left to overflow silently.
+     A month view is seven columns by definition. At 320px the card interior is
+     256px; seven 44px cells plus six 4px gaps demand 332px. The floor cannot
+     be met on any phone narrower than ~414px, and leaving it in force did not
+     produce a scrollbar — it squeezed the tracks to 33px while the buttons
+     kept claiming 44px, so the day cells overlapped and taps landed on the
+     wrong date. Width is released; `min-height: 44px` and `aspect-square`
+     still give roughly 33x44 per cell, which clears WCAG 2.5.8's 24px AA
+     minimum comfortably. The 44px rule is this project's own AAA-level bar,
+     and a seven-column grid is where it stops being satisfiable. */
+  .calendar-grid button {
+    min-width: 0;
+  }
   /* Inline links can't grow via min-height, and forcing a flex box on every
      link would stop long ones wrapping mid-sentence. Vertical padding is the
      one lever that enlarges an inline element's hit area without touching

@@ -40,10 +40,10 @@ function WeeklySectionBlock({
   return (
     <div className="card p-6">
       <div className="analysis-section">
-        <h3 className="flex items-center gap-2">
+        <h2 className="flex items-center gap-2">
           <Icon className="w-[1.05em] h-[1.05em] flex-shrink-0" />
           {heading}
-        </h3>
+        </h2>
         {isEmpty ? (
           <p className="text-sm text-slate-400 mt-3">None.</p>
         ) : (

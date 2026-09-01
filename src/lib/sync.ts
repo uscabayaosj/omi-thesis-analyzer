@@ -6,7 +6,7 @@ import { notifyAnalysesChanged } from "@/lib/badge";
 // directly (test/sync-merge.test.mts) rather than only through the browser —
 // a ticked promise being silently reverted by a merge is precisely the class
 // of bug that needs a test, not a manual check.
-import { mergeMaps, mergeArrayNamespace, type RecordMap, type ArrayRecord } from "@/lib/merge";
+import { mergeMaps, mergeArrayNamespace, stableStringify, type RecordMap, type ArrayRecord } from "@/lib/merge";
 
 const ANALYSES_NS = "omi-adhd-analyses";
 
@@ -107,17 +107,17 @@ export async function pullAndMerge(force = false): Promise<boolean> {
         const localRaw = localStorage.getItem(ns);
         const localList: ArrayRecord[] = localRaw ? JSON.parse(localRaw) : [];
         const merged = mergeArrayNamespace(ns, localList, remoteList);
-        if (JSON.stringify(merged) !== JSON.stringify(localList)) {
+        if (stableStringify(merged) !== stableStringify(localList)) {
           localStorage.setItem(ns, JSON.stringify(merged));
           changed = true;
         }
-        if (JSON.stringify(merged) !== JSON.stringify(remoteList)) schedulePush(ns);
+        if (stableStringify(merged) !== stableStringify(remoteList)) schedulePush(ns);
         continue;
       }
 
       const local = readLocal(ns);
       const merged = mergeMaps(local, remote as RecordMap);
-      if (JSON.stringify(merged) !== JSON.stringify(local)) {
+      if (stableStringify(merged) !== stableStringify(local)) {
         writeLocal(ns, merged);
         changed = true;
         // This write bypasses adhd-storage's writeMap, so the badge listener
@@ -126,7 +126,7 @@ export async function pullAndMerge(force = false): Promise<boolean> {
       }
       // Push back whenever the local copy held anything the server lacked, so
       // the first device to run this seeds the server with its history.
-      if (JSON.stringify(merged) !== JSON.stringify(remote)) schedulePush(ns);
+      if (stableStringify(merged) !== stableStringify(remote)) schedulePush(ns);
     }
     return changed;
   } catch {

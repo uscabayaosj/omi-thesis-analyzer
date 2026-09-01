@@ -391,7 +391,7 @@ function GroupAnalysisContent() {
   }
 
   return (
-    <main className="max-w-3xl mx-auto px-4 py-8">
+    <main id="main" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-8">
       {/* Group analyses keep no version history, so a re-run is unrecoverable —
           the same guard the single-conversation lenses carry. */}
       {showRerunConfirm && (

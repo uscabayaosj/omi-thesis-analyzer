@@ -8,7 +8,11 @@ import { getPeople, type Person } from "@/lib/people";
 import { groupMeetingsByPlace } from "@/lib/place-resolve";
 import { getMeetingLocations, onPlaceDeleted } from "@/lib/meeting-location";
 import MeetingMap, { type MapMarker } from "@/components/MeetingMap";
-import LocationPicker from "@/components/LocationPicker";
+import dynamic from "next/dynamic";
+// Same treatment as MeetingMap: `leaflet/dist/leaflet.css` is imported at this
+// component's module scope, so a static import pulls the stylesheet into the
+// route bundle whether or not a picker is ever opened.
+const LocationPicker = dynamic(() => import("@/components/LocationPicker"), { ssr: false });
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { pullAndMerge } from "@/lib/sync";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY_CARD, LINK_BACK } from "@/lib/ui";
@@ -56,7 +60,7 @@ export default function PlaceDetailPage() {
   }
   if (!place) {
     return (
-      <main className="max-w-3xl mx-auto px-4 py-8 text-center">
+      <main id="main" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-8 text-center">
         <h1 className="font-bold text-white mb-2">This place no longer exists</h1>
         <Link href="/people" className={BUTTON_SECONDARY_CARD}>All people</Link>
       </main>
@@ -75,7 +79,7 @@ export default function PlaceDetailPage() {
   };
 
   return (
-    <main className="max-w-3xl mx-auto px-4 py-8">
+    <main id="main" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-8">
       <Link href="/people" className={LINK_BACK}>← People</Link>
 
       {!editing ? (

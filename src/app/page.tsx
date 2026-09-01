@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo, memo, Suspense } from "react
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getAnalyzedIds, getAnalysisAge } from "@/lib/storage";
-import { getAdhdAnalyzedIds, saveAdhdAnalysis } from "@/lib/adhd-storage";
+import { getAdhdAnalyzedIds, getAdhdSummaries, saveAdhdAnalysis } from "@/lib/adhd-storage";
 import type { AdhdAnalysis } from "@/lib/adhd";
 import { cacheGet, cacheSet } from "@/lib/cache";
 import { fetchJson } from "@/lib/fetch-json";
@@ -75,20 +75,27 @@ function LensBadges({ thesis, adhd }: { thesis: boolean; adhd: boolean }) {
       {label}
     </span>
   );
-  // The pills themselves stay aria-hidden (their text alone reads as bare
-  // "Thesis ADHD" with no state), but the per-lens state still has to reach a
-  // screen reader — the row's own label collapses both lenses into a single
-  // "(analyzed)", which can't distinguish thesis-done from ADHD-done.
+  // Entirely aria-hidden. The per-lens state still has to reach a screen
+  // reader — the row's own label collapses both lenses into one "(analyzed)",
+  // which can't distinguish thesis-done from ADHD-done — but it is announced
+  // by <LensState> AFTER the title instead of from here. These pills sit first
+  // in DOM order for layout reasons, and reading their state from here meant a
+  // screen reader said "Thesis not analyzed, ADHD Aid analyzed" before naming
+  // the conversation, on every row of a day's list.
   return (
-    <div className="mt-0.5 flex-shrink-0 flex flex-col gap-0.5">
-      <span className="sr-only">
-        Thesis {thesis ? "analyzed" : "not analyzed"}, ADHD Aid {adhd ? "analyzed" : "not analyzed"}.
-      </span>
-      <span aria-hidden="true" className="contents">
-        {pill(thesis, "Thesis")}
-        {pill(adhd, "ADHD")}
-      </span>
+    <div aria-hidden="true" className="mt-0.5 flex-shrink-0 flex flex-col gap-0.5">
+      {pill(thesis, "Thesis")}
+      {pill(adhd, "ADHD")}
     </div>
+  );
+}
+
+/** The lens state, announced after the conversation's name. */
+function LensState({ thesis, adhd }: { thesis: boolean; adhd: boolean }) {
+  return (
+    <span className="sr-only">
+      Thesis {thesis ? "analyzed" : "not analyzed"}, ADHD Aid {adhd ? "analyzed" : "not analyzed"}.
+    </span>
   );
 }
 
@@ -171,14 +178,14 @@ function CalendarMonth({
           <ChevronRightIcon className="w-4 h-4" />
         </button>
       </div>
-      <div className="grid grid-cols-7 gap-1 mb-1">
+      <div className="calendar-grid grid grid-cols-7 gap-1 mb-1">
         {["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map((d) => (
           <div key={d} className="text-center text-[10px] font-semibold text-slate-400" aria-hidden="true">
             {d}
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-7 gap-1" role="group" aria-label="Pick a day">
+      <div className="calendar-grid grid grid-cols-7 gap-1" role="group" aria-label="Pick a day">
         {cells.map((cell, i) => {
           if (!cell) return <div key={`blank-${i}`} aria-hidden="true" />;
           const { day, dayStr } = cell;
@@ -239,8 +246,42 @@ function CalendarMonth({
   );
 }
 
+/**
+ * What to call a conversation.
+ *
+ * Omi leaves `structured.title` empty for most recordings, so the list used to
+ * render "Untitled" on every row and the only discriminator across a whole day
+ * was a timestamp — the screen the user opens most, carrying no information.
+ * The ADHD pass already writes a plain-language summary of each conversation;
+ * when Omi has no title, that sentence is a far better name than a placeholder.
+ * Falls back to the timestamp-plus-category shape the rollup list uses, and
+ * only then to a label.
+ */
+function conversationTitle(convo: Conversation, gist?: string): string {
+  const omi = convo.structured?.title?.trim();
+  if (omi) return omi;
+  if (gist) return gist;
+  const when = formatDateTime(convo.created_at);
+  const cat = convo.structured?.category?.trim();
+  return cat ? `${when} · ${cat}` : when;
+}
+
+/** The location mark. Rendered ONLY when a location exists: the absent state
+ *  was a 1.23:1 smudge that also announced "No location attached" on every row.
+ *  Absence is the absence of the mark. Shared by both row branches so the two
+ *  cannot drift apart again — they already did once. */
+function LocationMark({ hasLocation }: { hasLocation: boolean }) {
+  if (!hasLocation) return null;
+  return (
+    <span title="Location attached">
+      <span className="sr-only">Location attached</span>
+      <MapPinIcon aria-hidden="true" className="w-3.5 h-3.5 flex-shrink-0 text-cyan-300" />
+    </span>
+  );
+}
+
 const ConversationRow = memo(function ConversationRow({
-  convo, selectMode, isSelected, isAnalyzed, isAnalyzedEither, isAdhd, onToggleSelect,
+  convo, selectMode, isSelected, isAnalyzed, isAnalyzedEither, isAdhd, gist, onToggleSelect,
 }: {
   convo: Conversation;
   selectMode: boolean;
@@ -248,6 +289,10 @@ const ConversationRow = memo(function ConversationRow({
   isAnalyzed: boolean;
   isAnalyzedEither: boolean;
   isAdhd: boolean;
+  /** The ADHD analysis's one-line summary, when one exists. Used as the title
+   *  when Omi returned none. Passed in rather than read per row so the list
+   *  keeps no storage access in its render path. */
+  gist?: string;
   onToggleSelect: (id: string) => void;
 }) {
   const hasLocation = convo.geolocation?.latitude != null && convo.geolocation?.longitude != null;
@@ -275,8 +320,9 @@ const ConversationRow = memo(function ConversationRow({
           <LensBadges thesis={isAnalyzed} adhd={isAdhd} />
           <div className="flex-1 min-w-0">
             <h2 className="font-semibold text-white truncate">
-              {convo.structured?.title || "Untitled"}
+              {conversationTitle(convo, gist)}
             </h2>
+            <LensState thesis={isAnalyzed} adhd={isAdhd} />
             {convo.structured?.overview && (
               <p className="text-slate-400 font-serif italic text-sm mt-1 line-clamp-1">{convo.structured.overview}</p>
             )}
@@ -285,16 +331,7 @@ const ConversationRow = memo(function ConversationRow({
               {convo.structured?.category && (
                 <span className="bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap max-w-[16ch] truncate" title={convo.structured.category}>{convo.structured.category}</span>
               )}
-              {/* Only drawn when a location exists. It used to render either
-                  way — the absent state at ~1.3:1 (invisible) while still
-                  announcing "No location attached" on every row. Absence is
-                  now just the absence of the mark. */}
-              {hasLocation && (
-                <span title="Location attached">
-                  <span className="sr-only">Location attached</span>
-                  <MapPinIcon aria-hidden="true" className="w-3.5 h-3.5 flex-shrink-0 text-cyan-300" />
-                </span>
-              )}
+              <LocationMark hasLocation={hasLocation} />
             </div>
           </div>
         </div>
@@ -305,7 +342,11 @@ const ConversationRow = memo(function ConversationRow({
   return (
     <Link
       href={`/conversation/${convo.id}`}
-      aria-label={`${convo.structured?.title || "Untitled conversation"}${isAnalyzedEither ? " (analyzed)" : ""}`}
+      /* Identity before status. This previously began with the lens state, so
+         a screen reader announced "Thesis not analyzed, ADHD Aid analyzed"
+         before saying which conversation it was — twenty-seven times down a
+         day's list. */
+      aria-label={`${conversationTitle(convo, gist)}${isAnalyzedEither ? " (analyzed)" : ""}`}
       className={`card p-5 block transition-colors min-h-[44px] border-l-2 ${
         isAnalyzedEither
           ? "border-l-emerald-500/40 hover:border-emerald-500/50"
@@ -316,8 +357,9 @@ const ConversationRow = memo(function ConversationRow({
         <LensBadges thesis={isAnalyzed} adhd={isAdhd} />
         <div className="flex-1 min-w-0">
           <h2 className="font-semibold text-white truncate">
-            {convo.structured?.title || "Untitled"}
+            {conversationTitle(convo, gist)}
           </h2>
+          <LensState thesis={isAnalyzed} adhd={isAdhd} />
           {convo.structured?.overview && (
             <p className="text-slate-400 font-serif italic text-sm mt-1 line-clamp-2">{convo.structured.overview}</p>
           )}
@@ -332,13 +374,7 @@ const ConversationRow = memo(function ConversationRow({
                 {convo.folder_name}
               </span>
             )}
-            <span title={hasLocation ? "Location attached" : "No location attached"}>
-              <span className="sr-only">{hasLocation ? "Location attached" : "No location attached"}</span>
-              <MapPinIcon
-                aria-hidden="true"
-                className={`w-3.5 h-3.5 flex-shrink-0 ${hasLocation ? "text-cyan-300" : "text-slate-700"}`}
-              />
-            </span>
+            <LocationMark hasLocation={hasLocation} />
           </div>
         </div>
         <svg className="w-5 h-5 text-slate-600 mt-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -365,6 +401,10 @@ function HomeInner() {
   // detail view), so this page has to re-read it when it regains focus.
   const [analyzedIds, setAnalyzedIds] = useState<Set<string>>(() => getAnalyzedIds());
   const [adhdIds, setAdhdIds] = useState<Set<string>>(() => getAdhdAnalyzedIds());
+  /* Built once per change, not per row: the list must keep no storage access
+     in its render path. Supplies a human title for the conversations Omi
+     returned unnamed, which on a busy day is most of them. */
+  const [gists, setGists] = useState<Map<string, string>>(() => getAdhdSummaries());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastSynced, setLastSynced] = useState<string | null>(null);
@@ -494,6 +534,7 @@ function HomeInner() {
       if (document.visibilityState !== "visible") return;
       setAnalyzedIds(getAnalyzedIds());
       setAdhdIds(getAdhdAnalyzedIds());
+      setGists(getAdhdSummaries());
     };
     // Merge in anything analyzed on the user's other device before the first
     // resync, so badges reflect the full picture rather than this device's
@@ -675,6 +716,7 @@ function HomeInner() {
     }
     setBatchFailures(failures);
     setAdhdIds(getAdhdAnalyzedIds());
+    setGists(getAdhdSummaries());
     setBatchRunning(false);
   }, [titleOf]);
 
@@ -1230,6 +1272,7 @@ function HomeInner() {
                       isAnalyzed={analyzedIds.has(convo.id)}
                       isAnalyzedEither={isAnalyzedEither(convo.id)}
                       isAdhd={adhdIds.has(convo.id)}
+                      gist={gists.get(convo.id)}
                       onToggleSelect={toggleSelect}
                     />
                   ))}
@@ -1245,6 +1288,7 @@ function HomeInner() {
                 isAnalyzed={analyzedIds.has(convo.id)}
                 isAnalyzedEither={isAnalyzedEither(convo.id)}
                 isAdhd={adhdIds.has(convo.id)}
+                gist={gists.get(convo.id)}
                 onToggleSelect={toggleSelect}
               />
             ))}

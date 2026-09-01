@@ -1,7 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import LocationPicker from "@/components/LocationPicker";
+import dynamic from "next/dynamic";
+// Same treatment as MeetingMap: `leaflet/dist/leaflet.css` is imported at this
+// component's module scope, so a static import pulls the stylesheet into the
+// route bundle whether or not a picker is ever opened.
+const LocationPicker = dynamic(() => import("@/components/LocationPicker"), { ssr: false });
 import { getPlaces, createPlace, type Place } from "@/lib/places";
 import {
   getMeetingLocation, saveMeetingLocation, clearMeetingLocation,

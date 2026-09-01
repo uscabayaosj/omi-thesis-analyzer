@@ -21,8 +21,15 @@ interface RelationshipGraphProps {
   onOpenPlace: (placeId: string) => void;
 }
 
-const W = 600;
-const H = 460;
+/* Sized so the graph stays legible on a phone, the same reasoning EgoWeb
+   already carries. A `viewBox` scales its contents with the container, so a
+   600-unit box inside a ~272px card on a 320px screen renders at 0.45: the
+   9px labels became ~4px and the r=28 hit circles ~25px, and no CSS floor can
+   reach them because `min-width`/`min-height` do nothing to SVG elements.
+   Halving the box roughly doubles the effective scale; the layout is computed
+   from W/H so the arrangement is unchanged, only its density. */
+const W = 340;
+const H = 260;
 
 // Node ids from two different records (Person, Place) can collide by raw id,
 // so every id in the layout/position maps is namespaced by kind — these are
@@ -174,7 +181,7 @@ export default function RelationshipGraph({ people, onOpen, onOpenPlace }: Relat
       </div>
 
       <div className="card p-2 overflow-hidden">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full block" style={{ touchAction: "pan-y" }}
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-md mx-auto block" style={{ touchAction: "pan-y" }}
           role="group" aria-label={showPlaces ? "Relationship and place network" : "Relationship network"}>
           {edges.map((e) => {
             const pa = pos.get(e.a)!; const pb = pos.get(e.b)!;
@@ -201,10 +208,10 @@ export default function RelationshipGraph({ people, onOpen, onOpenPlace }: Relat
                 }}
                 tabIndex={0}
                 role="button" aria-label={isSel ? `Open ${nameOf(pid)}` : `Highlight ${nameOf(pid)}`}>
-                <circle cx={p.x} cy={p.y} r={28} fill="transparent" />
-                <circle cx={p.x} cy={p.y} r={18} fill={isSel ? "#b96d33" : "#262019"} stroke="#7a6b58" />
+                <circle cx={p.x} cy={p.y} r={20} fill="transparent" />
+                <circle cx={p.x} cy={p.y} r={13} fill={isSel ? "#b96d33" : "#262019"} stroke="#7a6b58" />
                 <text x={p.x} y={p.y + 3} textAnchor="middle" fontSize={9}
-                  fill={isSel ? "#14100d" : "#dcd2bf"}>{nameOf(pid).split(" ")[0].slice(0, 8)}</text>
+                  fill={isSel ? "#14100d" : "#dcd2bf"}><title>{nameOf(pid)}</title>{nameOf(pid).split(" ")[0].slice(0, 8)}</text>
               </g>
             );
           })}
@@ -229,10 +236,10 @@ export default function RelationshipGraph({ people, onOpen, onOpenPlace }: Relat
                 }}
                 tabIndex={0}
                 role="button" aria-label={isSel ? `Open ${placeNameOf(plid)}` : `Highlight ${placeNameOf(plid)}`}>
-                <circle cx={p.x} cy={p.y} r={26} fill="transparent" />
+                <circle cx={p.x} cy={p.y} r={19} fill="transparent" />
                 <polygon points={points} fill={isSel ? "#b96d33" : "#221c17"} stroke="#7a6b58" />
                 <text x={p.x} y={p.y + 3} textAnchor="middle" fontSize={9}
-                  fill={isSel ? "#14100d" : "#c6b9a5"}>{placeNameOf(plid).split(" ")[0].slice(0, 8)}</text>
+                  fill={isSel ? "#14100d" : "#c6b9a5"}><title>{placeNameOf(plid)}</title>{placeNameOf(plid).split(" ")[0].slice(0, 8)}</text>
               </g>
             );
           })}
