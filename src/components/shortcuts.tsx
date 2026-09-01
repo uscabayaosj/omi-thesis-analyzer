@@ -55,6 +55,20 @@ export default function GlobalShortcuts() {
         return;
       }
 
+      /* Nothing below this line may fire while the overlay is open. A modal
+         that declares `aria-modal="true"` owes the rest of the page silence,
+         and this guard previously sat inside the Escape branch only — so `g p`
+         with the panel open navigated the route underneath and left the dialog
+         mounted over it. `?` is handled after this so the overlay can still
+         toggle itself closed. */
+      if (showHelp) {
+        if (e.key === "?") {
+          e.preventDefault();
+          setShowHelp(false);
+        }
+        return;
+      }
+
       if (isTypingTarget(e.target)) return;
 
       if (pendingG) {

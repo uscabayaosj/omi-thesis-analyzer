@@ -231,6 +231,10 @@ export default function ConversationPage() {
      load. Only relevant when both lenses have results; a conversation with
      just one is always shown on that one. */
   const lensAppliedFor = useRef<string | null>(null);
+  /* A 404 from Omi is a different situation from an unreachable Omi, and the
+     two need different copy and different affordances. `api-error.ts` already
+     distinguishes them in the message it produces. */
+  const isGone = !!error && /no longer exists on Omi/i.test(error);
   const rovingLens = useRovingRadioGroup(LENS_VALUES, lens, setLens);
   const [adhd, setAdhd] = useState<AdhdAnalysis | null>(null);
   const [adhdDoneKeys, setAdhdDoneKeys] = useState<string[]>([]);
@@ -580,6 +584,10 @@ export default function ConversationPage() {
           <span className="text-sm text-slate-400" aria-live="polite">
             {refreshing ? "Refreshing…" : lastSynced ? `Synced ${getAnalysisAge(lastSynced).label}` : ""}
           </span>
+          {/* Both of these need the conversation to still exist on Omi. Leaving
+              them enabled on a 404 offers the user two actions that cannot
+              succeed, which is worse than offering none. */}
+          {!isGone && (
           <button
             onClick={() => loadConversation("refresh")}
             disabled={loading || refreshing}
@@ -589,7 +597,8 @@ export default function ConversationPage() {
             <RefreshIcon className={`w-4 h-4 flex-shrink-0 ${refreshing ? "animate-spin" : ""}`} />
             {refreshing ? "Refreshing…" : "Refresh"}
           </button>
-          {scanState === "done" ? (
+          )}
+          {isGone ? null : scanState === "done" ? (
             <Link
               href="/people"
               className="text-sm min-h-[44px] px-3 py-2 rounded-lg text-cyan-300 hover:text-cyan-200 hover:bg-slate-800 transition-colors flex items-center"
@@ -696,10 +705,18 @@ export default function ConversationPage() {
           <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
             Unavailable
           </p>
-          <h1 className="font-bold text-white mb-2">Conversation unavailable</h1>
+          {/* The body used to assert "Omi couldn't be reached" regardless of
+              why. When the cause is a 404 the banner above simultaneously says
+              the conversation was deleted — two different diagnoses on one
+              screen — and Refresh is offered for something no amount of
+              retrying will fix. The copy follows the actual cause now. */}
+          <h1 className="font-bold text-white mb-2">
+            {isGone ? "Conversation deleted" : "Conversation unavailable"}
+          </h1>
           <p className="text-slate-400 font-serif italic text-[0.95rem]">
-            This conversation isn&apos;t cached on this device and Omi couldn&apos;t be reached. Try
-            Refresh above, or go back to the list.
+            {isGone
+              ? "Omi no longer has this conversation, so there's nothing left to fetch. Any analysis you already saved for it would appear here — there isn't one."
+              : "This conversation isn't cached on this device and Omi couldn't be reached. Try Refresh above, or go back to the list."}
           </p>
         </header>
       )}

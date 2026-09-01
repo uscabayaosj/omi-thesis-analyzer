@@ -375,17 +375,10 @@ function HomeInner() {
   // mismatch that React's hydration flags as an error. Starting from `null`
   // renders identical (empty) markup on the server and the first client
   // pass, then fills in once mounted.
-  const [todayDateline, setTodayDateline] = useState<string | null>(null);
+  const [mountedDateline, setMountedDateline] = useState(false);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- deliberate: renders identical markup on the server and the first client pass, then fills in once mounted
-    setTodayDateline(
-      new Date().toLocaleDateString("en-GB", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      })
-    );
+    setMountedDateline(true);
   }, []);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -416,6 +409,19 @@ function HomeInner() {
   const [selectedDate, setSelectedDate] = useState(() =>
     dayParam && /^\d{4}-\d{2}-\d{2}$/.test(dayParam) ? dayParam : todayStr
   );
+  /* Follows the day being browsed, not the wall clock. It previously always
+     printed today, so opening ?day=2026-08-30 showed a running head reading
+     "TUESDAY, 1 SEPTEMBER 2026" above a list of Sunday's conversations — the
+     masthead contradicting the page under it. /rollup was fixed for this and
+     the hub was left behind. */
+  const todayDateline = useMemo(() => {
+    if (!mountedDateline) return null;
+    const d = /^\d{4}-\d{2}-\d{2}$/.test(selectedDate) ? new Date(`${selectedDate}T12:00:00`) : new Date();
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toLocaleDateString("en-GB", {
+      weekday: "long", day: "numeric", month: "long", year: "numeric",
+    });
+  }, [mountedDateline, selectedDate]);
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const d = dayParam && /^\d{4}-\d{2}-\d{2}$/.test(dayParam) ? new Date(dayParam) : new Date();
     return { year: d.getFullYear(), month: d.getMonth() };

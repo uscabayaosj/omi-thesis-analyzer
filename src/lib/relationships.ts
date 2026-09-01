@@ -168,6 +168,21 @@ export function deleteRelationship(id: string): boolean {
 /** Delete every edge touching a person. Best-effort (called after the person
  *  is already gone); a failed write leaves orphan edges that read-time filters
  *  in the UI skip anyway. */
+/**
+ * Put a removed relationship back.
+ *
+ * Restamped, not replayed verbatim: `deleteRelationship` leaves a tombstone
+ * stamped *now* and pushes it, so writing the original record back with its
+ * original timestamp would lose the next merge to that tombstone and the undo
+ * would silently revert — the same failure that made ticked promises reappear
+ * unchecked. `timestamp` here is an internal merge clock and is never shown.
+ */
+export function restoreRelationship(rel: Relationship): boolean {
+  const map = pruneTombstones(readMap());
+  map[rel.id] = { ...rel, timestamp: new Date().toISOString() };
+  return writeMap(map);
+}
+
 export function onPersonDeleted(personId: string): void {
   const map = pruneTombstones(readMap());
   let changed = false;

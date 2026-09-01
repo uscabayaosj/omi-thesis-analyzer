@@ -27,7 +27,7 @@ import RelationshipEditor from "@/components/RelationshipEditor";
 import EgoWeb from "@/components/EgoWeb";
 import {
   getRelationshipsFor, deleteRelationship, otherId, roleFor,
-  RELATIONSHIP_TYPES, RELATIONSHIP_LABEL, type Relationship,
+  RELATIONSHIP_TYPES, RELATIONSHIP_LABEL, restoreRelationship, type Relationship,
 } from "@/lib/relationships";
 import { getPlaces } from "@/lib/places";
 import { groupMeetingsByPlace, effectiveMeetingLocation, shortPlaceLabel } from "@/lib/place-resolve";
@@ -755,7 +755,20 @@ export default function PersonDetailPage() {
 
         {editingRel && (
           <button
-            onClick={() => { if (deleteRelationship(editingRel.id)) { setEditingRel(null); refreshRels(); } }}
+            onClick={() => {
+              // The only destructive action in the app that had neither a
+              // confirm nor a way back. Made reversible rather than guarded,
+              // matching how fact and alias deletion work.
+              const removed = editingRel;
+              if (deleteRelationship(removed.id)) {
+                setEditingRel(null);
+                refreshRels();
+                offerUndo("Relationship removed.", () => {
+                  restoreRelationship(removed);
+                  refreshRels();
+                });
+              }
+            }}
             className="text-sm text-red-400 hover:text-red-300 mt-2 min-h-[44px] px-2"
           >
             Remove this relationship

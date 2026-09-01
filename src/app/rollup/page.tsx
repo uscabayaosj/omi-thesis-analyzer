@@ -29,7 +29,9 @@ import { BUTTON_PRIMARY, BUTTON_GHOST, LINK_BACK, BUTTON_SECONDARY } from "@/lib
 interface ConvoLite {
   id: string;
   created_at: string;
-  structured?: { title?: string };
+  // `category` is carried so the coverage list has something to show when Omi
+  // returns an empty title, which it does for most recordings.
+  structured?: { title?: string; category?: string };
 }
 
 // Local hour, not UTC — matches how every other timestamp in this app renders.
@@ -666,7 +668,24 @@ function RollupPageInner() {
                       const analyzed = !!getAdhdAnalysis(c.id);
                       return (
                         <div key={c.id} role="listitem" className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-slate-900/60">
-                          <span className="font-serif text-sm text-slate-300 truncate min-w-0">{c.structured?.title || "Untitled"}</span>
+                          {/* Omi returns an empty `structured.title` for most
+                              recordings, so this rendered as a column of
+                              identical "Untitled" rows — twenty-seven of them
+                              on a busy day, none distinguishable from any
+                              other. The conversation list already solves this
+                              with the time and category; falling back to the
+                              same discriminators here makes the coverage list
+                              readable instead of decorative. */}
+                          <span className="font-serif text-sm text-slate-300 truncate min-w-0">
+                            {c.structured?.title?.trim() || (
+                              <>
+                                <span className="font-mono text-slate-400">
+                                  {formatDateTime(c.created_at, { hour: "2-digit", minute: "2-digit" })}
+                                </span>
+                                {c.structured?.category ? ` · ${c.structured.category}` : " · untitled"}
+                              </>
+                            )}
+                          </span>
                           {analyzed ? (
                             <span className="font-mono text-xs bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 px-2 py-0.5 rounded-full flex-shrink-0">analyzed</span>
                           ) : (
