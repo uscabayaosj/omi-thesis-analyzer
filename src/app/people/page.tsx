@@ -23,6 +23,7 @@ import {
 } from "@/lib/people";
 import { runExtraction } from "@/lib/people-pipeline";
 import { useUndoOffer } from "@/components/UndoProvider";
+import { usePersistedPreference } from "@/lib/use-persisted-preference";
 import { getAnalyzedIds, getAnalysisAge } from "@/lib/storage";
 import { getAdhdAnalyzedIds } from "@/lib/adhd-storage";
 import { pullAndMerge } from "@/lib/sync";
@@ -113,13 +114,19 @@ function groupByLetter(people: Person[]): { letter: string; people: Person[] }[]
 
 type ViewMode = "grid" | "web" | "map" | "places";
 
+const VIEW_MODES: ViewMode[] = ["grid", "web", "map", "places"];
+const isViewMode = (v: string): v is ViewMode => (VIEW_MODES as string[]).includes(v);
+
 export default function PeoplePage() {
   const router = useRouter();
   const [people, setPeople] = useState<Person[]>([]);
   const [pending, setPending] = useState<PendingSuggestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [view, setView] = useState<ViewMode>("grid");
+  // Remembered per device: on a directory you open several times a day,
+  // resetting to the grid every visit means re-selecting the map or the web
+  // each time you come back to the thing you were already looking at.
+  const [view, setView] = usePersistedPreference<ViewMode>("omi-people-view", "grid", isViewMode);
   const [places, setPlaces] = useState<Place[]>([]);
   const [addingPlace, setAddingPlace] = useState(false);
   const [prefill, setPrefill] = useState<{ lat: number; lng: number; raw?: string } | null>(null);

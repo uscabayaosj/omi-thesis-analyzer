@@ -45,6 +45,7 @@ import { BUTTON_PRIMARY, BUTTON_GHOST, BUTTON_SECONDARY } from "@/lib/ui";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { pullAndMerge } from "@/lib/sync";
 import { useRovingRadioGroup } from "@/lib/roving";
+import { usePersistedPreference } from "@/lib/use-persisted-preference";
 import { runExtraction, suggestFromAdhdPeople } from "@/lib/people-pipeline";
 import dynamic from "next/dynamic";
 import { type MapMarker } from "@/components/MeetingMap";
@@ -59,6 +60,9 @@ import { getMeetingLocation } from "@/lib/meeting-location";
 import { getPlace } from "@/lib/places";
 
 const LENS_VALUES = ["thesis", "adhd", "both"] as const;
+type Lens = (typeof LENS_VALUES)[number];
+
+const isLens = (v: string): v is Lens => (LENS_VALUES as readonly string[]).includes(v);
 
 function fmtElapsed(sec: number): string {
   const m = Math.floor(sec / 60);
@@ -213,8 +217,20 @@ export default function ConversationPage() {
     setScanState("error" in res ? "error" : "done");
   }, [id]);
 
-  type Lens = "thesis" | "adhd" | "both";
+  /* The lens you last chose, remembered per device. This never overrides the
+     "only one lens has results" case below — showing the thesis tab on a
+     conversation that only has an ADHD analysis would be worse than any
+     preference. It only settles the case where both are available, which
+     previously always resolved to thesis and cost a tap on every visit. */
+  const [lensPref, setLensPref] = usePersistedPreference<Lens>("omi-lens", "thesis", isLens);
   const [lens, setLens] = useState<Lens>("thesis");
+  /* Applied separately from the load effect above, and once per conversation.
+     The stored preference is read after mount (reading it during render would
+     break hydration), so the load effect's first run still sees the fallback —
+     applying it there would silently ignore the preference on every first
+     load. Only relevant when both lenses have results; a conversation with
+     just one is always shown on that one. */
+  const lensAppliedFor = useRef<string | null>(null);
   const rovingLens = useRovingRadioGroup(LENS_VALUES, lens, setLens);
   const [adhd, setAdhd] = useState<AdhdAnalysis | null>(null);
   const [adhdDoneKeys, setAdhdDoneKeys] = useState<string[]>([]);
@@ -298,10 +314,12 @@ export default function ConversationPage() {
       // Kept so the degraded view has a real title when the shell can't load.
       setAdhdTitle(storedAdhd.title);
     }
-    // Default lens: the single lens that has results; else thesis.
+    // Default lens: the single lens that has results wins outright; when both
+    // are present (or neither), fall back to the remembered preference.
     const hasThesis = !!stored;
     const hasAdhd = !!storedAdhd;
     if (hasAdhd && !hasThesis) setLens("adhd");
+    else if (hasThesis && !hasAdhd) setLens("thesis");
     else setLens("thesis");
     }
   }, [id]);
@@ -350,6 +368,13 @@ export default function ConversationPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadConversation("initial");
   }, [loadConversation]);
+
+  useEffect(() => {
+    if (!analysis || !adhd) return;
+    if (lensAppliedFor.current === id) return;
+    lensAppliedFor.current = id;
+    setLens(lensPref);
+  }, [analysis, adhd, lensPref, id]);
 
   useEffect(() => {
     if (startedAt === null) return;
@@ -782,6 +807,7 @@ export default function ConversationPage() {
                   if (analysis) setThesisSeen(analysis);
                   if (adhd) setAdhdSeen(adhd);
                   setLens(l);
+                  setLensPref(l);
                 }}
                 {...rovingLens(l)}
                 className={`px-4 py-2 min-h-[44px] rounded-md text-sm transition-colors ${

@@ -7,6 +7,7 @@ import type { UsageSummary, UsagePeriodSummary, UsageBreakdownRow, UsageTimezone
 import { USAGE_TIMEZONES, DEFAULT_USAGE_TIMEZONE, isUsageTimezoneKey } from "@/lib/usage";
 import { ArrowLeftIcon } from "@/components/icons";
 import { LINK_BACK } from "@/lib/ui";
+import { usePersistedPreference } from "@/lib/use-persisted-preference";
 
 const USAGE_TZ_STORAGE_KEY = "omi-usage-tz";
 
@@ -58,19 +59,14 @@ function BreakdownTable({ title, rows }: { title: string; rows: UsageBreakdownRo
 export default function UsagePage() {
   const [summary, setSummary] = useState<UsageSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Same shape as the hydration bug fixed on /rollup/week: reading
-  // localStorage in the initializer made the client's first render disagree
-  // with the server's. It never threw here only because the divergence landed
-  // on a <select> value, which React does not hydration-check as text — so the
-  // page silently rendered the default while already fetching the stored
-  // timezone. Restore the preference after mount instead.
-  const [tz, setTz] = useState<UsageTimezoneKey>(DEFAULT_USAGE_TIMEZONE);
-
-  useEffect(() => {
-    const stored = window.localStorage.getItem(USAGE_TZ_STORAGE_KEY);
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration-safe mount flag: it exists to hold the first client render to the server's output before any localStorage-derived value is read
-    if (isUsageTimezoneKey(stored)) setTz(stored);
-  }, []);
+  // Uses the shared preference hook, which owns the hydration-safe read: this
+  // route previously hand-rolled it, and an earlier version read localStorage
+  // in the initializer and diverged from the server's render.
+  const [tz, setTz] = usePersistedPreference<UsageTimezoneKey>(
+    USAGE_TZ_STORAGE_KEY,
+    DEFAULT_USAGE_TIMEZONE,
+    isUsageTimezoneKey
+  );
 
   useEffect(() => {
     fetchJson<UsageSummary>(`/api/usage?tz=${tz}`)
@@ -80,7 +76,6 @@ export default function UsagePage() {
 
   function handleTzChange(next: UsageTimezoneKey) {
     setTz(next);
-    window.localStorage.setItem(USAGE_TZ_STORAGE_KEY, next);
   }
 
   return (
