@@ -180,7 +180,16 @@ export default function RelationshipGraph({ people, onOpen, onOpenPlace }: Relat
         </button>
       </div>
 
+      {/* Labels are HTML, not SVG <text>.
+          Text inside a viewBox scales with the box, so on a phone the node
+          names rendered around 4px and no font-size or CSS floor could reach
+          them — and they ignored the reader's own text-size setting entirely.
+          Positioning them as absolutely-placed HTML over the SVG lets them use
+          real CSS pixels that respect user zoom, while the SVG keeps the
+          geometry. The overlay is aria-hidden and pointer-events-none: each
+          node's accessible name and hit target already live on its <g>. */}
       <div className="card p-2 overflow-hidden">
+        <div className="relative w-full max-w-md mx-auto">
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-md mx-auto block" style={{ touchAction: "pan-y" }}
           role="group" aria-label={showPlaces ? "Relationship and place network" : "Relationship network"}>
           {edges.map((e) => {
@@ -210,8 +219,6 @@ export default function RelationshipGraph({ people, onOpen, onOpenPlace }: Relat
                 role="button" aria-label={isSel ? `Open ${nameOf(pid)}` : `Highlight ${nameOf(pid)}`}>
                 <circle cx={p.x} cy={p.y} r={20} fill="transparent" />
                 <circle cx={p.x} cy={p.y} r={13} fill={isSel ? "#b96d33" : "#262019"} stroke="#7a6b58" />
-                <text x={p.x} y={p.y + 3} textAnchor="middle" fontSize={9}
-                  fill={isSel ? "#14100d" : "#dcd2bf"}><title>{nameOf(pid)}</title>{nameOf(pid).split(" ")[0].slice(0, 8)}</text>
               </g>
             );
           })}
@@ -238,12 +245,45 @@ export default function RelationshipGraph({ people, onOpen, onOpenPlace }: Relat
                 role="button" aria-label={isSel ? `Open ${placeNameOf(plid)}` : `Highlight ${placeNameOf(plid)}`}>
                 <circle cx={p.x} cy={p.y} r={19} fill="transparent" />
                 <polygon points={points} fill={isSel ? "#b96d33" : "#221c17"} stroke="#7a6b58" />
-                <text x={p.x} y={p.y + 3} textAnchor="middle" fontSize={9}
-                  fill={isSel ? "#14100d" : "#c6b9a5"}><title>{placeNameOf(plid)}</title>{placeNameOf(plid).split(" ")[0].slice(0, 8)}</text>
               </g>
             );
           })}
         </svg>
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+          {personIds.map((pid) => {
+            const key = personKey(pid);
+            const p = pos.get(key)!;
+            const isSel = key === selected;
+            return (
+              <span
+                key={key}
+                className={`absolute -translate-x-1/2 -translate-y-1/2 text-[11px] leading-none font-medium whitespace-nowrap ${
+                  isSel ? "text-slate-950" : "text-slate-200"
+                }`}
+                style={{ left: `${(p.x / W) * 100}%`, top: `${(p.y / H) * 100}%`, opacity: isDim(key) ? 0.35 : 1 }}
+              >
+                {nameOf(pid).split(" ")[0].slice(0, 8)}
+              </span>
+            );
+          })}
+          {[...placeIds].map((plid) => {
+            const key = placeKey(plid);
+            const p = pos.get(key)!;
+            const isSel = key === selected;
+            return (
+              <span
+                key={key}
+                className={`absolute -translate-x-1/2 -translate-y-1/2 text-[11px] leading-none font-medium whitespace-nowrap ${
+                  isSel ? "text-slate-950" : "text-slate-300"
+                }`}
+                style={{ left: `${(p.x / W) * 100}%`, top: `${(p.y / H) * 100}%`, opacity: isDim(key) ? 0.35 : 1 }}
+              >
+                {placeNameOf(plid).split(" ")[0].slice(0, 8)}
+              </span>
+            );
+          })}
+        </div>
+        </div>
       </div>
       <p className="text-xs text-slate-400 mt-2 text-center">
         {showPlaces

@@ -54,6 +54,7 @@ export type ArrayRecord = Record<string, unknown>;
 const DONE_FIELDS: { keys: string; stamp: string }[] = [
   { keys: "doneKeys", stamp: "doneKeysUpdatedAt" },
   { keys: "planDoneKeys", stamp: "planDoneUpdatedAt" },
+  { keys: "letGoKeys", stamp: "letGoUpdatedAt" },
 ];
 
 /**

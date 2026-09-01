@@ -347,6 +347,22 @@ export function removePending(id: string): void {
   writeMap(PENDING_NS, map);
 }
 
+/**
+ * Put a deleted person back.
+ *
+ * Restamped rather than replayed: `deletePerson` leaves a tombstone stamped
+ * now and pushes it, so writing the original record back with its original
+ * timestamp would lose the next merge to that tombstone and the undo would
+ * silently revert. Relationships are restored separately by the caller, since
+ * `onPersonDeleted` tombstones those too and this module must not reach into
+ * the relationship store.
+ */
+export function restorePerson(person: Person): boolean {
+  const map = pruneTombstones(readMap<unknown>(PEOPLE_NS));
+  map[person.id] = { ...person, timestamp: new Date().toISOString() };
+  return writeMap(PEOPLE_NS, map);
+}
+
 /** Put a removed suggestion back, id and all, so an undo restores the exact
  *  record rather than a lookalike with a new id. */
 export function restorePending(s: PendingSuggestion): void {

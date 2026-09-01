@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   deletePerson,
+  restorePerson,
   getPeople,
   getPerson,
   mergePeople,
@@ -364,10 +365,22 @@ export default function PersonDetailPage() {
 
   const confirmDelete = () => {
     setShowDeleteDialog(false);
+    if (!person) return;
+    /* Deleting a person destroys the most data of any action in the app — the
+       record plus its facts, meetings, aliases, and every relationship
+       touching them — and was the only destructive action with a confirm and
+       no way back. Both halves are snapshotted here, and the offer survives
+       the redirect below because UndoProvider lives in the layout. */
+    const personSnapshot = person;
+    const relSnapshot = getRelationshipsFor(id);
     if (!deletePerson(id)) {
       setSaveError("Couldn’t delete — the change didn’t save. Try again.");
       return;
     }
+    offerUndo(`Deleted ${personSnapshot.name}.`, () => {
+      restorePerson(personSnapshot);
+      for (const rel of relSnapshot) restoreRelationship(rel);
+    });
     router.push("/people");
   };
 

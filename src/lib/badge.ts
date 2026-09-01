@@ -14,8 +14,12 @@ export function notifyAnalysesChanged(): void {
 
 function countUnacknowledged(analyses: StoredAdhdAnalysis[]): number {
   return analyses.reduce((sum, a) => {
-    const done = new Set(a.doneKeys ?? []);
-    return sum + a.analysis.commitments.filter((c) => !done.has(c.key)).length;
+    // A retired promise is resolved, just not by doing it. Counting it would
+    // make the badge a tally of everything ever extracted rather than of what
+    // is actually outstanding — which is how it reached 58 and stopped meaning
+    // anything.
+    const resolved = new Set([...(a.doneKeys ?? []), ...(a.letGoKeys ?? [])]);
+    return sum + a.analysis.commitments.filter((c) => !resolved.has(c.key)).length;
   }, 0);
 }
 

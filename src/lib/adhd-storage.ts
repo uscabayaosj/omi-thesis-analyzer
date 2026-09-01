@@ -18,6 +18,17 @@ export interface StoredAdhdAnalysis {
    *  restamp `timestamp` (that means "when this analysis was produced") and
    *  without it a tick had no way to win a cross-device merge. */
   doneKeysUpdatedAt?: string;
+  /** Commitment keys the user has explicitly retired without doing them.
+   *
+   *  A promise could previously only be *done*. That made the ledger dishonest:
+   *  an extraction error, a promise that was never the user's, or one overtaken
+   *  by events could only be cleared by claiming it was completed. Retiring is
+   *  its own act, recorded as its own act — which is also what the third
+   *  product principle requires, since the alternative was laundering it
+   *  through "done" and losing the distinction forever. */
+  letGoKeys?: string[];
+  /** When `letGoKeys` last changed — same clock reasoning as `doneKeysUpdatedAt`. */
+  letGoUpdatedAt?: string;
 }
 
 export interface StoredRollup {
@@ -168,12 +179,42 @@ export function toggleCommitmentDone(id: string, key: string): string[] {
   if (set.has(key)) set.delete(key);
   else set.add(key);
   stored.doneKeys = Array.from(set);
+  // Done and let-go are mutually exclusive dispositions.
+  const letGo = new Set(Array.isArray(stored.letGoKeys) ? stored.letGoKeys : []);
+  if (letGo.delete(key)) {
+    stored.letGoKeys = Array.from(letGo);
+    stored.letGoUpdatedAt = new Date().toISOString();
+  }
   // Stamp the tick itself, not the analysis. Without this the merge had only
   // identical analysis timestamps to compare and resolved the tie to the
   // server, so a tick was reverted whenever the debounced push had not landed.
   stored.doneKeysUpdatedAt = new Date().toISOString();
   writeMap(ANALYSES_KEY, map);
   return stored.doneKeys;
+}
+
+/** Retire a commitment without claiming it was done. Mutually exclusive with
+ *  done: marking one clears the other, because a promise cannot be both. */
+export function toggleCommitmentLetGo(id: string, key: string): string[] {
+  const map = readMap<StoredAdhdAnalysis>(ANALYSES_KEY);
+  const stored = map[id];
+  if (!stored) return [];
+  const letGo = new Set(Array.isArray(stored.letGoKeys) ? stored.letGoKeys : []);
+  const now = new Date().toISOString();
+  if (letGo.has(key)) {
+    letGo.delete(key);
+  } else {
+    letGo.add(key);
+    const done = new Set(Array.isArray(stored.doneKeys) ? stored.doneKeys : []);
+    if (done.delete(key)) {
+      stored.doneKeys = Array.from(done);
+      stored.doneKeysUpdatedAt = now;
+    }
+  }
+  stored.letGoKeys = Array.from(letGo);
+  stored.letGoUpdatedAt = now;
+  writeMap(ANALYSES_KEY, map);
+  return stored.letGoKeys;
 }
 
 export function togglePlanStepDone(day: string, key: string): string[] {

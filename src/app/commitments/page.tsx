@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getAllCommitments, groupByPerson, type OpenCommitment } from "@/lib/commitments";
-import { toggleCommitmentDone, getAllAdhdAnalyses } from "@/lib/adhd-storage";
+import { toggleCommitmentDone, toggleCommitmentLetGo, getAllAdhdAnalyses } from "@/lib/adhd-storage";
 import { notifyAnalysesChanged, syncAppBadge } from "@/lib/badge";
 import { confidenceLabel } from "@/lib/adhd";
 import { Inline } from "@/components/Prose";
@@ -95,6 +95,13 @@ export default function CommitmentsPage() {
   const [showDone, setShowDone] = useState(false);
   const [age, setAge] = useState<AgeFilter>("all");
   const [dir, setDir] = useState<DirFilter>("all");
+  /* Fifty promises across thirty-seven person groups arrived as one 13,000px
+     wall on the screen you open when you are already behind. Filters alone did
+     not help, because the honest default is "show me everything I owe" — so
+     the list is capped instead of filtered. Nothing is hidden silently: the
+     remainder is stated and one tap away, which keeps the third principle
+     intact while making the first screen usable. */
+  const [showAll, setShowAll] = useState(false);
   // Held to the server's view on the first render — this reads localStorage,
   // which the server cannot see (same hydration trap fixed on /rollup/week).
   const [mounted, setMounted] = useState(false);
@@ -111,6 +118,21 @@ export default function CommitmentsPage() {
       if (changed) reload(showDone);
     });
   }, [reload, showDone]);
+
+  const letGo = useCallback((it: OpenCommitment) => {
+    toggleCommitmentLetGo(it.conversationId, it.key);
+    notifyAnalysesChanged();
+    syncAppBadge(getAllAdhdAnalyses());
+    // Kept on screen for the session, like a tick, so the list does not reflow
+    // out from under the thumb mid-tap.
+    setItems((prev) =>
+      prev.map((p) =>
+        p.key === it.key && p.conversationId === it.conversationId
+          ? { ...p, letGo: !p.letGo, done: false }
+          : p
+      )
+    );
+  }, []);
 
   const toggle = useCallback((it: OpenCommitment) => {
     toggleCommitmentDone(it.conversationId, it.key);
@@ -137,9 +159,13 @@ export default function CommitmentsPage() {
     return true;
   }), [items, age, dir]);
 
-  const groups = useMemo(() => groupByPerson(filtered), [filtered]);
-  const openCount = filtered.filter((i) => !i.done).length;
-  const doneCount = filtered.length - openCount;
+  const allGroups = useMemo(() => groupByPerson(filtered), [filtered]);
+  const GROUP_CAP = 8;
+  const groups = showAll ? allGroups : allGroups.slice(0, GROUP_CAP);
+  const cappedAway = allGroups.length - groups.length;
+  const openCount = filtered.filter((i) => !i.done && !i.letGo).length;
+  const doneCount = filtered.filter((i) => i.done).length;
+  const letGoCount = filtered.filter((i) => i.letGo).length;
   const hiddenByFilter = items.length - filtered.length;
 
   return (
@@ -172,14 +198,15 @@ export default function CommitmentsPage() {
           <div className="card p-4 mb-4 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-slate-200">
               <strong className="font-semibold">{openCount}</strong> open
-              {doneCount > 0 && <span className="text-slate-400"> · {doneCount} closed</span>}
+              {doneCount > 0 && <span className="text-slate-400"> · {doneCount} done</span>}
+              {letGoCount > 0 && <span className="text-slate-400"> · {letGoCount} let go</span>}
             </p>
             <button
               onClick={() => setShowDone((v) => !v)}
               aria-pressed={showDone}
               className="bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm px-3 py-2 min-h-[44px] rounded-lg transition-colors"
             >
-              {showDone ? "Hide closed" : "Show closed"}
+              {showDone ? "Hide resolved" : "Show resolved"}
             </button>
           </div>
 
@@ -205,6 +232,12 @@ export default function CommitmentsPage() {
             </div>
           )}
 
+          {cappedAway > 0 && (
+            <p className="text-xs text-slate-400 font-mono mb-3" role="status">
+              Showing the {GROUP_CAP} people who have waited longest.
+            </p>
+          )}
+
           <div className="space-y-6">
             {groups.map((g) => (
               <section key={g.who}>
@@ -228,13 +261,18 @@ export default function CommitmentsPage() {
                             ? <CheckSquareIcon className="w-5 h-5 text-emerald-400" />
                             : <SquareIcon className="w-5 h-5" />}
                         </button>
-                        <div className={`min-w-0 flex-1 ${it.done ? "line-through decoration-slate-500" : ""}`}>
+                        <div className={`min-w-0 flex-1 ${it.done || it.letGo ? "line-through decoration-slate-500" : ""}`}>
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="text-xs font-mono text-slate-400">{dir}</span>
                             <span className="text-xs px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-300">
                               {confidenceLabel(it.commitment.confidence)}
                             </span>
-                            {band && (
+                            {it.letGo && (
+                              <span className="text-xs px-1.5 py-0.5 rounded-full border border-slate-600 bg-slate-800 text-slate-300">
+                                let go
+                              </span>
+                            )}
+                            {band && !it.letGo && (
                               <span className={`text-xs px-1.5 py-0.5 rounded-full border ${band.tone}`}>
                                 {band.label}
                               </span>
@@ -255,12 +293,29 @@ export default function CommitmentsPage() {
                               </strong>
                             </p>
                           )}
-                          <Link
-                            href={`/conversation/${it.conversationId}`}
-                            className="text-xs text-cyan-400 hover:underline mt-1 inline-block"
-                          >
-                            {it.conversationTitle} · {it.date}
-                          </Link>
+                          <div className="flex flex-wrap items-center gap-3 mt-1">
+                            <Link
+                              href={`/conversation/${it.conversationId}`}
+                              className="text-xs text-cyan-400 hover:underline"
+                            >
+                              {it.conversationTitle} · {it.date}
+                            </Link>
+                            {/* The honest exit. Without it the only way to
+                                clear a promise that was misextracted, was never
+                                the user's, or has been overtaken by events was
+                                to claim it had been done. */}
+                            <button
+                              onClick={() => letGo(it)}
+                              aria-pressed={it.letGo}
+                              className={`text-xs min-h-[44px] px-2 rounded-lg transition-colors ${
+                                it.letGo
+                                  ? "text-slate-300 hover:text-white"
+                                  : "text-slate-400 hover:text-slate-200"
+                              }`}
+                            >
+                              {it.letGo ? "Bring back" : "Let go"}
+                            </button>
+                          </div>
                         </div>
                       </li>
                     );
@@ -269,6 +324,23 @@ export default function CommitmentsPage() {
               </section>
             ))}
           </div>
+
+          {cappedAway > 0 && (
+            <button
+              onClick={() => setShowAll(true)}
+              className="mt-4 w-full bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm px-3 py-2 min-h-[44px] rounded-lg transition-colors"
+            >
+              Show {cappedAway} more {cappedAway === 1 ? "person" : "people"}
+            </button>
+          )}
+          {showAll && allGroups.length > GROUP_CAP && (
+            <button
+              onClick={() => setShowAll(false)}
+              className="mt-4 w-full bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm px-3 py-2 min-h-[44px] rounded-lg transition-colors"
+            >
+              Show fewer
+            </button>
+          )}
         </>
       )}
     </main>

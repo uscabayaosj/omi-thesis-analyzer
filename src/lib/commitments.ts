@@ -24,6 +24,10 @@ export interface OpenCommitment {
   ageDays: number;
   commitment: AdhdCommitment;
   done: boolean;
+  /** Retired without being done. Kept distinct from `done` so the ledger can
+   *  tell "I did this" from "this is no longer mine to do", which is the whole
+   *  reason the disposition exists. */
+  letGo: boolean;
 }
 
 function dayOf(a: StoredAdhdAnalysis): string {
@@ -51,15 +55,17 @@ function daysBetween(day: string, now: number): number {
  * band. `includeDone` keeps ticked items so the ledger can show what was
  * closed today rather than having them vanish mid-tap.
  */
-export function getAllCommitments(includeDone = false): OpenCommitment[] {
+export function getAllCommitments(includeResolved = false): OpenCommitment[] {
   const now = Date.now();
   const out: OpenCommitment[] = [];
   for (const a of getAllAdhdAnalyses()) {
     const done = new Set(a.doneKeys ?? []);
+    const letGo = new Set(a.letGoKeys ?? []);
     const date = dayOf(a);
     for (const c of a.analysis.commitments) {
       const isDone = done.has(c.key);
-      if (isDone && !includeDone) continue;
+      const isLetGo = letGo.has(c.key);
+      if ((isDone || isLetGo) && !includeResolved) continue;
       out.push({
         key: c.key,
         conversationId: a.conversationId,
@@ -68,6 +74,7 @@ export function getAllCommitments(includeDone = false): OpenCommitment[] {
         ageDays: daysBetween(date, now),
         commitment: c,
         done: isDone,
+        letGo: isLetGo,
       });
     }
   }
@@ -97,6 +104,7 @@ export function groupByPerson(items: OpenCommitment[]): { who: string; items: Op
     });
 }
 
+/** Promises still genuinely outstanding — neither done nor retired. */
 export function countOpen(): number {
   return getAllCommitments(false).length;
 }
