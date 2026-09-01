@@ -351,7 +351,12 @@ export function removePending(id: string): void {
  *  record rather than a lookalike with a new id. */
 export function restorePending(s: PendingSuggestion): void {
   const map = pruneTombstones(readMap<PendingSuggestion | Tombstone>(PENDING_NS));
-  map[s.id] = s;
+  // Restamped, not replayed verbatim: `removePending` left a tombstone with a
+  // newer timestamp and pushed it, so restoring the original record would lose
+  // the next merge to that tombstone and the undo would silently revert. This
+  // field is an internal merge clock (and the tombstone TTL input) and is never
+  // shown, so moving it forward costs nothing.
+  map[s.id] = { ...s, timestamp: new Date().toISOString() };
   writeMap(PENDING_NS, map);
 }
 

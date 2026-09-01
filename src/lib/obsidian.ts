@@ -241,7 +241,7 @@ export function buildRollupMarkdown(stored: StoredRollup): { markdown: string; f
   const markdown = `---
 title: "Daily Rollup — ${stored.day}"
 date: ${stored.day}
-analyzed: ${stored.timestamp}
+analyzed: ${stored.generatedAt ?? stored.timestamp}
 type: adhd-rollup
 source: Omi DK2
 tags:

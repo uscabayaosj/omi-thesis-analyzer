@@ -228,6 +228,16 @@ export function saveCustomAnalysis(
   }
 }
 
+/**
+ * Currently unused, and NOT safe to wire up as-is.
+ *
+ * `omi-thesis-analyses` is an array namespace, and its merge seeds from the
+ * remote list — an entry the server still has is kept even when it is absent
+ * locally. So this delete would be undone by the next merge: the analysis
+ * would reappear after a reload, the same way a ticked promise used to. Map
+ * namespaces solve this with tombstones (see `removePending`); this one would
+ * need the same before any UI calls it.
+ */
 export function deleteAnalysis(conversationId: string): void {
   const all = getAll().filter((c) => c.conversationId !== conversationId);
   saveAll(all);

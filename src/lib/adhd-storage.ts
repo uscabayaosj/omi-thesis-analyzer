@@ -14,16 +14,29 @@ export interface StoredAdhdAnalysis {
   analysis: AdhdAnalysis;
   /** Commitment keys the user has marked done. */
   doneKeys: string[];
+  /** When `doneKeys` last changed. Its own clock, because ticking must not
+   *  restamp `timestamp` (that means "when this analysis was produced") and
+   *  without it a tick had no way to win a cross-device merge. */
+  doneKeysUpdatedAt?: string;
 }
 
 export interface StoredRollup {
   day: string; // YYYY-MM-DD
+  /** Last-write clock for cross-device merge. NOT "when this was generated" —
+   *  restoring a replaced rollup rewrites this so the undo can win a merge,
+   *  which is why `generatedAt` exists separately. */
   timestamp: string;
+  /** When the rollup was actually produced. What the export reports. Optional
+   *  for records written before the two meanings were separated; readers fall
+   *  back to `timestamp`. */
+  generatedAt?: string;
   conversationIds: string[];
   rollup: Rollup;
   /** Plan-step keys the user has ticked. Keyed by content hash, so ticking
    *  survives regenerating the same day as long as the step's text is stable. */
   planDoneKeys?: string[];
+  /** When `planDoneKeys` last changed — same reasoning as `doneKeysUpdatedAt`. */
+  planDoneUpdatedAt?: string;
 }
 
 const ANALYSES_KEY = "omi-adhd-analyses";
@@ -136,6 +149,10 @@ export function toggleCommitmentDone(id: string, key: string): string[] {
   if (set.has(key)) set.delete(key);
   else set.add(key);
   stored.doneKeys = Array.from(set);
+  // Stamp the tick itself, not the analysis. Without this the merge had only
+  // identical analysis timestamps to compare and resolved the tie to the
+  // server, so a tick was reverted whenever the debounced push had not landed.
+  stored.doneKeysUpdatedAt = new Date().toISOString();
   writeMap(ANALYSES_KEY, map);
   return stored.doneKeys;
 }
@@ -148,6 +165,7 @@ export function togglePlanStepDone(day: string, key: string): string[] {
   if (set.has(key)) set.delete(key);
   else set.add(key);
   stored.planDoneKeys = Array.from(set);
+  stored.planDoneUpdatedAt = new Date().toISOString();
   writeMap(ROLLUPS_KEY, map);
   return stored.planDoneKeys;
 }
@@ -176,12 +194,18 @@ export function saveRollup(record: {
   // forever, since the done-count is rendered against the new step list.
   const surviving = new Set((record.rollup.plan_steps ?? []).map((st) => st.key));
   const carried = (map[record.day]?.planDoneKeys ?? []).filter((k) => surviving.has(k));
+  const now = new Date().toISOString();
   const stored: StoredRollup = {
     day: record.day,
-    timestamp: new Date().toISOString(),
+    timestamp: now,
+    generatedAt: now,
     conversationIds: record.conversationIds,
     rollup: record.rollup,
-    ...(carried.length ? { planDoneKeys: carried } : {}),
+    // Carry the tick clock with the ticks, or restored ticks would lose the
+    // stamp that lets them win a merge.
+    ...(carried.length
+      ? { planDoneKeys: carried, planDoneUpdatedAt: map[record.day]?.planDoneUpdatedAt ?? new Date().toISOString() }
+      : {}),
   };
   map[record.day] = stored;
   writeMap(ROLLUPS_KEY, map);
@@ -195,7 +219,16 @@ export function saveRollup(record: {
  *  user and losing a day-close permanently. */
 export function restoreRollup(stored: StoredRollup): void {
   const map = readMap<StoredRollup>(ROLLUPS_KEY);
-  map[stored.day] = stored;
+  // Restoring is a NEW write, so it needs a fresh merge clock: the regeneration
+  // it undoes already pushed a newer record to the server, and replaying the
+  // old record with its old timestamp would simply lose the next merge and the
+  // undo would silently revert. The rollup's real generation time is preserved
+  // separately so the export keeps reporting the truth.
+  map[stored.day] = {
+    ...stored,
+    generatedAt: stored.generatedAt ?? stored.timestamp,
+    timestamp: new Date().toISOString(),
+  };
   writeMap(ROLLUPS_KEY, map);
 }
 

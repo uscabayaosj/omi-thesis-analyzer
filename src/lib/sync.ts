@@ -2,6 +2,11 @@
 
 import { SYNCED_NAMESPACES, type SyncedNamespace, isArrayNamespace } from "@/lib/kv";
 import { notifyAnalysesChanged } from "@/lib/badge";
+// The merge rule lives in its own dependency-free module so it can be tested
+// directly (test/sync-merge.test.mts) rather than only through the browser —
+// a ticked promise being silently reverted by a merge is precisely the class
+// of bug that needs a test, not a manual check.
+import { mergeMaps, mergeArrayNamespace, type RecordMap, type ArrayRecord } from "@/lib/merge";
 
 const ANALYSES_NS = "omi-adhd-analyses";
 
@@ -20,8 +25,6 @@ const ANALYSES_NS = "omi-adhd-analyses";
  * causal merging.
  */
 
-type RecordMap = Record<string, { timestamp?: string } & Record<string, unknown>>;
-type ArrayRecord = Record<string, unknown>;
 
 function readLocal(ns: string): RecordMap {
   try {
@@ -41,65 +44,10 @@ function writeLocal(ns: string, map: RecordMap): void {
   }
 }
 
-/** Newest `timestamp` wins; a record only one side has is always kept. */
-function mergeMaps(local: RecordMap, remote: RecordMap): RecordMap {
-  const merged: RecordMap = { ...remote };
-  for (const [id, localRec] of Object.entries(local)) {
-    const remoteRec = remote[id];
-    if (!remoteRec) {
-      merged[id] = localRec;
-      continue;
-    }
-    const l = localRec?.timestamp ?? "";
-    const r = remoteRec?.timestamp ?? "";
-    merged[id] = l > r ? localRec : remoteRec;
-  }
-  return merged;
-}
-
 // Array-shaped namespaces each have their own merge strategy below — the
 // uniform keyed-map merge above only works for records addressed by a
 // top-level id. Which namespaces are array-shaped is defined in kv.ts
 // (isArrayNamespace), shared with the server-side export route.
-
-// omi-thesis-group-analyses: entries are keyed by their conversation-id set
-// and re-runnable, so a whole-list replace is harmless — newest-list-wins by
-// length is sufficient (there's no per-entry identity worth merging on).
-function mergeByLength(local: ArrayRecord[], remote: ArrayRecord[]): ArrayRecord[] {
-  return remote.length > local.length ? remote : local;
-}
-
-// omi-thesis-analyses: StoredConversation[], one entry per real
-// conversationId whose current.timestamp genuinely can differ between
-// devices (re-analyzing the same conversation on a phone and a laptop). A
-// length comparison would silently drop a newer local edit whenever the
-// *other* side happens to have more distinct conversations analyzed — so
-// this merges per-conversationId instead, the same "newest timestamp wins"
-// rule the keyed-map merge above already uses for the map-shaped namespaces.
-function mergeConversationList(local: ArrayRecord[], remote: ArrayRecord[]): ArrayRecord[] {
-  const byId = new Map<string, ArrayRecord>();
-  for (const r of remote) {
-    const id = r?.conversationId;
-    if (typeof id === "string") byId.set(id, r);
-  }
-  for (const l of local) {
-    const id = l?.conversationId;
-    if (typeof id !== "string") continue;
-    const existing = byId.get(id);
-    if (!existing) {
-      byId.set(id, l);
-      continue;
-    }
-    const lt = (l.current as { timestamp?: string } | undefined)?.timestamp ?? "";
-    const rt = (existing.current as { timestamp?: string } | undefined)?.timestamp ?? "";
-    if (lt > rt) byId.set(id, l);
-  }
-  return Array.from(byId.values());
-}
-
-function mergeArrayNamespace(ns: string, local: ArrayRecord[], remote: ArrayRecord[]): ArrayRecord[] {
-  return ns === "omi-thesis-analyses" ? mergeConversationList(local, remote) : mergeByLength(local, remote);
-}
 
 let pushTimer: ReturnType<typeof setTimeout> | null = null;
 const pendingPush = new Set<SyncedNamespace>();
