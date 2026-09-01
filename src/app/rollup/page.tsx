@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo, useRef, Suspense, type Compo
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { fetchJson } from "@/lib/fetch-json";
-import { formatDateTime, dayOf } from "@/lib/format";
+import { formatDateTime, formatTime, dayOf } from "@/lib/format";
 import type { AdhdAnalysis, Rollup } from "@/lib/adhd";
 import type { DayConvoOutput } from "@/lib/rollup";
 import type { RollupJobState } from "@/lib/rollup-job";
@@ -680,7 +680,7 @@ function RollupPageInner() {
                             {c.structured?.title?.trim() || (
                               <>
                                 <span className="font-mono text-slate-400">
-                                  {formatDateTime(c.created_at, { hour: "2-digit", minute: "2-digit" })}
+                                  {formatTime(c.created_at)}
                                 </span>
                                 {c.structured?.category ? ` · ${c.structured.category}` : " · untitled"}
                               </>

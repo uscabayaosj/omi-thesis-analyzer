@@ -56,3 +56,19 @@ export function addDays(day: string, n: number): string {
   d.setDate(d.getDate() + n);
   return toDayString(d);
 }
+
+/**
+ * Clock time only.
+ *
+ * `formatDateTime` goes through `toLocaleDateString`, which still emits the
+ * date portion even when the options ask for nothing but hour and minute — so
+ * a per-row timestamp on a page already scoped to one day repeated that day's
+ * date on every row. This is for lists where the date is established by the
+ * surrounding context and only the time distinguishes the items.
+ */
+export function formatTime(value: string | undefined | null): string {
+  if (!value) return "Unknown time";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Unknown time";
+  return date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+}
