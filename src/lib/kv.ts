@@ -23,16 +23,20 @@ export function getStore(): Sql | null {
   // Next evaluates top-level module code at build time, which would break
   // `next build` on any deploy that hasn't been given the env var yet.
   const url = process.env.DATABASE_URL;
-  // Dev must never write to production's store. Deleting the env var locally
-  // is not durable — the next `vercel env pull` silently restores it — so the
-  // separation is enforced here: outside a production build, a configured URL
-  // is refused (degrading to localStorage-only, the app's normal dev state)
-  // unless TRACE_DEV_STORE_OK is set, the explicit opt-in for a database that
-  // really is a dev one. Born of a real leak: test records seeded during
-  // local verification synced into the production trace_store (2026-09-03).
-  if (url && process.env.NODE_ENV !== "production" && !process.env.TRACE_DEV_STORE_OK) {
+  // Only production may write to production's store. Deleting the env var
+  // locally is not durable — the next `vercel env pull` silently restores it —
+  // so the separation is enforced here: anywhere but the production
+  // environment, a configured URL is refused (degrading to localStorage-only,
+  // the app's normal dev state) unless TRACE_DEV_STORE_OK is set, the explicit
+  // opt-in for a database that really is a dev one. VERCEL_ENV is the
+  // authority when present because previews build with NODE_ENV=production;
+  // NODE_ENV is only the local fallback. Born of a real leak: test records
+  // seeded during local verification synced into the production trace_store
+  // (2026-09-03).
+  const env = process.env.VERCEL_ENV ?? process.env.NODE_ENV;
+  if (url && env !== "production" && !process.env.TRACE_DEV_STORE_OK) {
     console.warn(
-      "DATABASE_URL is set but NODE_ENV is not production — refusing to touch the store. " +
+      `DATABASE_URL is set but the environment is "${env}", not production — refusing to touch the store. ` +
         "Set TRACE_DEV_STORE_OK=1 only if this URL points at a dev database."
     );
     client = null;

@@ -29,6 +29,28 @@ test("the explicit override lets a dev database through", async () => {
   delete process.env.TRACE_DEV_STORE_OK;
 });
 
+// Preview deployments build with NODE_ENV=production, so the guard must key
+// on VERCEL_ENV when Vercel provides it — a preview is not production.
+test("a preview deployment is refused even with NODE_ENV=production", async () => {
+  process.env.DATABASE_URL = "postgres://user:pw@example.neon.tech/db";
+  process.env.NODE_ENV = "production";
+  process.env.VERCEL_ENV = "preview";
+  delete process.env.TRACE_DEV_STORE_OK;
+  const { getStore } = await import("../src/lib/kv.ts?guard=preview");
+  assert.equal(getStore(), null);
+});
+
+test("a production deployment is allowed through", async () => {
+  process.env.DATABASE_URL = "postgres://user:pw@example.neon.tech/db";
+  process.env.NODE_ENV = "production";
+  process.env.VERCEL_ENV = "production";
+  delete process.env.TRACE_DEV_STORE_OK;
+  const { getStore } = await import("../src/lib/kv.ts?guard=prod");
+  assert.notEqual(getStore(), null);
+  delete process.env.VERCEL_ENV;
+  delete process.env.NODE_ENV;
+});
+
 test("no DATABASE_URL stays a plain unconfigured store", async () => {
   delete process.env.DATABASE_URL;
   delete process.env.TRACE_DEV_STORE_OK;
