@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getAnalyzedIds, getAnalysisAge } from "@/lib/storage";
 import { getAdhdAnalyzedIds, getAdhdSummaries, saveAdhdAnalysis } from "@/lib/adhd-storage";
+import { getEnrichments, saveEnrichment, toggleKeep, type StoredEnrichment } from "@/lib/enrich-storage";
+import type { Enrichment } from "@/lib/enrich-core";
 import type { AdhdAnalysis } from "@/lib/adhd";
 import { cacheGet, cacheSet } from "@/lib/cache";
 import { fetchJson } from "@/lib/fetch-json";
@@ -254,12 +256,14 @@ function CalendarMonth({
  * was a timestamp — the screen the user opens most, carrying no information.
  * The ADHD pass already writes a plain-language summary of each conversation;
  * when Omi has no title, that sentence is a far better name than a placeholder.
- * Falls back to the timestamp-plus-category shape the rollup list uses, and
- * only then to a label.
+ * The enrichment pass exists to name conversations, so its title outranks the
+ * gist (a summary pressed into service). Falls back to the
+ * timestamp-plus-category shape the rollup list uses, and only then to a label.
  */
-function conversationTitle(convo: Conversation, gist?: string): string {
+function conversationTitle(convo: Conversation, enrichment?: StoredEnrichment, gist?: string): string {
   const omi = convo.structured?.title?.trim();
   if (omi) return omi;
+  if (enrichment?.title) return enrichment.title;
   if (gist) return gist;
   const when = formatDateTime(convo.created_at);
   const cat = convo.structured?.category?.trim();
@@ -281,7 +285,7 @@ function LocationMark({ hasLocation }: { hasLocation: boolean }) {
 }
 
 const ConversationRow = memo(function ConversationRow({
-  convo, selectMode, isSelected, isAnalyzed, isAnalyzedEither, isAdhd, gist, onToggleSelect,
+  convo, selectMode, isSelected, isAnalyzed, isAnalyzedEither, isAdhd, enrichment, gist, onToggleSelect,
 }: {
   convo: Conversation;
   selectMode: boolean;
@@ -289,6 +293,10 @@ const ConversationRow = memo(function ConversationRow({
   isAnalyzed: boolean;
   isAnalyzedEither: boolean;
   isAdhd: boolean;
+  /** The enrichment pass's record, when one exists — supplies the title and
+   *  overview for conversations Omi returned bare. Passed in rather than read
+   *  per row so the list keeps no storage access in its render path. */
+  enrichment?: StoredEnrichment;
   /** The ADHD analysis's one-line summary, when one exists. Used as the title
    *  when Omi returned none. Passed in rather than read per row so the list
    *  keeps no storage access in its render path. */
@@ -303,7 +311,7 @@ const ConversationRow = memo(function ConversationRow({
         onClick={() => onToggleSelect(convo.id)}
         role="option"
         aria-selected={isSelected}
-        aria-label={`${isSelected ? "Deselect" : "Select"} "${convo.structured?.title || "Untitled"}" for group analysis${isAnalyzedEither ? " (analyzed)" : ""}`}
+        aria-label={`${isSelected ? "Deselect" : "Select"} "${conversationTitle(convo, enrichment, gist)}" for group analysis${isAnalyzedEither ? " (analyzed)" : ""}`}
         className={`w-full text-left card p-5 transition-colors min-h-[44px] ${
           isSelected ? "border-cyan-500 bg-cyan-950/30" : "hover:border-slate-600"
         }`}
@@ -320,11 +328,11 @@ const ConversationRow = memo(function ConversationRow({
           <LensBadges thesis={isAnalyzed} adhd={isAdhd} />
           <div className="flex-1 min-w-0">
             <h2 className="font-semibold text-white truncate">
-              {conversationTitle(convo, gist)}
+              {conversationTitle(convo, enrichment, gist)}
             </h2>
             <LensState thesis={isAnalyzed} adhd={isAdhd} />
-            {convo.structured?.overview && (
-              <p className="text-slate-400 font-serif italic text-sm mt-1 line-clamp-1">{convo.structured.overview}</p>
+            {(convo.structured?.overview || enrichment?.overview) && (
+              <p className="text-slate-400 font-serif italic text-sm mt-1 line-clamp-1">{convo.structured?.overview || enrichment?.overview}</p>
             )}
             <div className="flex items-center gap-3 mt-2 text-xs text-slate-400 flex-wrap">
               <span className="font-mono whitespace-nowrap">{formatDateTime(convo.created_at)}</span>
@@ -346,7 +354,7 @@ const ConversationRow = memo(function ConversationRow({
          a screen reader announced "Thesis not analyzed, ADHD Aid analyzed"
          before saying which conversation it was — twenty-seven times down a
          day's list. */
-      aria-label={`${conversationTitle(convo, gist)}${isAnalyzedEither ? " (analyzed)" : ""}`}
+      aria-label={`${conversationTitle(convo, enrichment, gist)}${isAnalyzedEither ? " (analyzed)" : ""}`}
       className={`card p-5 block transition-colors min-h-[44px] border-l-2 ${
         isAnalyzedEither
           ? "border-l-emerald-500/40 hover:border-emerald-500/50"
@@ -357,11 +365,11 @@ const ConversationRow = memo(function ConversationRow({
         <LensBadges thesis={isAnalyzed} adhd={isAdhd} />
         <div className="flex-1 min-w-0">
           <h2 className="font-semibold text-white truncate">
-            {conversationTitle(convo, gist)}
+            {conversationTitle(convo, enrichment, gist)}
           </h2>
           <LensState thesis={isAnalyzed} adhd={isAdhd} />
-          {convo.structured?.overview && (
-            <p className="text-slate-400 font-serif italic text-sm mt-1 line-clamp-2">{convo.structured.overview}</p>
+          {(convo.structured?.overview || enrichment?.overview) && (
+            <p className="text-slate-400 font-serif italic text-sm mt-1 line-clamp-2">{convo.structured?.overview || enrichment?.overview}</p>
           )}
           <div className="flex items-center gap-3 mt-2 text-xs text-slate-400 flex-wrap">
             <span className="font-mono whitespace-nowrap">{formatDateTime(convo.created_at)}</span>
@@ -405,6 +413,10 @@ function HomeInner() {
      in its render path. Supplies a human title for the conversations Omi
      returned unnamed, which on a busy day is most of them. */
   const [gists, setGists] = useState<Map<string, string>>(() => getAdhdSummaries());
+  /* Same contract as `gists`: built once per change, threaded down, never read
+     per row. Carries titles/overviews from the enrichment pass plus the junk
+     verdicts that drive the Ignored section. */
+  const [enrichments, setEnrichments] = useState<Map<string, StoredEnrichment>>(() => getEnrichments());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastSynced, setLastSynced] = useState<string | null>(null);
@@ -437,6 +449,9 @@ function HomeInner() {
   const [batchProgress, setBatchProgress] = useState({ done: 0, total: 0, failed: 0 });
   const [batchFailures, setBatchFailures] = useState<BatchFailure[]>([]);
   const [pendingBatch, setPendingBatch] = useState<{ ids: string[]; replacing: number } | null>(null);
+  const [naming, setNaming] = useState(false);
+  const [namingProgress, setNamingProgress] = useState({ done: 0, total: 0 });
+  const [namingFailed, setNamingFailed] = useState(0);
 
   // Recomputed each render (cheap) so "today" stays correct if the tab is
   // left open past midnight. selectedDate is pinned at mount instead —
@@ -535,6 +550,7 @@ function HomeInner() {
       setAnalyzedIds(getAnalyzedIds());
       setAdhdIds(getAdhdAnalyzedIds());
       setGists(getAdhdSummaries());
+      setEnrichments(getEnrichments());
     };
     // Merge in anything analyzed on the user's other device before the first
     // resync, so badges reflect the full picture rather than this device's
@@ -612,16 +628,33 @@ function HomeInner() {
     if (!isSearching) return [];
     const q = searchQuery.trim().toLowerCase();
     return conversations.filter((c) => {
+      const e = enrichments.get(c.id);
       const title = c.structured?.title?.toLowerCase() ?? "";
       const overview = c.structured?.overview?.toLowerCase() ?? "";
-      return title.includes(q) || overview.includes(q);
+      const eTitle = e?.title?.toLowerCase() ?? "";
+      const eOverview = e?.overview?.toLowerCase() ?? "";
+      return title.includes(q) || overview.includes(q) || eTitle.includes(q) || eOverview.includes(q);
     });
-  }, [conversations, searchQuery, isSearching]);
+  }, [conversations, searchQuery, isSearching, enrichments]);
 
   const dayConversations = conversationsByDay.get(selectedDate) ?? [];
   const visibleConversations = isSearching ? searchResults : dayConversations;
 
-  const visibleAnalyzedCount = visibleConversations.filter((c) => isAnalyzedEither(c.id)).length;
+  // Hidden only on an explicit, unkept junk verdict. A conversation with no
+  // enrichment record always renders normally — absence of a verdict is not a
+  // verdict.
+  const isHiddenJunk = useCallback(
+    (cid: string) => {
+      const e = enrichments.get(cid);
+      return !!e && e.junk && !e.keep;
+    },
+    [enrichments]
+  );
+
+  // The scan-row count excludes hidden junk so "3/9 analyzed" counts only rows
+  // the list actually shows.
+  const countable = visibleConversations.filter((c) => !isHiddenJunk(c.id));
+  const visibleAnalyzedCount = countable.filter((c) => isAnalyzedEither(c.id)).length;
 
   const filtered = visibleConversations.filter((c) => {
     if (filter === "analyzed") return isAnalyzedEither(c.id);
@@ -629,12 +662,18 @@ function HomeInner() {
     return true;
   });
 
+  // The main list; junk verdicts collapse into the Ignored disclosure below it.
+  // `ignored` holds every junk-flagged row — kept ones included, so a Keep can
+  // be reversed from the same place it was granted.
+  const shown = filtered.filter((c) => !isHiddenJunk(c.id));
+  const ignored = filtered.filter((c) => enrichments.get(c.id)?.junk);
+
   // Date-group search results only when they actually span more than one day —
   // a single-day search doesn't need a redundant heading repeating what the
   // "Results for…" line above already says.
   const filteredByDay = isSearching
     ? Array.from(
-        filtered.reduce((map, c) => {
+        shown.reduce((map, c) => {
           const d = dayOf(c.created_at);
           (map.get(d) ?? map.set(d, []).get(d)!).push(c);
           return map;
@@ -653,7 +692,7 @@ function HomeInner() {
 
   // "All selected" must check membership, not just counts — the selection can
   // contain conversations hidden by the current filter (or on other days).
-  const allFilteredSelected = filtered.length > 0 && filtered.every((c) => selected.has(c.id));
+  const allFilteredSelected = shown.length > 0 && shown.every((c) => selected.has(c.id));
 
   // How many distinct days the current selection actually spans — drives the
   // "(across all days)" toolbar qualifier. A count-based check would fire on
@@ -671,9 +710,49 @@ function HomeInner() {
     if (allFilteredSelected) {
       setSelected(new Set());
     } else {
-      setSelected((prev) => new Set([...prev, ...filtered.map((c) => c.id)]));
+      setSelected((prev) => new Set([...prev, ...shown.map((c) => c.id)]));
     }
   };
+
+  // What "Name new" targets: visible, no cached enrichment, and no existing
+  // name from any source. The gist exclusion is a token-spend rule, not a
+  // display rule — a gisted conversation is already named, and enriching it
+  // would re-send a transcript to produce a name that exists.
+  const unnamed = useMemo(
+    () =>
+      visibleConversations.filter(
+        (c) => !enrichments.has(c.id) && !c.structured?.title?.trim() && !gists.has(c.id)
+      ),
+    [visibleConversations, enrichments, gists]
+  );
+
+  // Sequential like the ADHD batch. Each result is cached on save, so a rerun
+  // after failures re-targets exactly the still-unnamed rows — never a
+  // duplicate call for one already named.
+  const runNaming = useCallback(async () => {
+    const ids = unnamed.map((c) => c.id);
+    if (ids.length === 0) return;
+    setNaming(true);
+    setNamingProgress({ done: 0, total: ids.length });
+    setNamingFailed(0);
+    let failed = 0;
+    for (let i = 0; i < ids.length; i++) {
+      try {
+        const data = await fetchJson<{ enrichment: Enrichment; wordCount: number }>("/api/enrich", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ conversationId: ids[i] }),
+        });
+        saveEnrichment({ conversationId: ids[i], wordCount: data.wordCount, enrichment: data.enrichment });
+      } catch {
+        failed++;
+      }
+      setNamingProgress({ done: i + 1, total: ids.length });
+    }
+    setNamingFailed(failed);
+    setEnrichments(getEnrichments());
+    setNaming(false);
+  }, [unnamed]);
 
   const startGroupAnalysis = useCallback(() => {
     if (selected.size < 2) return;
@@ -1003,7 +1082,7 @@ function HomeInner() {
                 a native select replaces the pill row entirely instead. */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
               <span className="text-slate-400 whitespace-nowrap">
-                {visibleAnalyzedCount}/{visibleConversations.length} analyzed
+                {visibleAnalyzedCount}/{countable.length} analyzed
               </span>
               <select
                 value={filter}
@@ -1036,14 +1115,27 @@ function HomeInner() {
               </div>
             </div>
             {!selectMode ? (
-              <button
-                onClick={() => setSelectMode(true)}
-                aria-label="Enable selection mode to analyze multiple conversations as a group"
-                className={`${BUTTON_SECONDARY} flex-shrink-0`}
-              >
-                <SquareIcon className="w-3.5 h-3.5" />
-                Select &amp; Analyze Group
-              </button>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {unnamed.length > 0 && (
+                  <button
+                    onClick={runNaming}
+                    disabled={naming}
+                    aria-label={`Name ${unnamed.length} unnamed ${unnamed.length === 1 ? "conversation" : "conversations"}`}
+                    className={BUTTON_SECONDARY}
+                  >
+                    <SparklesIcon className="w-3.5 h-3.5" />
+                    {naming ? `Naming ${namingProgress.done}/${namingProgress.total}…` : `Name new (${unnamed.length})`}
+                  </button>
+                )}
+                <button
+                  onClick={() => setSelectMode(true)}
+                  aria-label="Enable selection mode to analyze multiple conversations as a group"
+                  className={BUTTON_SECONDARY}
+                >
+                  <SquareIcon className="w-3.5 h-3.5" />
+                  Select &amp; Analyze Group
+                </button>
+              </div>
             ) : (
               <button
                 onClick={exitSelectMode}
@@ -1057,6 +1149,14 @@ function HomeInner() {
           </div>
         )}
 
+        {/* A count is enough here: a failed naming is retryable by pressing the
+            button again, which re-targets exactly the still-unnamed rows. */}
+        {!naming && namingFailed > 0 && (
+          <p className="text-sm text-amber-300/90 mt-2" role="status">
+            {namingFailed} {namingFailed === 1 ? "conversation" : "conversations"} could not be named — press Name new to retry.
+          </p>
+        )}
+
         {/* Selection mode toolbar — count reflects the true cross-day, cross-search total */}
         {selectMode && (
           <div className="mt-3">
@@ -1068,7 +1168,7 @@ function HomeInner() {
               <div className="flex items-center gap-3 flex-wrap">
                 <button
                   onClick={selectAll}
-                  disabled={filtered.length === 0}
+                  disabled={shown.length === 0}
                   aria-label={allFilteredSelected ? "Deselect all conversations in this view" : "Select all conversations in this view"}
                   className="text-sm min-h-[44px] bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-200 px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
                 >
@@ -1240,7 +1340,7 @@ function HomeInner() {
         </div>
       )}
 
-      {!loading && visibleConversations.length > 0 && filtered.length === 0 && (
+      {!loading && visibleConversations.length > 0 && shown.length === 0 && ignored.length === 0 && (
         <div className="card p-8 text-center">
           <p className="text-slate-400">
             {filter === "analyzed" ? "No analyzed conversations here yet." : "Everything here has been analyzed!"}
@@ -1272,6 +1372,7 @@ function HomeInner() {
                       isAnalyzed={analyzedIds.has(convo.id)}
                       isAnalyzedEither={isAnalyzedEither(convo.id)}
                       isAdhd={adhdIds.has(convo.id)}
+                      enrichment={enrichments.get(convo.id)}
                       gist={gists.get(convo.id)}
                       onToggleSelect={toggleSelect}
                     />
@@ -1279,7 +1380,7 @@ function HomeInner() {
                 </div>
               </div>
             ))
-          : filtered.map((convo) => (
+          : shown.map((convo) => (
               <ConversationRow
                 key={convo.id}
                 convo={convo}
@@ -1288,11 +1389,51 @@ function HomeInner() {
                 isAnalyzed={analyzedIds.has(convo.id)}
                 isAnalyzedEither={isAnalyzedEither(convo.id)}
                 isAdhd={adhdIds.has(convo.id)}
+                enrichment={enrichments.get(convo.id)}
                 gist={gists.get(convo.id)}
                 onToggleSelect={toggleSelect}
               />
             ))}
       </div>
+
+      {/* Noise recordings, out of the way but never gone: every junk-flagged
+          conversation stays listed here (kept ones included), so the verdict
+          and the user's override are both reversible from the same place. */}
+      {ignored.length > 0 && (
+        <details className="mt-4 group">
+          <summary className="cursor-pointer list-none text-sm text-slate-400 hover:text-slate-300 transition-colors min-h-[44px] flex items-center gap-1.5">
+            <ChevronRightIcon className="w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] group-open:rotate-90" />
+            Ignored ({ignored.length}) — noise recordings, kept out of the way
+          </summary>
+          <ul className="pl-5 pt-1 space-y-2">
+            {ignored.map((convo) => {
+              const e = enrichments.get(convo.id);
+              const name = e?.title || formatDateTime(convo.created_at);
+              return (
+                <li key={convo.id} className="flex items-center justify-between gap-3 text-sm">
+                  <Link href={`/conversation/${convo.id}`} className="min-w-0 text-slate-300 hover:text-white transition-colors">
+                    <span className="block truncate">{name}</span>
+                    <span className="block text-xs text-slate-500 truncate">
+                      {e?.junkReason || "Marked as noise"}
+                      {e ? ` · ${e.wordCount} ${e.wordCount === 1 ? "word" : "words"}` : ""}
+                    </span>
+                  </Link>
+                  <button
+                    onClick={() => {
+                      toggleKeep(convo.id);
+                      setEnrichments(getEnrichments());
+                    }}
+                    aria-label={e?.keep ? `Ignore "${name}" again` : `Keep "${name}" in the list`}
+                    className="flex-shrink-0 text-cyan-400 hover:underline min-h-[44px] px-2"
+                  >
+                    {e?.keep ? "Ignore again" : "Keep"}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </details>
+      )}
 
       {/* Onboarding: About this framework — a quiet footnote at the end of the page */}
       <details className="mt-3 group">
