@@ -55,6 +55,10 @@ const DONE_FIELDS: { keys: string; stamp: string }[] = [
   { keys: "doneKeys", stamp: "doneKeysUpdatedAt" },
   { keys: "planDoneKeys", stamp: "planDoneUpdatedAt" },
   { keys: "letGoKeys", stamp: "letGoUpdatedAt" },
+  // Not a key list but the same contract: a user act carrying its own clock,
+  // resolved independently so it is never reverted by an otherwise-newer
+  // record (an enrichment re-run must not un-Keep an ignored conversation).
+  { keys: "keep", stamp: "keepUpdatedAt" },
 ];
 
 /**

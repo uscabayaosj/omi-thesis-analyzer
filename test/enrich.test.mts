@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { countTranscriptWords, toEnrichment, JUNK_WORD_FLOOR } from "../src/lib/enrich-core.ts";
+import { mergeMaps } from "../src/lib/merge.ts";
 
 test("countTranscriptWords sums words across segments", () => {
   assert.equal(countTranscriptWords([]), 0);
@@ -30,4 +31,18 @@ test("toEnrichment defaults junk to false on garbage — over-show, never hide",
   assert.deepEqual(toEnrichment({}), { junk: false, junk_reason: "", title: "", overview: "" });
   assert.equal(toEnrichment({ junk: "yes" }).junk, false); // wrong type is not a verdict
   assert.equal(toEnrichment({ junk: true, junk_reason: 3 }).junk_reason, "");
+});
+
+// A junk verdict re-produced on another device (newer record timestamp) must
+// not revert this device's explicit Keep override — same contract as ticks.
+test("a Keep override outlives a newer remote enrichment record", () => {
+  const local = {
+    c1: { conversationId: "c1", timestamp: "2026-09-01T00:00:00Z", junk: true, keep: true, keepUpdatedAt: "2026-09-03T00:00:00Z" },
+  };
+  const remote = {
+    c1: { conversationId: "c1", timestamp: "2026-09-02T00:00:00Z", junk: true },
+  };
+  const merged = mergeMaps(local as never, remote as never);
+  assert.equal(merged.c1.keep, true);
+  assert.equal(merged.c1.timestamp, "2026-09-02T00:00:00Z"); // body still newest-wins
 });
