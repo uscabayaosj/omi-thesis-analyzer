@@ -27,6 +27,7 @@ import { AdhdResults } from "@/components/AdhdResults";
 import type { AdhdAnalysis } from "@/lib/adhd";
 import type { OmiGeolocation } from "@/lib/omi-api";
 import { getAdhdAnalysis, saveAdhdAnalysis, toggleCommitmentDone } from "@/lib/adhd-storage";
+import { getEnrichments } from "@/lib/enrich-storage";
 import {
   RefreshIcon,
   ArrowLeftIcon,
@@ -176,6 +177,9 @@ function VersionHistory({
 export default function ConversationPage() {
   const { id } = useParams<{ id: string }>();
   const [conversation, setConversation] = useState<Conversation | null>(null);
+  /* Lazy read, once: the enrichment title fills in when Omi returned no name,
+     matching the home list. No setter — enrichment never changes on this page. */
+  const [enrichedTitle] = useState<string | undefined>(() => getEnrichments().get(id)?.title);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [storedAnalysis, setStoredAnalysis] = useState<StoredAnalysis | null>(null);
   const [versions, setVersions] = useState<AnalysisVersion[]>([]);
@@ -729,7 +733,7 @@ export default function ConversationPage() {
             </p>
             <h1 className="font-bold text-white mb-2">
               <span aria-hidden="true">{conversation.structured?.emoji || "💬"}</span>{" "}
-              {conversation.structured?.title || "Untitled"}
+              {conversation.structured?.title || enrichedTitle || "Untitled"}
             </h1>
             {conversation.structured?.overview && (
               <p className="text-slate-400 font-serif italic text-[0.95rem]">{conversation.structured.overview}</p>
@@ -778,7 +782,7 @@ export default function ConversationPage() {
                       {
                         lat: effectiveLocation.lat,
                         lng: effectiveLocation.lng,
-                        label: conversation.structured?.title || "This conversation",
+                        label: conversation.structured?.title || enrichedTitle || "This conversation",
                         sublabel: effectiveLocation.label || undefined,
                       },
                     ] satisfies MapMarker[]
