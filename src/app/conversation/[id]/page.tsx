@@ -177,9 +177,13 @@ function VersionHistory({
 export default function ConversationPage() {
   const { id } = useParams<{ id: string }>();
   const [conversation, setConversation] = useState<Conversation | null>(null);
-  /* Lazy read, once: the enrichment title fills in when Omi returned no name,
-     matching the home list. No setter — enrichment never changes on this page. */
-  const [enrichedTitle] = useState<string | undefined>(() => getEnrichments().get(id)?.title);
+  /* Lazy read, once: the enrichment title and overview fill in when Omi
+     returned none, matching the home list. The overview matters doubly here —
+     the list clamps it to two lines, so this page is where the full text can
+     actually be read. No setters — enrichment never changes on this page. */
+  const [enrichment] = useState(() => getEnrichments().get(id));
+  const enrichedTitle = enrichment?.title;
+  const enrichedOverview = enrichment?.overview;
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [storedAnalysis, setStoredAnalysis] = useState<StoredAnalysis | null>(null);
   const [versions, setVersions] = useState<AnalysisVersion[]>([]);
@@ -735,8 +739,10 @@ export default function ConversationPage() {
               <span aria-hidden="true">{conversation.structured?.emoji || "💬"}</span>{" "}
               {conversation.structured?.title || enrichedTitle || "Untitled"}
             </h1>
-            {conversation.structured?.overview && (
-              <p className="text-slate-400 font-serif italic text-[0.95rem]">{conversation.structured.overview}</p>
+            {(conversation.structured?.overview || enrichedOverview) && (
+              <p className="text-slate-400 font-serif italic text-[0.95rem]">
+                {conversation.structured?.overview || enrichedOverview}
+              </p>
             )}
             <p className="text-slate-400 text-sm mt-2 font-mono">
               {formatDateTime(conversation.created_at, {
