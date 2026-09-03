@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { countTranscriptWords, toEnrichment, JUNK_WORD_FLOOR } from "../src/lib/enrich-core.ts";
+import { countTranscriptWords, toEnrichment, isHiddenJunk, JUNK_WORD_FLOOR } from "../src/lib/enrich-core.ts";
 import { mergeMaps } from "../src/lib/merge.ts";
 
 test("countTranscriptWords sums words across segments", () => {
@@ -31,6 +31,16 @@ test("toEnrichment defaults junk to false on garbage — over-show, never hide",
   assert.deepEqual(toEnrichment({}), { junk: false, junk_reason: "", title: "", overview: "" });
   assert.equal(toEnrichment({ junk: "yes" }).junk, false); // wrong type is not a verdict
   assert.equal(toEnrichment({ junk: true, junk_reason: 3 }).junk_reason, "");
+});
+
+// The one shared definition of "hidden as noise": an explicit, unkept junk
+// verdict. No record, a clean verdict, or a Keep override all mean visible.
+test("isHiddenJunk hides only an unkept junk verdict", () => {
+  assert.equal(isHiddenJunk(undefined), false); // absence of a verdict is not a verdict
+  assert.equal(isHiddenJunk({ junk: false }), false);
+  assert.equal(isHiddenJunk({ junk: true }), true);
+  assert.equal(isHiddenJunk({ junk: true, keep: true }), false);
+  assert.equal(isHiddenJunk({ junk: true, keep: false }), true);
 });
 
 // A junk verdict re-produced on another device (newer record timestamp) must

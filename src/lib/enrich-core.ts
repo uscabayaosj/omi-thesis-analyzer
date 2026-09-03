@@ -34,6 +34,14 @@ export function countTranscriptWords(segments: TranscriptSegment[]): number {
   return n;
 }
 
+/** The one shared definition of "hidden as noise": an explicit junk verdict
+ *  the user has not overridden with Keep. Absence of a record is not a
+ *  verdict. Used by the home list, the rollup page, and anywhere else that
+ *  must agree on what the junk filter hides. */
+export function isHiddenJunk(e?: { junk: boolean; keep?: boolean }): boolean {
+  return !!e && e.junk && !e.keep;
+}
+
 /** Never throws. `junk` must be literally `true` to count: a malformed reply
  *  can only over-show a conversation, never hide one. */
 export function toEnrichment(raw: Record<string, unknown>): Enrichment {

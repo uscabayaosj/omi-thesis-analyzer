@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { getAnalyzedIds, getAnalysisAge } from "@/lib/storage";
 import { getAdhdAnalyzedIds, getAdhdSummaries, saveAdhdAnalysis } from "@/lib/adhd-storage";
 import { getEnrichments, saveEnrichment, toggleKeep, type StoredEnrichment } from "@/lib/enrich-storage";
-import type { Enrichment } from "@/lib/enrich-core";
+import { isHiddenJunk as isHiddenJunkRecord, type Enrichment } from "@/lib/enrich-core";
 import type { AdhdAnalysis } from "@/lib/adhd";
 import { cacheGet, cacheSet } from "@/lib/cache";
 import { fetchJson } from "@/lib/fetch-json";
@@ -644,10 +644,7 @@ function HomeInner() {
   // enrichment record always renders normally — absence of a verdict is not a
   // verdict.
   const isHiddenJunk = useCallback(
-    (cid: string) => {
-      const e = enrichments.get(cid);
-      return !!e && e.junk && !e.keep;
-    },
+    (cid: string) => isHiddenJunkRecord(enrichments.get(cid)),
     [enrichments]
   );
 

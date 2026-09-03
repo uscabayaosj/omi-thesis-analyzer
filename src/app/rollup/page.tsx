@@ -11,6 +11,8 @@ import type { RollupJobState } from "@/lib/rollup-job";
 import {
   getAdhdAnalysis, saveAdhdAnalysis, getRollup, saveRollup, getPreviousRollup, getRollupDays, togglePlanStepDone, restoreRollup,
 } from "@/lib/adhd-storage";
+import { getEnrichments, type StoredEnrichment } from "@/lib/enrich-storage";
+import { isHiddenJunk } from "@/lib/enrich-core";
 import { pullAndMerge } from "@/lib/sync";
 import { countOpen } from "@/lib/commitments";
 import { exportRollupToObsidian, downloadRollupMarkdown } from "@/lib/obsidian";
@@ -132,6 +134,7 @@ function RollupPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [convos, setConvos] = useState<ConvoLite[]>([]);
+  const [enrichments, setEnrichments] = useState<Map<string, StoredEnrichment>>(new Map());
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [restOpen, setRestOpen] = useState(false);
@@ -197,6 +200,9 @@ function RollupPageInner() {
     // to the server's output before any localStorage-derived value is read.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
+    // Junk verdicts from the enrichment pass; read once post-mount (SSR-safe)
+    // so the day's roll-up scope can exclude what the home list hides.
+    setEnrichments(getEnrichments());
   }, []);
 
   useEffect(() => {
@@ -499,10 +505,26 @@ function RollupPageInner() {
   }, [selectedDay]);
 
   const selectedConvos = selectedDay ? (days.find((d) => d[0] === selectedDay)?.[1] ?? []) : [];
+  // The roll-up's scope is what the junk filter shows: noise recordings the
+  // home list hides must not be ADHD-analyzed (real money per conversation —
+  // yesterday alone had 22 of them) or fed into the day's plan.
+  const rollupConvos = selectedConvos.filter((c) => !isHiddenJunk(enrichments.get(c.id)));
+  const junkCount = selectedConvos.length - rollupConvos.length;
   // Conversations already analysed are reused rather than re-billed, so the
   // forecast has to net them off or it overstates the cost every time.
   const planOpen = Boolean(selectedDay && rollup);
-  const analyzedCount = mounted ? selectedConvos.filter((c) => getAdhdAnalysis(c.id)).length : 0;
+  const analyzedCount = mounted ? rollupConvos.filter((c) => getAdhdAnalysis(c.id)).length : 0;
+  // Offline-buffered audio syncs late: a day can gain conversations *after*
+  // its rollup was generated, and the rollup then silently under-reports the
+  // day. Compare the day's current (non-junk) conversations against the ids
+  // the saved rollup was built from, and say so instead of staying quiet.
+  const lateArrivals = (() => {
+    if (!mounted || !selectedDay || !rollup) return 0;
+    const stored = getRollup(selectedDay);
+    if (!stored) return 0;
+    const rolled = new Set(stored.conversationIds);
+    return rollupConvos.filter((c) => !rolled.has(c.id)).length;
+  })();
 
   return (
     <main id="main" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-8">
@@ -626,6 +648,27 @@ function RollupPageInner() {
             <ArrowLeftIcon className="w-4 h-4" /> All days
           </button>
 
+          {/* Offline-buffered recordings sync after the fact, so a closed day
+              can quietly grow. The plan below is still the old plan; say so
+              before the user reads it as complete. */}
+          {!running && lateArrivals > 0 && (
+            <div className="card p-4 mb-4 border-amber-500/30" role="status">
+              <p className="text-amber-300/90 text-sm flex items-start gap-2">
+                <WarningIcon className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span>
+                  {lateArrivals} conversation{lateArrivals === 1 ? "" : "s"} arrived after this rollup was
+                  made, so the plan below doesn&apos;t know about {lateArrivals === 1 ? "it" : "them"}.
+                </span>
+              </p>
+              <button
+                onClick={() => setShowRegenConfirm(true)}
+                className="mt-3 text-sm min-h-[44px] bg-slate-700 hover:bg-slate-600 text-slate-100 px-4 py-2 rounded-lg transition-colors"
+              >
+                Regenerate to include {lateArrivals === 1 ? "it" : "them"}
+              </button>
+            </div>
+          )}
+
           {rollup && (
             <div className="mb-6">
               {rollup.plan_steps?.length ? (
@@ -652,7 +695,7 @@ function RollupPageInner() {
                     Saved before plans became tickable, so this one is read-only.{" "}
                     <button
                       onClick={() => setShowRegenConfirm(true)}
-                      disabled={running || selectedConvos.length === 0}
+                      disabled={running || rollupConvos.length === 0}
                       className="text-cyan-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
                     >
                       Regenerate this day
@@ -669,16 +712,18 @@ function RollupPageInner() {
             <p className="text-slate-400 font-mono text-sm mt-1">
               {selectedConvos.length === 0
                 ? "Saved rollup — source conversations unavailable offline"
-                : `${selectedConvos.length} conversation${selectedConvos.length === 1 ? "" : "s"} this day`}
+                : `${rollupConvos.length} conversation${rollupConvos.length === 1 ? "" : "s"} this day${
+                    junkCount > 0 ? ` · ${junkCount} ignored as noise` : ""
+                  }`}
             </p>
 
             {/* One list per time-of-day group rather than a single outer list:
                 a role="list" may only own listitems, and the group wrappers in
                 between were breaking that ownership for assistive tech. */}
             <div className="mt-3 space-y-3">
-              {(selectedConvos.length > CHUNK_THRESHOLD
-                ? groupByTimeOfDay(selectedConvos)
-                : ([[null, selectedConvos]] as [string | null, ConvoLite[]][])
+              {(rollupConvos.length > CHUNK_THRESHOLD
+                ? groupByTimeOfDay(rollupConvos)
+                : ([[null, rollupConvos]] as [string | null, ConvoLite[]][])
               ).map(([label, group]) => (
                 <div key={label ?? "all"}>
                   {label && <p className="font-mono text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1.5">{label}</p>}
@@ -728,9 +773,9 @@ function RollupPageInner() {
               <button
                 onClick={() => {
                   if (rollup) setShowRegenConfirm(true);
-                  else generate(selectedConvos, selectedDay);
+                  else generate(rollupConvos, selectedDay);
                 }}
-                disabled={running || selectedConvos.length === 0}
+                disabled={running || rollupConvos.length === 0}
                 className={`${BUTTON_PRIMARY} w-full py-2 px-5 inline-flex items-center justify-center gap-2`}
               >
                 {running ? (
@@ -756,9 +801,9 @@ function RollupPageInner() {
               {/* An analysis costs real money and real minutes, and until now
                   neither was stated anywhere before the button was pressed —
                   only reconciled afterwards on /usage. */}
-              {!running && selectedConvos.length > 0 && (
+              {!running && rollupConvos.length > 0 && (
                 <p className="text-xs text-slate-400 mt-2 font-mono">
-                  {estimateRun(selectedConvos.length, analyzedCount)}
+                  {estimateRun(rollupConvos.length, analyzedCount)}
                 </p>
               )}
               {!running && progress.total > 0 && progress.failed > 0 && (
@@ -787,7 +832,7 @@ function RollupPageInner() {
               onCancel={() => setShowRegenConfirm(false)}
               onConfirm={() => {
                 setShowRegenConfirm(false);
-                generate(selectedConvos, selectedDay);
+                generate(rollupConvos, selectedDay);
               }}
             />
           )}
