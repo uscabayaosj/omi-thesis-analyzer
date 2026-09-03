@@ -23,6 +23,21 @@ export function getStore(): Sql | null {
   // Next evaluates top-level module code at build time, which would break
   // `next build` on any deploy that hasn't been given the env var yet.
   const url = process.env.DATABASE_URL;
+  // Dev must never write to production's store. Deleting the env var locally
+  // is not durable — the next `vercel env pull` silently restores it — so the
+  // separation is enforced here: outside a production build, a configured URL
+  // is refused (degrading to localStorage-only, the app's normal dev state)
+  // unless TRACE_DEV_STORE_OK is set, the explicit opt-in for a database that
+  // really is a dev one. Born of a real leak: test records seeded during
+  // local verification synced into the production trace_store (2026-09-03).
+  if (url && process.env.NODE_ENV !== "production" && !process.env.TRACE_DEV_STORE_OK) {
+    console.warn(
+      "DATABASE_URL is set but NODE_ENV is not production — refusing to touch the store. " +
+        "Set TRACE_DEV_STORE_OK=1 only if this URL points at a dev database."
+    );
+    client = null;
+    return client;
+  }
   try {
     client = url ? neon(url) : null;
   } catch (e) {
