@@ -17,21 +17,20 @@ export async function POST(req: NextRequest) {
 
     const convo = await getConversation(conversationId);
     const segments = convo.transcript_segments ?? [];
-    if (segments.length === 0) {
-      return NextResponse.json(
-        { error: "This conversation has no transcript to name." },
-        { status: 404 }
-      );
-    }
-
     const wordCount = countTranscriptWords(segments);
 
-    // Below the floor there is nothing to name: junk by definition, no LLM spent.
+    // Below the floor there is nothing to name: junk by definition, no LLM
+    // spent. A conversation with no transcript at all lands here too — a 404
+    // would leave it permanently "unnamed", re-fetched on every batch run,
+    // when what it needs is a cached verdict like any other noise recording.
     if (wordCount < JUNK_WORD_FLOOR) {
       return NextResponse.json({
         enrichment: {
           junk: true,
-          junk_reason: `Only ${wordCount} ${wordCount === 1 ? "word" : "words"} were caught`,
+          junk_reason:
+            wordCount === 0
+              ? "No transcript was captured"
+              : `Only ${wordCount} ${wordCount === 1 ? "word" : "words"} were caught`,
           title: "",
           overview: "",
         },
