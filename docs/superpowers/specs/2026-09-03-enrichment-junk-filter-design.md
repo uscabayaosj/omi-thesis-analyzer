@@ -27,7 +27,8 @@ localStorage map storage + synced namespace.
 
 - `export interface Enrichment { junk: boolean; junk_reason: string; title: string; overview: string }`
 - `enrichConversation(transcript, date): Promise<Enrichment>` — one
-  `chatCompletion` call (JSON mode, usage label `"enrich"`). The prompt asks for:
+  `chatCompletion` call (JSON mode, usage label `"enrich"`), input clamped to
+  `ENRICH_CLAMP_CHARS` (see Cost section). The prompt asks for:
   - `junk`: true when the transcript is noise — fragments with no recoverable
     subject matter (TV/radio/background speech, a few stray words, STT garbage).
     A short but real exchange is NOT junk.
@@ -93,10 +94,11 @@ extend or mirror for `keepUpdatedAt`).
 - **Overview fallback**: rows render `structured.overview`, else enrichment
   overview.
 - **Search** (`title.includes(q)`…) also matches enrichment title + overview.
-- **"Name new (n)" batch button**: shown when ≥ 1 visible conversation lacks an
-  enrichment record. Runs `/api/enrich` sequentially over unenriched
-  conversations (same loop shape as the ADHD batch, including per-item failure
-  collection), saving each result. Junk-by-floor results cost nothing.
+- **"Name new (n)" batch button**: shown when ≥ 1 visible conversation is
+  *unnamed* — no enrichment record, no Omi title, **and no ADHD gist** (a
+  gisted conversation is already named; enriching it would duplicate spend).
+  Runs `/api/enrich` sequentially over the unnamed set, saving each result.
+  Junk-by-floor results cost nothing.
 - **Ignored section**: conversations whose enrichment says `junk && !keep`
   are removed from the main list and collapsed into an "Ignored (n)"
   disclosure at the bottom. Each row shows the junk reason + word count, still
@@ -134,8 +136,19 @@ Manual verification via dev server: batch-name a page of conversations, confirm
 titles/overviews render, junk collapses, Keep restores, search matches enriched
 titles.
 
-## Cost
+## Cost / token efficiency (a first-class constraint)
 
-One small JSON call per real conversation, once ever (cached by conversation id;
-re-runs only if the user re-triggers). Heuristic junk costs zero. Logged under
-the `"enrich"` label so the usage page itemizes it.
+- **One call per conversation, ever.** Results are cached by conversation id;
+  the batch only targets conversations with no stored record, so a retry
+  re-runs failures only. Nothing re-enriches on load, focus, or sync.
+- **No duplicate work across lenses.** A conversation that already has an ADHD
+  analysis is excluded from the "Name new" set — its gist already names it, and
+  an enrich call would re-send a transcript to produce a name that exists.
+  (The title chain still prefers enrichment over gist when both exist.)
+- **Clamped input.** The enrich call sends only the first
+  `ENRICH_CLAMP_CHARS = 4000` characters of transcript — a title/overview/junk
+  verdict doesn't need the whole conversation, and input tokens are this
+  feature's entire cost. Real junk is short by definition; anything long enough
+  to truncate is by definition not junk.
+- **Junk-by-floor spends zero LLM tokens** (server-side word count only).
+- Logged under the `"enrich"` label so `/usage` itemizes it.
