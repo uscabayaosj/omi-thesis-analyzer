@@ -51,6 +51,21 @@ test("a production deployment is allowed through", async () => {
   delete process.env.NODE_ENV;
 });
 
+// `vercel env pull --environment=production` writes VERCEL_ENV="production"
+// into .env.local, which next dev loads — so VERCEL_ENV alone can be spoofed
+// by a pulled file. NODE_ENV cannot (Next forces it to "development" under
+// next dev and ignores env files for it), so production requires BOTH.
+test("a pulled production env file cannot bypass the guard under next dev", async () => {
+  process.env.DATABASE_URL = "postgres://user:pw@example.neon.tech/db";
+  process.env.NODE_ENV = "development";
+  process.env.VERCEL_ENV = "production";
+  delete process.env.TRACE_DEV_STORE_OK;
+  const { getStore } = await import("../src/lib/kv.ts?guard=pulled");
+  assert.equal(getStore(), null);
+  delete process.env.VERCEL_ENV;
+  delete process.env.NODE_ENV;
+});
+
 test("no DATABASE_URL stays a plain unconfigured store", async () => {
   delete process.env.DATABASE_URL;
   delete process.env.TRACE_DEV_STORE_OK;

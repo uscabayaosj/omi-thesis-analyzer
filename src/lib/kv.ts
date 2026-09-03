@@ -28,15 +28,24 @@ export function getStore(): Sql | null {
   // so the separation is enforced here: anywhere but the production
   // environment, a configured URL is refused (degrading to localStorage-only,
   // the app's normal dev state) unless TRACE_DEV_STORE_OK is set, the explicit
-  // opt-in for a database that really is a dev one. VERCEL_ENV is the
-  // authority when present because previews build with NODE_ENV=production;
-  // NODE_ENV is only the local fallback. Born of a real leak: test records
-  // seeded during local verification synced into the production trace_store
-  // (2026-09-03).
-  const env = process.env.VERCEL_ENV ?? process.env.NODE_ENV;
-  if (url && env !== "production" && !process.env.TRACE_DEV_STORE_OK) {
+  // opt-in for a database that really is a dev one.
+  //
+  // "Production" requires BOTH signals, because each alone can lie:
+  // - VERCEL_ENV alone is spoofable — `vercel env pull --environment=production`
+  //   writes VERCEL_ENV="production" into .env.local, which next dev loads
+  //   (found the hard way: that exact pull re-attached local dev to the
+  //   production store straight past the first version of this guard).
+  // - NODE_ENV alone misses previews, which build with NODE_ENV=production.
+  // NODE_ENV cannot be spoofed by a pulled file (Next forces it per command
+  // and ignores env files for it), so the pair is trustworthy together.
+  // Born of a real leak: test records seeded during local verification synced
+  // into the production trace_store (2026-09-03).
+  const isProduction =
+    process.env.NODE_ENV === "production" && (process.env.VERCEL_ENV ?? "production") === "production";
+  if (url && !isProduction && !process.env.TRACE_DEV_STORE_OK) {
     console.warn(
-      `DATABASE_URL is set but the environment is "${env}", not production — refusing to touch the store. ` +
+      `DATABASE_URL is set but this is not production (NODE_ENV="${process.env.NODE_ENV}", ` +
+        `VERCEL_ENV="${process.env.VERCEL_ENV ?? ""}") — refusing to touch the store. ` +
         "Set TRACE_DEV_STORE_OK=1 only if this URL points at a dev database."
     );
     client = null;
