@@ -40,8 +40,7 @@ export function getStore(): Sql | null {
   // and ignores env files for it), so the pair is trustworthy together.
   // Born of a real leak: test records seeded during local verification synced
   // into the production trace_store (2026-09-03).
-  const isProduction =
-    process.env.NODE_ENV === "production" && (process.env.VERCEL_ENV ?? "production") === "production";
+  const isProduction = process.env.NODE_ENV === "production" && process.env.VERCEL_ENV === "production";
   if (url && !isProduction && !process.env.TRACE_DEV_STORE_OK) {
     console.warn(
       `DATABASE_URL is set but this is not production (NODE_ENV="${process.env.NODE_ENV}", ` +

@@ -66,6 +66,20 @@ test("a pulled production env file cannot bypass the guard under next dev", asyn
   delete process.env.NODE_ENV;
 });
 
+// A local `next build && next start` run sets NODE_ENV=production but never
+// sets VERCEL_ENV (that only exists on Vercel's own infrastructure). VERCEL_ENV
+// must not default to "production" when merely absent, or this collapses back
+// to the NODE_ENV-alone check the pair was built to replace.
+test("NODE_ENV=production with VERCEL_ENV unset is refused, not treated as production", async () => {
+  process.env.DATABASE_URL = "postgres://user:pw@example.neon.tech/db";
+  process.env.NODE_ENV = "production";
+  delete process.env.VERCEL_ENV;
+  delete process.env.TRACE_DEV_STORE_OK;
+  const { getStore } = await import("../src/lib/kv.ts?guard=novercelenv");
+  assert.equal(getStore(), null);
+  delete process.env.NODE_ENV;
+});
+
 test("no DATABASE_URL stays a plain unconfigured store", async () => {
   delete process.env.DATABASE_URL;
   delete process.env.TRACE_DEV_STORE_OK;

@@ -201,7 +201,11 @@ function RollupPageInner() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
     // Junk verdicts from the enrichment pass; read once post-mount (SSR-safe)
-    // so the day's roll-up scope can exclude what the home list hides.
+    // so the day's roll-up scope can exclude what the home list hides. Pull
+    // first so a verdict made on another device is reflected before the
+    // day's plan/cost is scoped — otherwise a stale local copy can let junk
+    // conversations slip into the plan. No-op when the store isn't configured.
+    pullAndMerge().then(() => setEnrichments(getEnrichments()));
     setEnrichments(getEnrichments());
   }, []);
 
@@ -518,13 +522,15 @@ function RollupPageInner() {
   // its rollup was generated, and the rollup then silently under-reports the
   // day. Compare the day's current (non-junk) conversations against the ids
   // the saved rollup was built from, and say so instead of staying quiet.
-  const lateArrivals = (() => {
+  const lateArrivals = useMemo(() => {
     if (!mounted || !selectedDay || !rollup) return 0;
     const stored = getRollup(selectedDay);
     if (!stored) return 0;
     const rolled = new Set(stored.conversationIds);
-    return rollupConvos.filter((c) => !rolled.has(c.id)).length;
-  })();
+    const dayConvos = days.find((d) => d[0] === selectedDay)?.[1] ?? [];
+    const nonJunk = dayConvos.filter((c) => !isHiddenJunk(enrichments.get(c.id)));
+    return nonJunk.filter((c) => !rolled.has(c.id)).length;
+  }, [mounted, selectedDay, rollup, days, enrichments]);
 
   return (
     <main id="main" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-8">
@@ -765,7 +771,7 @@ function RollupPageInner() {
 
             <div
               className={
-                selectedConvos.length > CHUNK_THRESHOLD
+                rollupConvos.length > CHUNK_THRESHOLD
                   ? "sticky bottom-0 mt-4 pt-3 pb-3 border-t border-slate-700 bg-[var(--card)]"
                   : "mt-4"
               }

@@ -3,6 +3,8 @@ import { getConversation, segmentsToText } from "@/lib/omi-api";
 import { enrichConversation } from "@/lib/enrich";
 import { countTranscriptWords, JUNK_WORD_FLOOR } from "@/lib/enrich-core";
 import { friendlyError } from "@/lib/api-error";
+import { getStore, getNamespaceData } from "@/lib/kv";
+import type { StoredEnrichment } from "@/lib/enrich-storage";
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,6 +15,30 @@ export async function POST(req: NextRequest) {
         { error: "Please select a conversation to name." },
         { status: 400 }
       );
+    }
+
+    // Check the durable store before spending an LLM call: another device
+    // may have already enriched this conversation and synced the result.
+    // Narrows (but, without a real lock, can't fully close) the window where
+    // two devices both name the same still-unnamed conversation at once.
+    const sql = getStore();
+    if (sql) {
+      const data = (await getNamespaceData(sql, "omi-enrichments")) as Record<
+        string,
+        StoredEnrichment
+      > | null;
+      const existing = data?.[conversationId];
+      if (existing) {
+        return NextResponse.json({
+          enrichment: {
+            junk: existing.junk,
+            junk_reason: existing.junkReason ?? "",
+            title: existing.title ?? "",
+            overview: existing.overview ?? "",
+          },
+          wordCount: existing.wordCount,
+        });
+      }
     }
 
     const convo = await getConversation(conversationId);

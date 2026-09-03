@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getAnalyzedIds, getAnalysisAge } from "@/lib/storage";
 import { getAdhdAnalyzedIds, getAdhdSummaries, saveAdhdAnalysis } from "@/lib/adhd-storage";
-import { getEnrichments, saveEnrichment, toggleKeep, type StoredEnrichment } from "@/lib/enrich-storage";
+import { getEnrichments, saveEnrichments, toggleKeep, type StoredEnrichment } from "@/lib/enrich-storage";
 import { isHiddenJunk as isHiddenJunkRecord, type Enrichment } from "@/lib/enrich-core";
 import type { AdhdAnalysis } from "@/lib/adhd";
 import { cacheGet, cacheSet } from "@/lib/cache";
@@ -608,16 +608,18 @@ function HomeInner() {
 
   const daysWithEntries = useMemo(() => new Set(conversationsByDay.keys()), [conversationsByDay]);
 
-  // Which of those days still have at least one unanalyzed conversation — lets
-  // the calendar dot distinguish "has entries" from "has entries, done" so the
-  // researcher doesn't have to open every day to see which ones still need work.
+  // Which of those days still have at least one unanalyzed, non-junk
+  // conversation — lets the calendar dot distinguish "has entries" from "has
+  // entries, done" so the researcher doesn't have to open every day to see
+  // which ones still need work. A day whose entries are all hidden-junk has
+  // nothing left to analyze, so it must not keep the dot forever.
   const daysNeedingAttention = useMemo(() => {
     const set = new Set<string>();
     for (const [day, list] of conversationsByDay) {
-      if (list.some((c) => !isAnalyzedEither(c.id))) set.add(day);
+      if (list.some((c) => !isAnalyzedEither(c.id) && !isHiddenJunkRecord(enrichments.get(c.id)))) set.add(day);
     }
     return set;
-  }, [conversationsByDay, isAnalyzedEither]);
+  }, [conversationsByDay, isAnalyzedEither, enrichments]);
 
   const isSearching = searchQuery.trim().length > 0;
 
@@ -660,10 +662,13 @@ function HomeInner() {
   });
 
   // The main list; junk verdicts collapse into the Ignored disclosure below it.
-  // `ignored` holds every junk-flagged row — kept ones included, so a Keep can
-  // be reversed from the same place it was granted.
+  // `ignored` holds every junk-flagged row for the day — kept ones included,
+  // so a Keep can be reversed from the same place it was granted. Built from
+  // `visibleConversations`, not `filtered`, so the analyzed/unanalyzed
+  // dropdown (which junk conversations can never satisfy) doesn't change how
+  // many "Ignored" rows appear.
   const shown = filtered.filter((c) => !isHiddenJunk(c.id));
-  const ignored = filtered.filter((c) => enrichments.get(c.id)?.junk);
+  const ignored = visibleConversations.filter((c) => enrichments.get(c.id)?.junk);
 
   // Date-group search results only when they actually span more than one day —
   // a single-day search doesn't need a redundant heading repeating what the
@@ -725,7 +730,9 @@ function HomeInner() {
 
   // Sequential like the ADHD batch. Each result is cached on save, so a rerun
   // after failures re-targets exactly the still-unnamed rows — never a
-  // duplicate call for one already named.
+  // duplicate call for one already named. Results are accumulated and saved
+  // in one batched write at the end rather than one full-map read/write per
+  // conversation.
   const runNaming = useCallback(async () => {
     const ids = unnamed.map((c) => c.id);
     if (ids.length === 0) return;
@@ -733,6 +740,7 @@ function HomeInner() {
     setNamingProgress({ done: 0, total: ids.length });
     setNamingFailed(0);
     let failed = 0;
+    const results: { conversationId: string; wordCount: number; enrichment: Enrichment }[] = [];
     for (let i = 0; i < ids.length; i++) {
       try {
         const data = await fetchJson<{ enrichment: Enrichment; wordCount: number }>("/api/enrich", {
@@ -740,12 +748,13 @@ function HomeInner() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ conversationId: ids[i] }),
         });
-        saveEnrichment({ conversationId: ids[i], wordCount: data.wordCount, enrichment: data.enrichment });
+        results.push({ conversationId: ids[i], wordCount: data.wordCount, enrichment: data.enrichment });
       } catch {
         failed++;
       }
       setNamingProgress({ done: i + 1, total: ids.length });
     }
+    if (results.length > 0) saveEnrichments(results);
     setNamingFailed(failed);
     setEnrichments(getEnrichments());
     setNaming(false);
@@ -1405,7 +1414,7 @@ function HomeInner() {
           <ul className="pl-5 pt-1 space-y-2">
             {ignored.map((convo) => {
               const e = enrichments.get(convo.id);
-              const name = e?.title || formatDateTime(convo.created_at);
+              const name = conversationTitle(convo, e, gists.get(convo.id));
               return (
                 <li key={convo.id} className="flex items-center justify-between gap-3 text-sm">
                   <Link href={`/conversation/${convo.id}`} className="min-w-0 text-slate-300 hover:text-white transition-colors">
@@ -1417,8 +1426,8 @@ function HomeInner() {
                   </Link>
                   <button
                     onClick={() => {
-                      toggleKeep(convo.id);
-                      setEnrichments(getEnrichments());
+                      const updated = toggleKeep(convo.id);
+                      if (updated) setEnrichments((prev) => new Map(prev).set(convo.id, updated));
                     }}
                     aria-label={e?.keep ? `Ignore "${name}" again` : `Keep "${name}" in the list`}
                     className="flex-shrink-0 text-cyan-400 hover:underline min-h-[44px] px-2"

@@ -34,15 +34,11 @@ export function getEnrichments(): Map<string, StoredEnrichment> {
   return new Map(Object.entries(readMap<StoredEnrichment>(ENRICHMENTS_KEY)));
 }
 
-export function saveEnrichment(record: {
-  conversationId: string;
-  wordCount: number;
-  enrichment: Enrichment;
-}): StoredEnrichment {
-  const map = readMap<StoredEnrichment>(ENRICHMENTS_KEY);
-  const prev = map[record.conversationId];
+type EnrichmentInput = { conversationId: string; wordCount: number; enrichment: Enrichment };
+
+function buildStoredEnrichment(prev: StoredEnrichment | undefined, record: EnrichmentInput): StoredEnrichment {
   const { junk, junk_reason, title, overview } = record.enrichment;
-  const stored: StoredEnrichment = {
+  return {
     conversationId: record.conversationId,
     timestamp: new Date().toISOString(),
     wordCount: record.wordCount,
@@ -53,17 +49,37 @@ export function saveEnrichment(record: {
     // A re-run replaces the verdict but not the user's override.
     ...(prev?.keep !== undefined ? { keep: prev.keep, keepUpdatedAt: prev.keepUpdatedAt } : {}),
   };
+}
+
+export function saveEnrichment(record: EnrichmentInput): StoredEnrichment {
+  const map = readMap<StoredEnrichment>(ENRICHMENTS_KEY);
+  const stored = buildStoredEnrichment(map[record.conversationId], record);
   map[record.conversationId] = stored;
   writeMap(ENRICHMENTS_KEY, map);
   return stored;
 }
 
-export function toggleKeep(conversationId: string): boolean {
+/** Same as `saveEnrichment`, batched: one read and one write for the whole
+ *  list instead of one full-map read/write per record — used by the "Name
+ *  new" batch, which would otherwise re-parse and re-stringify the entire
+ *  stored map once per conversation named. */
+export function saveEnrichments(records: EnrichmentInput[]): StoredEnrichment[] {
+  const map = readMap<StoredEnrichment>(ENRICHMENTS_KEY);
+  const stored = records.map((record) => {
+    const result = buildStoredEnrichment(map[record.conversationId], record);
+    map[record.conversationId] = result;
+    return result;
+  });
+  writeMap(ENRICHMENTS_KEY, map);
+  return stored;
+}
+
+export function toggleKeep(conversationId: string): StoredEnrichment | null {
   const map = readMap<StoredEnrichment>(ENRICHMENTS_KEY);
   const stored = map[conversationId];
-  if (!stored) return false;
+  if (!stored) return null;
   stored.keep = !stored.keep;
   stored.keepUpdatedAt = new Date().toISOString();
   writeMap(ENRICHMENTS_KEY, map);
-  return stored.keep;
+  return stored;
 }
