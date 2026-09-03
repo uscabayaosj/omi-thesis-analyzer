@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { countTranscriptWords, toEnrichment, JUNK_WORD_FLOOR } from "../src/lib/enrich.ts";
+import { countTranscriptWords, toEnrichment, JUNK_WORD_FLOOR } from "../src/lib/enrich-core.ts";
 
 test("countTranscriptWords sums words across segments", () => {
   assert.equal(countTranscriptWords([]), 0);
