@@ -56,6 +56,23 @@ export function outToAbsMs(map: OffsetMapEntry[], outMs: number): number {
   return map[0]?.absStartMs ?? 0;
 }
 
+/** Inverse of outToAbsMs: given a wall-clock ms, find its offset in the
+ *  assembled buffer. Falls back to the start of the buffer if `absMs` is
+ *  before every piece, and to the end of the last piece if it's after. Used
+ *  to slice one speaker's audio back out of an already-assembled buffer
+ *  (see identify.ts / the enroll-voice route). */
+export function absToOutMs(map: OffsetMapEntry[], absMs: number): number {
+  let prev: OffsetMapEntry | null = null;
+  for (const e of map) {
+    const pieceDurMs = e.outEndMs - e.outStartMs;
+    if (absMs < e.absStartMs) break;
+    if (absMs <= e.absStartMs + pieceDurMs) return e.outStartMs + (absMs - e.absStartMs);
+    prev = e;
+  }
+  if (prev) return prev.outEndMs;
+  return map[0]?.outStartMs ?? 0;
+}
+
 export function encodeWav(pcm: Int16Array, sampleRate: number = SAMPLE_RATE): Uint8Array<ArrayBuffer> {
   const dataBytes = pcm.length * 2;
   const out = new Uint8Array(44 + dataBytes);

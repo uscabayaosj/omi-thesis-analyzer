@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { assembleVoiced, outToAbsMs, encodeWav } from "../src/lib/capture/assemble.ts";
+import { assembleVoiced, outToAbsMs, absToOutMs, encodeWav } from "../src/lib/capture/assemble.ts";
 
 const s = (ms: number) => Math.round((ms / 1000) * 16000);
 const piece = (absStartMs: number, ms: number, fill: number) => ({
@@ -41,4 +41,14 @@ test("encodeWav writes a valid 44-byte header for 16 kHz mono PCM16", () => {
   assert.equal(v.getUint32(40, true), 6); // data bytes
   assert.equal(v.getInt16(46, true), 1);
   assert.equal(v.getInt16(48, true), -1);
+});
+
+test("absToOutMs is the inverse of outToAbsMs", () => {
+  const { map } = assembleVoiced([piece(5_000, 500, 1), piece(10_000, 1000, 2)], 400);
+  assert.equal(absToOutMs(map, 5_000), 0);
+  assert.equal(absToOutMs(map, 5_250), 250);
+  assert.equal(absToOutMs(map, 5_500), 500); // end of piece 1
+  assert.equal(absToOutMs(map, 7_000), 500); // in the real-time gap → snaps to end of piece 1
+  assert.equal(absToOutMs(map, 10_100), 1_000);
+  assert.equal(absToOutMs(map, 20_000), 1_900); // past the end → end of last piece
 });
