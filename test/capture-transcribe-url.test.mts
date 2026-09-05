@@ -13,7 +13,8 @@ test("default URL carries the quality settings", () => {
   const p = params(buildTranscribeUrl());
   assert.equal(p.get("model"), "nova-3");
   assert.equal(p.get("language"), "en");
-  assert.equal(p.get("diarize"), "true");
+  assert.equal(p.get("diarize_model"), "latest");
+  assert.equal(p.get("diarize"), null);
   assert.equal(p.get("utterances"), "true");
   assert.equal(p.get("utt_split"), "1");
   assert.equal(p.get("smart_format"), "true");
@@ -21,7 +22,7 @@ test("default URL carries the quality settings", () => {
   assert.equal(p.get("numerals"), "true");
   assert.equal(p.get("measurements"), "true");
   assert.equal(p.get("filler_words"), "false");
-  assert.equal(p.get("mip_opt_out"), "true");
+  assert.equal(p.get("mip_opt_out"), "false");
   assert.equal(p.get("tag"), "trace-capture");
   assert.deepEqual(p.getAll("keyterm"), [...DEFAULT_KEYTERMS]);
 });
