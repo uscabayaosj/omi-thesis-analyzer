@@ -11,6 +11,7 @@
     "capture:replay": "node scripts/capture-replay.mts"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
     "@neondatabase/serverless": "^1.1.0",
     "@vercel/blob": "^2.8.0",
     "leaflet": "^1.9.4",
