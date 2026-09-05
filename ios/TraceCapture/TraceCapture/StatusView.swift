@@ -15,6 +15,12 @@ struct StatusView: View {
                         Button("Find pendant") { showSettings = true }
                     }
                 }
+                Section("Conversation") {
+                    Text("A conversation ends on its own after three quiet minutes. End it now to transcribe what you have.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                    Button("End conversation now") { coordinator.endConversation() }
+                    if let n = coordinator.endNote { Text(n).font(.footnote).foregroundStyle(.secondary) }
+                }
                 Section("Uploads") {
                     LabeledContent("Waiting to upload", value: coordinator.pending == 0 ? "none" : "\(coordinator.pending) chunks")
                     LabeledContent("Last upload", value: coordinator.lastUpload.map { $0.formatted(date: .omitted, time: .shortened) } ?? "not yet")

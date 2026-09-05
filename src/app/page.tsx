@@ -17,6 +17,7 @@ import {
   UsersIcon, TrendingUpIcon, DownloadIcon,
 } from "@/components/icons";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { CaptureBanner } from "@/components/CaptureBanner";
 import { pullAndMerge } from "@/lib/sync";
 import { useRovingRadioGroup } from "@/lib/roving";
 import { exportAllData } from "@/lib/export";
@@ -1009,6 +1010,10 @@ function HomeInner() {
             {exportNotice}
           </p>
         )}
+
+        {/* What the pendant is capturing right now — otherwise the three-minute
+            wait before a conversation appears reads as "nothing is happening". */}
+        <CaptureBanner onEnded={() => loadConversations("refresh")} />
 
         {/* Search — bypasses day-scoping entirely; the fast path when you know the topic, not the date */}
         {conversations.length > 0 && (

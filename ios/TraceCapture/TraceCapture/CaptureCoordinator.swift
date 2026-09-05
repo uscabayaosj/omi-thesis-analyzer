@@ -13,6 +13,7 @@ final class CaptureCoordinator {
     var lastUpload: Date?
     var lastError: String?
     var framesThisChunk = 0
+    var endNote: String?
 
     private let writer = ChunkWriter(directory: UploadQueue.directory)
     private var started = false
@@ -46,6 +47,21 @@ final class CaptureCoordinator {
         pending = uploads.pendingCount
         uploads.retryPending()
         pendant.start()
+    }
+
+    /// "I'm done — transcribe it": flushes the current chunk, then asks TRACE
+    /// to close the open session now instead of after three quiet minutes.
+    func endConversation() {
+        if let file = writer.flush() { UploadQueue.shared.enqueue(file: file) }
+        guard let base = CaptureSettings.baseURL else { return }
+        endNote = "Ending…"
+        var req = URLRequest(url: base.appendingPathComponent("api/capture/close"))
+        req.httpMethod = "POST"
+        if let token = CaptureSettings.ingestToken { req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        URLSession.shared.dataTask(with: req) { [weak self] _, response, error in
+            let ok = error == nil && (200..<300).contains((response as? HTTPURLResponse)?.statusCode ?? 0)
+            DispatchQueue.main.async { self?.endNote = ok ? "Ended — it will appear in TRACE in a moment." : "Could not end it — check the connection." }
+        }.resume()
     }
 
     /// Tells TRACE the stream stopped so a quiet session closes promptly.

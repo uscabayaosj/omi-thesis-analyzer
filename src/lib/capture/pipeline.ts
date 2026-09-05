@@ -160,3 +160,15 @@ export async function sweep(nowMs = Date.now()): Promise<{ closed: string[]; ret
   for (const id of retried) await closeSession(id);
   return { closed: stale.map((s) => s.id), retried };
 }
+
+/** Close every open session now, regardless of the silence gap — the user's
+ *  "I'm done, transcribe it" button. Awaited (not deferred) so the caller can
+ *  refresh the list the moment the conversation exists. */
+export async function closeAllOpen(): Promise<{ closed: string[] }> {
+  const sql = getStore();
+  if (!sql) return { closed: [] };
+  await store.ensureCaptureSchemaOnce(sql);
+  const open = await store.listStaleOpen(sql, Date.now() + 60_000);
+  for (const s of open) await closeSession(s.id);
+  return { closed: open.map((s) => s.id) };
+}
