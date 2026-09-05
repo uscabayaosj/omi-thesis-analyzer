@@ -1,0 +1,41 @@
+name: TraceCapture
+options:
+  bundleIdPrefix: com.uscabayaosj
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    TARGETED_DEVICE_FAMILY: "1"
+    CODE_SIGN_STYLE: Automatic
+targets:
+  TraceCapture:
+    type: application
+    platform: iOS
+    sources: [TraceCapture]
+    info:
+      path: TraceCapture/Info.plist
+      properties:
+        CFBundleDisplayName: TRACE Capture
+        UILaunchScreen: {}
+        UIBackgroundModes: [bluetooth-central]
+        NSBluetoothAlwaysUsageDescription: TRACE Capture keeps your Omi pendant connected so your conversations reach TRACE.
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.uscabayaosj.tracecapture
+  TraceCaptureTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [TraceCaptureTests]
+    dependencies:
+      - target: TraceCapture
+schemes:
+  TraceCapture:
+    build:
+      targets:
+        TraceCapture: all
+        TraceCaptureTests: [test]
+    test:
+      targets: [TraceCaptureTests]
