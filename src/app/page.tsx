@@ -509,7 +509,7 @@ function HomeInner() {
       // On an explicit refresh, always report. On the initial load, only surface
       // an error if there was no cached list to fall back on.
       if (mode === "refresh" || !cacheGet(CONVERSATIONS_CACHE_KEY)) {
-        setError(e instanceof Error ? e.message : "Failed to reach Omi");
+        setError(e instanceof Error ? e.message : "Could not refresh the list");
       } else {
         // Silently falling back to cache used to mean a whole day of stale rows
         // rendered as if they were current — the list looked authoritative and
@@ -886,7 +886,7 @@ function HomeInner() {
           <span className="tracking-[0.18em]">TRACE</span>
         </h1>
         <p className="text-slate-400 font-serif italic text-[0.95rem]">
-          Personal &amp; research assistant — your Omi conversations as thesis evidence and a daily plan
+          Personal &amp; research assistant — your recorded conversations as thesis evidence and a daily plan
         </p>
 
         {/* Header controls, split by job so nothing overflows on a phone:
@@ -967,11 +967,11 @@ function HomeInner() {
             aria-live="polite"
           >
             {refreshing
-              ? "Refreshing from Omi…"
+              ? "Refreshing…"
               : loading
               ? "Loading…"
               : stale
-              ? `Couldn't reach Omi — showing saved copy${lastSynced ? ` from ${getAnalysisAge(lastSynced).label}` : ""}`
+              ? `Couldn't refresh — showing saved copy${lastSynced ? ` from ${getAnalysisAge(lastSynced).label}` : ""}`
               : lastSynced
               ? `Synced ${getAnalysisAge(lastSynced).label}`
               : "Not synced yet"}
@@ -989,7 +989,7 @@ function HomeInner() {
             <button
               onClick={() => loadConversations("refresh")}
               disabled={loading || refreshing}
-              aria-label="Refresh conversations from Omi"
+              aria-label="Refresh conversations"
               className={BUTTON_GHOST}
             >
               <RefreshIcon className={`w-4 h-4 flex-shrink-0 ${refreshing ? "animate-spin" : ""}`} />
@@ -1329,7 +1329,7 @@ function HomeInner() {
         <div className="card p-8 text-center">
           <MicIcon className="w-10 h-10 mx-auto mb-4 text-slate-600" />
           <p className="text-slate-300">No conversations found.</p>
-          <p className="text-slate-400 text-sm mt-2">Record a conversation with your Omi device, then come back.</p>
+          <p className="text-slate-400 text-sm mt-2">Wear your pendant and have a conversation, then come back.</p>
         </div>
       )}
 

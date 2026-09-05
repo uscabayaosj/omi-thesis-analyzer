@@ -4,6 +4,11 @@ import { getStore } from "@/lib/kv";
 import { ensureCaptureSchemaOnce, listConversationsLite } from "@/lib/capture/store";
 import { friendlyError } from "@/lib/api-error";
 
+/** Neon returns timestamptz columns as Date objects; the UI (and the sort
+ *  below) expects the ISO strings the Omi API has always used. */
+const iso = (v: unknown): string | undefined =>
+  v instanceof Date ? v.toISOString() : typeof v === "string" ? v : undefined;
+
 /**
  * TRACE's own store is the primary source; the Omi API is consulted only while
  * OMI_API_KEY is still set (the transition period before the Omi app is
@@ -19,9 +24,9 @@ export async function GET() {
       for (const r of await listConversationsLite(sql, 200)) {
         byId.set(r.id, {
           id: r.id,
-          created_at: r.created_at,
-          started_at: r.started_at ?? undefined,
-          finished_at: r.finished_at ?? undefined,
+          created_at: iso(r.created_at) ?? "",
+          started_at: iso(r.started_at),
+          finished_at: iso(r.finished_at),
           source: r.source,
           structured: (r.structured as Conversation["structured"]) ?? undefined,
           geolocation: (r.geolocation as Conversation["geolocation"]) ?? null,
