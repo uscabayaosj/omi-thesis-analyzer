@@ -56,7 +56,7 @@ export function outToAbsMs(map: OffsetMapEntry[], outMs: number): number {
   return map[0]?.absStartMs ?? 0;
 }
 
-export function encodeWav(pcm: Int16Array, sampleRate: number = SAMPLE_RATE): Uint8Array {
+export function encodeWav(pcm: Int16Array, sampleRate: number = SAMPLE_RATE): Uint8Array<ArrayBuffer> {
   const dataBytes = pcm.length * 2;
   const out = new Uint8Array(44 + dataBytes);
   const v = new DataView(out.buffer);
