@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- TRACE Capture: the TRACE waveform alone, inside a copper ring — a pendant,
+       a record button. Sibling of public/icon.svg (voice → lines). iOS applies
+       the corner mask; the leather background must be full-bleed and opaque. -->
+  <rect width="1024" height="1024" fill="#2a1c10"/>
+  <circle cx="512" cy="512" r="368" fill="none" stroke="#b96d33" stroke-width="56"/>
+  <g stroke="#d99a5e" stroke-width="52" stroke-linecap="round" fill="none">
+    <path d="M336 456v112M424 344v336M512 264v496M600 376v272M688 440v144"/>
+  </g>
+</svg>

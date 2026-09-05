@@ -1,23 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 64 64">
-  <defs>
-    <linearGradient id="node" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#e6b988"/>
-      <stop offset="100%" stop-color="#c97f45"/>
-    </linearGradient>
-    <mask id="cut">
-      <rect width="64" height="64" fill="#fff"/>
-      <circle cx="32" cy="11.5" r="8.8" fill="#000"/>
-      <rect x="30.8" y="27" width="2.4" height="30" fill="#000"/>
-      <rect x="0" y="20.6" width="25" height="3.6" fill="#000"/>
-      <rect x="39" y="20.6" width="25" height="3.6" fill="#000"/>
-    </mask>
-  </defs>
+  <!-- TRACE: voice → lines. A waveform on the left resolves into ruled journal
+       lines on the right — speech becoming notes. Copper on brand-leather. -->
   <rect width="64" height="64" fill="#2a1c10"/>
-  <g transform="translate(32,33.4) scale(0.62) translate(-32,-30.2)">
-    <path d="M8 13 H56 V27 H40 V57 H24 V27 H8 Z" fill="#ffffff" mask="url(#cut)"/>
-    <path d="M8 22.4 H24 M40 22.4 H56" stroke="url(#node)" stroke-width="3.6" stroke-linecap="round"/>
-    <circle cx="32" cy="11.5" r="6.4" fill="url(#node)"/>
-    <circle cx="6" cy="22.4" r="5.8" fill="url(#node)"/>
-    <circle cx="58" cy="22.4" r="5.8" fill="url(#node)"/>
+  <g stroke="#b96d33" stroke-width="3.2" stroke-linecap="round" fill="none">
+    <path d="M10 27v10M15.5 20v24M21 14v36M26.5 22v20"/>
+  </g>
+  <g stroke="#d99a5e" stroke-width="3.2" stroke-linecap="round" fill="none">
+    <path d="M34 24h20M34 32h20M34 40h12"/>
   </g>
 </svg>

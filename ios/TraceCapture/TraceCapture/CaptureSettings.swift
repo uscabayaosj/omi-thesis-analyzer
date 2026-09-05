@@ -21,6 +21,14 @@ enum CaptureSettings {
 
     static var deviceIdString: String { peripheralId?.uuidString.lowercased() ?? "unpaired" }
 
+    /// Relay mute: frames are dropped before the chunk writer. Persisted so a
+    /// mute survives relaunch and BLE background restoration — you stay muted
+    /// until you say otherwise.
+    static var muted: Bool {
+        get { defaults.bool(forKey: "muted") }
+        set { defaults.set(newValue, forKey: "muted") }
+    }
+
     static var ingestToken: String? {
         get {
             let query: [String: Any] = [

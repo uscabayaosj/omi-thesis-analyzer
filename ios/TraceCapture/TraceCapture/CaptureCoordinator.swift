@@ -14,6 +14,9 @@ final class CaptureCoordinator {
     var lastError: String?
     var framesThisChunk = 0
     var endNote: String?
+    /// Relay mute. Read from settings at construction so a relaunch — including
+    /// a silent BLE background restoration — comes back still muted.
+    private(set) var muted = CaptureSettings.muted
 
     private let writer = ChunkWriter(directory: UploadQueue.directory)
     private var started = false
@@ -28,7 +31,7 @@ final class CaptureCoordinator {
         pendant.onBattery = { [weak self] b in DispatchQueue.main.async { self?.battery = b } }
         pendant.onCodec = { [weak self] c in self?.writer.codec = c }
         pendant.onFrame = { [weak self] frame in
-            guard let self else { return }
+            guard let self, !self.muted else { return }
             if let rolled = self.writer.append(frame: frame) { uploads.enqueue(file: rolled) }
             self.framesThisChunk = self.writer.pendingFrames
         }
@@ -47,6 +50,22 @@ final class CaptureCoordinator {
         pending = uploads.pendingCount
         uploads.retryPending()
         pendant.start()
+    }
+
+    /// Relay mute. The BLE subscription stays live (instant unmute, battery
+    /// keeps reporting); frames are simply dropped at the door, so nothing
+    /// heard while muted is ever written or uploaded. Muting flushes what was
+    /// already captured — audio from before the mute is legitimate — and asks
+    /// TRACE to close the open conversation now rather than after the quiet
+    /// window. Unmuting needs nothing: the next chunk opens a new one.
+    func setMuted(_ on: Bool) {
+        guard on != muted else { return }
+        muted = on
+        CaptureSettings.muted = on
+        guard on else { return }
+        if let file = writer.flush() { UploadQueue.shared.enqueue(file: file) }
+        framesThisChunk = 0
+        requestSweep()
     }
 
     /// "I'm done — transcribe it": flushes the current chunk, then asks TRACE
