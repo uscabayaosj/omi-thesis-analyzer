@@ -37,6 +37,8 @@ export async function POST(req: NextRequest) {
     if (msg === "store not configured") return NextResponse.json({ error: "Store not configured" }, { status: 503 });
     console.error("capture ingest failed:", err);
     const { error, status } = friendlyError(err);
-    return NextResponse.json({ error }, { status });
+    // This route is bearer-authed and single-user: the raw message is more
+    // useful than a friendly one when a chunk fails on the phone.
+    return NextResponse.json({ error, detail: msg }, { status });
   }
 }
