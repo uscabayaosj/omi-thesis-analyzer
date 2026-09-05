@@ -126,6 +126,7 @@ async function transcribeSession(sql: Sql, s: SessionState): Promise<Conversatio
     session_id: s.id,
     word_count: countWords(segments),
     audio_refs: chunkIds.map((id) => paths.get(id)).filter((p): p is string => !!p),
+    unmatched_speakers: null,
   };
 }
 

@@ -25,5 +25,6 @@ export async function loadConversation(id: string): Promise<Conversation> {
     structured: (r.structured as Conversation["structured"]) ?? undefined,
     transcript_segments: r.transcript_segments as Conversation["transcript_segments"],
     geolocation: (r.geolocation as Conversation["geolocation"]) ?? null,
+    unmatched_speakers: (r.unmatched_speakers as Conversation["unmatched_speakers"]) ?? undefined,
   };
 }

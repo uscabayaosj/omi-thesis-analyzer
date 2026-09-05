@@ -42,6 +42,9 @@ export interface SessionState {
 export interface TranscriptSegment {
   text: string;
   speaker_id: number;
+  /** Set when a Person's voiceprint matched this segment's speaker cluster
+   *  (see identify.ts / pipeline.ts's identifySpeakers). */
+  speaker_person_id?: string;
   /** Seconds relative to the conversation start. */
   start: number;
   end: number;

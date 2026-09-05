@@ -75,6 +75,7 @@ interface TranscriptSegment {
   text: string;
   speaker_id?: number;
   speaker_name?: string;
+  speaker_person_id?: string;
 }
 
 interface Conversation {
@@ -88,6 +89,7 @@ interface Conversation {
   };
   transcript_segments?: TranscriptSegment[];
   geolocation?: ConversationGeolocation | null;
+  unmatched_speakers?: number[];
 }
 
 // ── Components ──

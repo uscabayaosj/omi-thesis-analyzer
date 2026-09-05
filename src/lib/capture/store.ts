@@ -75,6 +75,10 @@ async function ensureCaptureSchema(sql: Sql): Promise<void> {
       inserted_at         TIMESTAMPTZ NOT NULL DEFAULT now()
     )`);
   await withTimeout(sql`CREATE INDEX IF NOT EXISTS conversations_created_idx ON conversations (created_at DESC)`);
+  // Speaker-cluster ids that didn't match anyone in the People Directory at
+  // transcription time (spec: 2026-09-05-speaker-identification-design.md).
+  // Added after first deploy, hence ALTER rather than a column in the CREATE.
+  await withTimeout(sql`ALTER TABLE conversations ADD COLUMN IF NOT EXISTS unmatched_speakers JSONB`);
 }
 
 let ready: Promise<void> | null = null;
@@ -154,6 +158,16 @@ export async function getOpenSession(sql: Sql, deviceId: string): Promise<Sessio
   return rows[0] ? toState(rows[0]) : null;
 }
 
+/** Look up the session that produced a given conversation — used by the
+ *  enroll-voice route to re-fetch that speaker's audio after the session
+ *  has already closed. */
+export async function getSessionByConversationId(sql: Sql, conversationId: string): Promise<StoredSession | null> {
+  const rows = (await withTimeout(
+    sql`SELECT * FROM capture_sessions WHERE conversation_id = ${conversationId} ORDER BY started_at DESC LIMIT 1`
+  )) as SessionRow[];
+  return rows[0] ? toState(rows[0]) : null;
+}
+
 export async function getSession(sql: Sql, id: string): Promise<StoredSession | null> {
   const rows = (await withTimeout(sql`SELECT * FROM capture_sessions WHERE id = ${id}`)) as SessionRow[];
   return rows[0] ? toState(rows[0]) : null;
@@ -201,17 +215,19 @@ export async function listRetryable(sql: Sql): Promise<string[]> {
 export async function upsertConversations(sql: Sql, rows: ConversationRow[]): Promise<void> {
   for (const r of rows) {
     await withTimeout(sql`
-      INSERT INTO conversations (id, source, created_at, started_at, finished_at, transcript_segments, structured, geolocation, session_id, word_count, audio_refs)
+      INSERT INTO conversations (id, source, created_at, started_at, finished_at, transcript_segments, structured, geolocation, session_id, word_count, audio_refs, unmatched_speakers)
       VALUES (${r.id}, ${r.source}, ${r.created_at}, ${r.started_at}, ${r.finished_at},
               ${JSON.stringify(r.transcript_segments)}::jsonb,
               ${r.structured === null ? null : JSON.stringify(r.structured)}::jsonb,
               ${r.geolocation === null ? null : JSON.stringify(r.geolocation)}::jsonb,
               ${r.session_id}, ${r.word_count},
-              ${r.audio_refs === null ? null : JSON.stringify(r.audio_refs)}::jsonb)
+              ${r.audio_refs === null ? null : JSON.stringify(r.audio_refs)}::jsonb,
+              ${r.unmatched_speakers == null ? null : JSON.stringify(r.unmatched_speakers)}::jsonb)
       ON CONFLICT (id) DO UPDATE SET
         transcript_segments = EXCLUDED.transcript_segments, structured = EXCLUDED.structured,
         geolocation = EXCLUDED.geolocation, finished_at = EXCLUDED.finished_at,
-        word_count = EXCLUDED.word_count, audio_refs = EXCLUDED.audio_refs`);
+        word_count = EXCLUDED.word_count, audio_refs = EXCLUDED.audio_refs,
+        unmatched_speakers = EXCLUDED.unmatched_speakers`);
   }
 }
 
@@ -219,7 +235,7 @@ export type ConversationLite = Omit<ConversationRow, "transcript_segments">;
 
 export async function listConversationsLite(sql: Sql, limit = 200): Promise<ConversationLite[]> {
   return (await withTimeout(sql`
-    SELECT id, source, created_at, started_at, finished_at, structured, geolocation, session_id, word_count, audio_refs
+    SELECT id, source, created_at, started_at, finished_at, structured, geolocation, session_id, word_count, audio_refs, unmatched_speakers
     FROM conversations ORDER BY created_at DESC LIMIT ${limit}`)) as ConversationLite[];
 }
 
