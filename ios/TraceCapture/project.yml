@@ -29,6 +29,9 @@ targets:
     type: bundle.unit-test
     platform: iOS
     sources: [TraceCaptureTests]
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
     dependencies:
       - target: TraceCapture
 schemes:
