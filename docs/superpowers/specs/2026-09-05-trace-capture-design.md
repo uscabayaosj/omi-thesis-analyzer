@@ -161,7 +161,7 @@ are padded 300 ms each side and spans shorter than 500 ms are dropped. The
 threshold is an env var so it can be tuned with a redeploy.
 
 **Sessions.** At most one open session per device. A new span joins the open
-session if `span.start − session.last_speech_at ≤ 180 s` (Omi's rule); otherwise
+session if `span.start − session.last_speech_at ≤ 90 s` (shortened from Omi's 180 s on 2026-09-05); otherwise
 the open session closes and a new one starts at the span. Hard caps that also
 force a close: 4 h wall time, or **45 min of voiced audio** (keeps the assembled
 WAV ≈ 86 MB, within one function's memory and the 300 s limit). A session that
@@ -242,7 +242,7 @@ tables are never touched.
 
 - node:test for `container`, `vad`, `sessions`, `assemble` (offset mapping),
   and the Omi→row import mapping; each with boundary cases (codec ids, span
-  padding, the 180 s gap, the 45-min voiced cap, the 2 s discard floor).
+  padding, the 90 s gap, the 45-min voiced cap, the 2 s discard floor).
 - A replay script (`scripts/capture-replay.mts`) that feeds a recorded `.trch`
   chunk through parse → decode → VAD locally and prints spans — the tuning tool
   for `CAPTURE_VAD_DBFS`.

@@ -5,8 +5,10 @@ import type { AbsSpan, SessionState } from "./types";
  * caller passes `nowMs` — so they can be tested to the millisecond.
  */
 
-/** Omi's own rule: three silent minutes end a conversation. */
-export const SESSION_GAP_MS = 180_000;
+/** Ninety silent seconds end a conversation — shortened from Omi's three
+ *  minutes (2026-09-05) because back-to-back talks were merging; the
+ *  "End conversation now" button covers anything in between. */
+export const SESSION_GAP_MS = 90_000;
 export const SESSION_MAX_WALL_MS = 4 * 3_600_000;
 /** Keeps the assembled WAV (~86 MB) inside one function's memory and time. */
 export const SESSION_MAX_VOICED_MS = 45 * 60_000;

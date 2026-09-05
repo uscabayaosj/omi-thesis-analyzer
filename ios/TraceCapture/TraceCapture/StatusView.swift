@@ -16,7 +16,7 @@ struct StatusView: View {
                     }
                 }
                 Section("Conversation") {
-                    Text("A conversation ends on its own after three quiet minutes. End it now to transcribe what you have.")
+                    Text("A conversation ends on its own after ninety quiet seconds. End it now to transcribe what you have.")
                         .font(.footnote).foregroundStyle(.secondary)
                     Button("End conversation now") { coordinator.endConversation() }
                     if let n = coordinator.endNote { Text(n).font(.footnote).foregroundStyle(.secondary) }

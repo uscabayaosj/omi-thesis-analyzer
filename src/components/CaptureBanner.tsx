@@ -15,7 +15,7 @@ interface OpenSession {
 
 /**
  * The conversation being captured right now. A session only becomes a
- * conversation three minutes after the talking stops, and until this banner
+ * conversation ninety seconds after the talking stops, and until this banner
  * existed that interval read as "nothing is happening". Ending it here closes
  * and transcribes immediately.
  */
@@ -65,7 +65,7 @@ export function CaptureBanner({ onEnded }: { onEnded: () => void }) {
           Capturing a conversation since <span className="font-mono">{formatDateTime(s.startedAt)}</span> —{" "}
           {Math.round(s.voicedMs / 60_000)} min of speech so far.
           <span className="block text-sm text-slate-400 mt-1">
-            It appears here about three minutes after the talking stops.{" "}
+            It appears here about ninety seconds after the talking stops.{" "}
             <Link href="/capture" className="text-cyan-400 hover:underline">Capture status</Link>
           </span>
         </p>
