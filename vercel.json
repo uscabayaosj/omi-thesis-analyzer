@@ -1,5 +1,6 @@
 {
   "crons": [
-    { "path": "/api/push/check-rollup", "schedule": "0 21 * * *" }
+    { "path": "/api/push/check-rollup", "schedule": "0 21 * * *" },
+    { "path": "/api/capture/sweep", "schedule": "30 3 * * *" }
   ]
 }
