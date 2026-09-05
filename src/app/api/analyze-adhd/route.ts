@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
 
     if (!convo.transcript_segments || convo.transcript_segments.length === 0) {
       return NextResponse.json(
-        { error: "This conversation has no transcript to analyze. Try recording a new conversation with your Omi device." },
+        { error: "This conversation has no transcript to analyze. Try recording a new conversation with your pendant." },
         { status: 404 }
       );
     }

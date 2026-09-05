@@ -434,7 +434,7 @@ function GroupAnalysisContent() {
             role="status"
           >
             {skipped >= ids.length / 2 ? "⚠ " : ""}
-            {skipped} of {ids.length} conversation{ids.length === 1 ? "" : "s"} could not be loaded from Omi and {skipped === 1 ? "was" : "were"} left out
+            {skipped} of {ids.length} conversation{ids.length === 1 ? "" : "s"} could not be loaded and {skipped === 1 ? "was" : "were"} left out
             {skipped >= ids.length / 2 ? " — this synthesis covers less than half of the selected group and should not be treated as complete." : " of this analysis."}
           </p>
         )}

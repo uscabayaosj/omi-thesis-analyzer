@@ -242,7 +242,7 @@ export default function ConversationPage() {
   /* A 404 from Omi is a different situation from an unreachable Omi, and the
      two need different copy and different affordances. `api-error.ts` already
      distinguishes them in the message it produces. */
-  const isGone = !!error && /no longer exists on Omi/i.test(error);
+  const isGone = !!error && /no longer exists on Omi|isn't in TRACE's store/i.test(error);
   const rovingLens = useRovingRadioGroup(LENS_VALUES, lens, setLens);
   const [adhd, setAdhd] = useState<AdhdAnalysis | null>(null);
   const [adhdDoneKeys, setAdhdDoneKeys] = useState<string[]>([]);
@@ -366,7 +366,7 @@ export default function ConversationPage() {
       setLastSynced(new Date().toISOString());
       if (data.transcript_segments?.length) cacheSet(cacheKey, data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to reach Omi");
+      setError(e instanceof Error ? e.message : "Could not load this conversation");
     } finally {
       if (mode === "initial") setLoading(false);
       else setRefreshing(false);
@@ -599,7 +599,7 @@ export default function ConversationPage() {
           <button
             onClick={() => loadConversation("refresh")}
             disabled={loading || refreshing}
-            aria-label="Refresh this conversation and transcript from Omi"
+            aria-label="Refresh this conversation and transcript"
             className={`${BUTTON_GHOST} flex-shrink-0`}
           >
             <RefreshIcon className={`w-4 h-4 flex-shrink-0 ${refreshing ? "animate-spin" : ""}`} />
@@ -674,7 +674,7 @@ export default function ConversationPage() {
               {storedAnalysis?.title || adhdTitle || "Saved analysis"}
             </h1>
             <p className="text-slate-400 font-serif italic text-[0.95rem]">
-              Couldn&apos;t reach Omi, so the recording and transcript aren&apos;t available. This is the
+              Couldn&apos;t load the recording and transcript. This is the
               analysis already saved on this device.
             </p>
           </header>
@@ -723,8 +723,8 @@ export default function ConversationPage() {
           </h1>
           <p className="text-slate-400 font-serif italic text-[0.95rem]">
             {isGone
-              ? "Omi no longer has this conversation, so there's nothing left to fetch. Any analysis you already saved for it would appear here — there isn't one."
-              : "This conversation isn't cached on this device and Omi couldn't be reached. Try Refresh above, or go back to the list."}
+              ? "This conversation is no longer available, so there's nothing left to fetch. Any analysis you already saved for it would appear here — there isn't one."
+              : "This conversation isn't cached on this device and couldn't be loaded. Try Refresh above, or go back to the list."}
           </p>
         </header>
       )}

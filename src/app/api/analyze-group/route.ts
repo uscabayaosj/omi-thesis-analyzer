@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
 
     if (conversationData.length < 2) {
       const reason = failedCount > 0
-        ? `${failedCount} of the selected conversations could not be loaded from Omi.`
+        ? `${failedCount} of the selected conversations could not be loaded.`
         : "Fewer than 2 of the selected conversations have transcripts.";
       return NextResponse.json(
         { error: `Not enough conversations to analyze as a group. ${reason}` },

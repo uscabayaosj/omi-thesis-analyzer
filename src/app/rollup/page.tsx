@@ -221,7 +221,7 @@ function RollupPageInner() {
         const data = await fetchJson<ConvoLite[]>("/api/conversations");
         setConvos(Array.isArray(data) ? data : []);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to reach Omi");
+        setError(e instanceof Error ? e.message : "Could not load conversations");
       } finally {
         setLoading(false);
       }
@@ -640,7 +640,7 @@ function RollupPageInner() {
             <li className="card p-8 text-center">
               <p className="text-slate-400">
                 {error
-                  ? "Couldn’t reach Omi, and no rollups are saved on this device yet."
+                  ? "Couldn’t load conversations, and no rollups are saved on this device yet."
                   : "No conversations to roll up yet."}
               </p>
             </li>

@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     template: "%s · TRACE",
   },
   description:
-    "Turns Omi wearable conversations into thesis evidence and daily executive-function structure.",
+    "Turns conversations captured by a wearable pendant into thesis evidence and daily executive-function structure.",
   manifest: "/manifest.json",
   icons: {
     icon: [
