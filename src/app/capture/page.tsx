@@ -57,8 +57,18 @@ export default function CapturePage() {
     setBusy("import");
     setNote(null);
     try {
-      const r = await fetchJson<{ imported: number }>("/api/capture/import-omi", { method: "POST" });
-      setNote(`Imported ${r.imported} conversations from Omi.`);
+      let offset: number | null = 0;
+      let total = 0;
+      while (offset !== null) {
+        const r: { imported: number; nextOffset: number | null } = await fetchJson(
+          `/api/capture/import-omi?offset=${offset}&pages=1`,
+          { method: "POST" }
+        );
+        total += r.imported;
+        offset = r.nextOffset;
+        setNote(`Imported ${total} conversations so far…`);
+      }
+      setNote(`Imported ${total} conversations from Omi.`);
       await load();
     } catch (e) {
       setNote(e instanceof Error ? e.message : "Import failed.");
