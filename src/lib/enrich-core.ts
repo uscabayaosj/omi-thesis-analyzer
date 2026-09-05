@@ -5,7 +5,7 @@
  * The LLM call itself lives in enrich.ts.
  */
 
-import type { TranscriptSegment } from "./omi-api";
+import type { TranscriptSegment } from "./conversation-types";
 
 export interface Enrichment {
   /** True when the recording is noise with no recoverable subject matter. */

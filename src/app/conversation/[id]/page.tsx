@@ -25,7 +25,7 @@ import { formatDateTime, dayOf } from "@/lib/format";
 import { ThesisResults, type Analysis } from "@/components/ThesisResults";
 import { AdhdResults } from "@/components/AdhdResults";
 import type { AdhdAnalysis } from "@/lib/adhd";
-import type { OmiGeolocation } from "@/lib/omi-api";
+import type { ConversationGeolocation } from "@/lib/conversation-types";
 import { getAdhdAnalysis, saveAdhdAnalysis, toggleCommitmentDone } from "@/lib/adhd-storage";
 import { getEnrichments } from "@/lib/enrich-storage";
 import {
@@ -87,7 +87,7 @@ interface Conversation {
     category?: string;
   };
   transcript_segments?: TranscriptSegment[];
-  geolocation?: OmiGeolocation | null;
+  geolocation?: ConversationGeolocation | null;
 }
 
 // ── Components ──
@@ -242,7 +242,7 @@ export default function ConversationPage() {
   /* A 404 from Omi is a different situation from an unreachable Omi, and the
      two need different copy and different affordances. `api-error.ts` already
      distinguishes them in the message it produces. */
-  const isGone = !!error && /no longer exists on Omi|isn't in TRACE's store/i.test(error);
+  const isGone = !!error && /isn't in TRACE's store/i.test(error);
   const rovingLens = useRovingRadioGroup(LENS_VALUES, lens, setLens);
   const [adhd, setAdhd] = useState<AdhdAnalysis | null>(null);
   const [adhdDoneKeys, setAdhdDoneKeys] = useState<string[]>([]);
@@ -524,7 +524,7 @@ export default function ConversationPage() {
       // See suggestFromAdhdPeople for why runExtraction isn't called here.
       const adhdDate = data.conversation?.created_at || conversation?.created_at;
       if (adhdDate) {
-        const geo = (data.conversation as { geolocation?: OmiGeolocation } | undefined)?.geolocation;
+        const geo = (data.conversation as { geolocation?: ConversationGeolocation } | undefined)?.geolocation;
         suggestFromAdhdPeople(id, adhdDate, data.analysis.people, geo);
       }
     } catch (e) {

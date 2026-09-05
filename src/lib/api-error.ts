@@ -13,23 +13,11 @@ export function friendlyError(err: unknown): FriendlyError {
 
   const raw = err instanceof Error ? err.message : String(err);
 
-  if (raw.includes("OMI_API_KEY")) {
-    return { error: "Your Omi connection isn't set up yet. Add your Omi API key and reload.", status: 500 };
+  if (raw.includes("store not configured")) {
+    return { error: "TRACE's store isn't configured here, so conversations can't be loaded.", status: 503 };
   }
   if (raw.includes("conversation not found in TRACE")) {
     return { error: "That conversation isn't in TRACE's store.", status: 404 };
-  }
-  if (raw.includes("Omi API 404")) {
-    return { error: "That conversation no longer exists on Omi. It may have been deleted.", status: 404 };
-  }
-  if (raw.includes("Omi API 401") || raw.includes("Omi API 403")) {
-    return { error: "Omi didn't accept your API key. Double-check it's correct and try again.", status: 502 };
-  }
-  if (raw.includes("Omi API 429")) {
-    return { error: "Omi is rate-limiting requests. Wait a moment and try again.", status: 429 };
-  }
-  if (raw.includes("Omi API")) {
-    return { error: "Could not reach Omi. Check your connection and your Omi API key, then try again.", status: 502 };
   }
   if (raw.includes("API key not set")) {
     return { error: "Your AI analysis key isn't set up yet. Add your provider's API key and reload.", status: 500 };

@@ -1,13 +1,14 @@
 # TRACE — Personal & Research Assistant
 
-Turns Omi wearable conversations into two things: thesis evidence for PhD research on Pioneer Sovereignty, and a daily executive-function plan. Pulls conversations from the Omi Developer API and runs analysis through GPT-5.6-luna.
+Turns conversations captured by an Omi DK2 pendant — through TRACE's own iOS relay app, with no Omi app or cloud involved — into two things: thesis evidence for PhD research on Pioneer Sovereignty, and a daily executive-function plan. Pulls conversations from the Omi Developer API and runs analysis through GPT-5.6-luna.
 
 ## Setup
 
 1. Copy `.env.example` to `.env.local`
-2. Add your Omi Developer API key (from Omi app → Developer → API Keys)
-3. Add your OpenAI API key
-4. `npm run dev` or deploy to Vercel
+2. Add your OpenAI API key
+3. On Vercel: `DEEPGRAM_API_KEY`, `CAPTURE_INGEST_TOKEN` (any long random string), a private Blob store, and the Neon integration
+4. Build `ios/TraceCapture` onto your iPhone (see `docs/superpowers/specs/2026-09-05-trace-capture-design.md`), enter the same URL + token in its Settings, pair the pendant
+5. `npm run dev` or deploy to Vercel
 
 ## Analysis Dimensions
 
@@ -38,12 +39,13 @@ Both ADHD Aid and Daily Rollup export to Obsidian or download as markdown, same 
 
 ## Deploy to Vercel
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/uscabayaosj/omi-thesis-analyzer&env=OMI_API_KEY,OPENAI_API_KEY)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/uscabayaosj/omi-thesis-analyzer&env=OPENAI_API_KEY,DEEPGRAM_API_KEY,CAPTURE_INGEST_TOKEN)
 
 ## Tech Stack
 
 - Next.js 15 (App Router)
 - Tailwind CSS
 - OpenAI GPT-5.6-luna
-- Omi Developer API
+- Deepgram nova-3 (speech-to-text), Vercel Blob (audio archive), Neon (store)
+- TRACE Capture: a SwiftUI/CoreBluetooth relay app in `ios/`
 - PWA (installable on mobile)

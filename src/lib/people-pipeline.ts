@@ -1,7 +1,7 @@
 "use client";
 
 import { fetchJson } from "@/lib/fetch-json";
-import type { Conversation, OmiGeolocation } from "@/lib/omi-api";
+import type { Conversation, ConversationGeolocation } from "@/lib/conversation-types";
 import type { AdhdPerson } from "@/lib/adhd";
 import {
   addPending,
@@ -94,7 +94,7 @@ export function suggestFromAdhdPeople(
   conversationId: string,
   date: string,
   people: AdhdPerson[],
-  geo?: OmiGeolocation | null
+  geo?: ConversationGeolocation | null
 ): void {
   try {
     const ignored = new Set(getIgnoredNames().map(normalize));

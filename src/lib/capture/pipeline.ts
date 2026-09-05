@@ -7,7 +7,7 @@ import { detectSpeech, levelStats, VAD_DEFAULTS } from "./vad";
 import { placeSpan, isStale, disposition, SESSION_GAP_MS } from "./sessions";
 import { assembleVoiced, encodeWav, type VoicedPiece } from "./assemble";
 import { transcribeWav, utterancesToSegments } from "./transcribe";
-import { countWords, type ConversationRow } from "./omi-import-map";
+import { countWords, type ConversationRow } from "./rows";
 import type { AbsSpan, SessionState } from "./types";
 import * as store from "./store";
 

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { Analysis } from "./omi-api";
+import type { Analysis } from "./conversation-types";
 import { logUsage, type NormalizedUsage } from "./usage";
 
 interface ChatMessage {

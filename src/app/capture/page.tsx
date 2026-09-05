@@ -5,7 +5,7 @@ import Link from "next/link";
 import { fetchJson } from "@/lib/fetch-json";
 import { formatDateTime } from "@/lib/format";
 import { ArrowLeftIcon, RefreshIcon } from "@/components/icons";
-import { BUTTON_GHOST, BUTTON_SECONDARY } from "@/lib/ui";
+import { BUTTON_GHOST } from "@/lib/ui";
 
 interface Status {
   configured: boolean;
@@ -29,7 +29,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 export default function CapturePage() {
   const [status, setStatus] = useState<Status | null>(null);
-  const [busy, setBusy] = useState<"refresh" | "import" | null>(null);
+  const [busy, setBusy] = useState<"refresh" | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
   // No synchronous setState in the effect body: state changes only land after
@@ -53,29 +53,6 @@ export default function CapturePage() {
     setBusy(null);
   };
 
-  const runImport = async () => {
-    setBusy("import");
-    setNote(null);
-    try {
-      let offset: number | null = 0;
-      let total = 0;
-      while (offset !== null) {
-        const r: { imported: number; nextOffset: number | null } = await fetchJson(
-          `/api/capture/import-omi?offset=${offset}&pages=1`,
-          { method: "POST" }
-        );
-        total += r.imported;
-        offset = r.nextOffset;
-        setNote(`Imported ${total} conversations so far…`);
-      }
-      setNote(`Imported ${total} conversations from Omi.`);
-      await load();
-    } catch (e) {
-      setNote(e instanceof Error ? e.message : "Import failed.");
-    } finally {
-      setBusy(null);
-    }
-  };
 
   return (
     <main id="main" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-8">
@@ -141,9 +118,6 @@ export default function CapturePage() {
             <button onClick={load} disabled={busy !== null} className={BUTTON_GHOST}>
               <RefreshIcon className={`w-4 h-4 ${busy === "refresh" ? "animate-spin" : ""}`} />
               Refresh
-            </button>
-            <button onClick={runImport} disabled={busy !== null} className={BUTTON_SECONDARY}>
-              {busy === "import" ? "Importing…" : "Import Omi history"}
             </button>
           </div>
           {note && (

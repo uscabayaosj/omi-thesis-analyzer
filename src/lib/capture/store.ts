@@ -1,6 +1,6 @@
 import { withTimeout, type Sql } from "../kv";
 import type { AbsSpan, SessionState } from "./types";
-import type { ConversationRow } from "./omi-import-map";
+import type { ConversationRow } from "./rows";
 
 /**
  * Neon persistence for the capture pipeline. Modelled tables (unlike the

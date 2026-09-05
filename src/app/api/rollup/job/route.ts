@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadConversation } from "@/lib/conversations";
 import { after } from "next/server";
-import { segmentsToText } from "@/lib/omi-api";
+import { segmentsToText } from "@/lib/conversation-types";
 import { analyzeAdhd, type AdhdAnalysis, type Rollup } from "@/lib/adhd";
 import { generateRollup, type DayConvoOutput } from "@/lib/rollup";
 import { getStore, ensureSchema, getNamespaceData, putNamespaceData, type Sql } from "@/lib/kv";

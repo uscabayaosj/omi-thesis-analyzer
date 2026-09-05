@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadConversation } from "@/lib/conversations";
-import { segmentsToText } from "@/lib/omi-api";
+import { segmentsToText } from "@/lib/conversation-types";
 import { analyzeCustom } from "@/lib/analysis";
 import { friendlyError } from "@/lib/api-error";
 
