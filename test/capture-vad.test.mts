@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { detectSpeech, windowDbfs, VAD_DEFAULTS } from "../src/lib/capture/vad.ts";
+import { detectSpeech, windowDbfs, levelStats, VAD_DEFAULTS } from "../src/lib/capture/vad.ts";
 
 const SR = 16000;
 /** ms → samples */
@@ -55,4 +55,11 @@ test("spans are clamped to the buffer and never overlap after padding", () => {
   assert.equal(spans[0].startMs, 0);
   assert.equal(spans[0].endMs, 700);
   assert.equal(VAD_DEFAULTS.thresholdDbfs, -45);
+});
+
+test("levelStats reports the floor and the peaks of a half-silent buffer", () => {
+  const stats = levelStats(toneBetween(1000, 1000, 0));
+  assert.equal(stats.p10, -100, "silent half clamps to -100");
+  assert.ok(stats.p90 > -20 && stats.p90 < 0, `loud half ${stats.p90}`);
+  assert.deepEqual(levelStats(new Int16Array(0)), { p10: -100, p50: -100, p90: -100 });
 });

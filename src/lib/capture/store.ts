@@ -20,6 +20,7 @@ export interface ChunkRow {
   voicedMs: number;
   blobPath: string;
   bytes: number;
+  levels?: { p10: number; p50: number; p90: number };
 }
 
 async function ensureCaptureSchema(sql: Sql): Promise<void> {
@@ -38,6 +39,11 @@ async function ensureCaptureSchema(sql: Sql): Promise<void> {
       received_at  TIMESTAMPTZ NOT NULL DEFAULT now()
     )`);
   await withTimeout(sql`CREATE INDEX IF NOT EXISTS capture_chunks_started_idx ON capture_chunks (started_at)`);
+  // Level percentiles per chunk (dBFS): the VAD tuning signal. Added after
+  // first deploy, hence ALTER rather than a column in the CREATE.
+  await withTimeout(sql`ALTER TABLE capture_chunks ADD COLUMN IF NOT EXISTS level_p10 REAL`);
+  await withTimeout(sql`ALTER TABLE capture_chunks ADD COLUMN IF NOT EXISTS level_p50 REAL`);
+  await withTimeout(sql`ALTER TABLE capture_chunks ADD COLUMN IF NOT EXISTS level_p90 REAL`);
   await withTimeout(sql`
     CREATE TABLE IF NOT EXISTS capture_sessions (
       id              UUID PRIMARY KEY,
@@ -94,8 +100,9 @@ export async function chunkExists(sql: Sql, id: string): Promise<boolean> {
 
 export async function insertChunk(sql: Sql, r: ChunkRow): Promise<void> {
   await withTimeout(sql`
-    INSERT INTO capture_chunks (id, device_id, codec, started_at, duration_ms, packets, voiced_ms, blob_path, bytes)
-    VALUES (${r.id}, ${r.deviceId}, ${r.codec}, ${iso(r.startedAtMs)}, ${r.durationMs}, ${r.packets}, ${r.voicedMs}, ${r.blobPath}, ${r.bytes})
+    INSERT INTO capture_chunks (id, device_id, codec, started_at, duration_ms, packets, voiced_ms, blob_path, bytes, level_p10, level_p50, level_p90)
+    VALUES (${r.id}, ${r.deviceId}, ${r.codec}, ${iso(r.startedAtMs)}, ${r.durationMs}, ${r.packets}, ${r.voicedMs}, ${r.blobPath}, ${r.bytes},
+            ${r.levels?.p10 ?? null}, ${r.levels?.p50 ?? null}, ${r.levels?.p90 ?? null})
     ON CONFLICT (id) DO NOTHING`);
 }
 
@@ -228,10 +235,12 @@ export interface CaptureStatus {
   open: { id: string; deviceId: string; startedAt: string; lastSpeechAt: string; voicedMs: number }[];
   byStatus7d: Record<string, number>;
   failed: { id: string; startedAt: string; error: string; attempts: number }[];
+  /** Newest chunks with their level percentiles — the VAD tuning readout. */
+  recentChunks: { startedAt: string; durationMs: number; voicedMs: number; p10: number | null; p50: number | null; p90: number | null }[];
 }
 
 export async function captureStatus(sql: Sql): Promise<CaptureStatus> {
-  const [last, open, counts, failed] = await Promise.all([
+  const [last, open, counts, failed, recent] = await Promise.all([
     withTimeout(sql`SELECT MAX(received_at) AS at FROM capture_chunks`) as Promise<{ at: string | null }[]>,
     withTimeout(
       sql`SELECT id, device_id, started_at, last_speech_at, voiced_ms FROM capture_sessions WHERE status = 'open'`
@@ -242,11 +251,15 @@ export async function captureStatus(sql: Sql): Promise<CaptureStatus> {
     withTimeout(
       sql`SELECT id, started_at, error, attempts FROM capture_sessions WHERE status = 'failed' ORDER BY started_at DESC LIMIT 20`
     ) as Promise<{ id: string; started_at: string; error: string | null; attempts: number }[]>,
+    withTimeout(
+      sql`SELECT started_at, duration_ms, voiced_ms, level_p10, level_p50, level_p90 FROM capture_chunks ORDER BY received_at DESC LIMIT 6`
+    ) as Promise<{ started_at: string; duration_ms: number; voiced_ms: number; level_p10: number | null; level_p50: number | null; level_p90: number | null }[]>,
   ]);
   return {
     lastChunkAt: last[0]?.at ?? null,
     open: open.map((o) => ({ id: o.id, deviceId: o.device_id, startedAt: o.started_at, lastSpeechAt: o.last_speech_at, voicedMs: o.voiced_ms })),
     byStatus7d: Object.fromEntries(counts.map((c) => [c.status, c.n])),
     failed: failed.map((f) => ({ id: f.id, startedAt: f.started_at, error: f.error ?? "", attempts: f.attempts })),
+    recentChunks: recent.map((c) => ({ startedAt: c.started_at, durationMs: c.duration_ms, voicedMs: c.voiced_ms, p10: c.level_p10, p50: c.level_p50, p90: c.level_p90 })),
   };
 }

@@ -84,3 +84,24 @@ export function detectSpeech(pcm: Int16Array, overrides: Partial<VadOptions> = {
   }
   return out.filter((sp) => sp.endMs - sp.startMs >= o.minSpanMs);
 }
+
+export interface LevelStats {
+  /** dBFS of the quietest tenth of windows — the noise floor. */
+  p10: number;
+  p50: number;
+  /** dBFS of the loudest tenth — where speech peaks sit. */
+  p90: number;
+}
+
+/** Window-level loudness percentiles, for tuning `thresholdDbfs` against a
+ *  real device without pulling audio out of the archive. -Infinity windows
+ *  (digital silence) are clamped to -100 so percentiles stay numeric. */
+export function levelStats(pcm: Int16Array, sampleRate = VAD_DEFAULTS.sampleRate, windowMs = VAD_DEFAULTS.windowMs): LevelStats {
+  const win = Math.round((sampleRate * windowMs) / 1000);
+  const levels: number[] = [];
+  for (let i = 0; i + win <= pcm.length; i += win) levels.push(Math.max(-100, windowDbfs(pcm, i, i + win)));
+  if (levels.length === 0) return { p10: -100, p50: -100, p90: -100 };
+  levels.sort((a, b) => a - b);
+  const at = (q: number) => Math.round(levels[Math.min(levels.length - 1, Math.floor(q * levels.length))] * 10) / 10;
+  return { p10: at(0.1), p50: at(0.5), p90: at(0.9) };
+}

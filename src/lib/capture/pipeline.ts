@@ -3,7 +3,7 @@ import { put, get } from "@vercel/blob";
 import { getStore, type Sql } from "../kv";
 import { parseChunk } from "./container";
 import { decodeChunk, decodeFrames } from "./decode";
-import { detectSpeech, VAD_DEFAULTS } from "./vad";
+import { detectSpeech, levelStats, VAD_DEFAULTS } from "./vad";
 import { placeSpan, isStale, disposition, SESSION_GAP_MS } from "./sessions";
 import { assembleVoiced, encodeWav, type VoicedPiece } from "./assemble";
 import { transcribeWav, utterancesToSegments } from "./transcribe";
@@ -69,6 +69,7 @@ export async function ingestChunk(input: { chunkId: string; deviceId: string; by
     voicedMs,
     blobPath,
     bytes: input.bytes.length,
+    levels: levelStats(pcm),
   });
 
   // Hand each voiced span to the session rules; persist whatever they decide.
