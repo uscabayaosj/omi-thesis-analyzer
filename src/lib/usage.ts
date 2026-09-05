@@ -121,6 +121,26 @@ export async function logUsage(args: {
   `);
 }
 
+/** Deepgram nova-3 prerecorded, pay-as-you-go, $ per audio minute. */
+const DEEPGRAM_PER_MINUTE_USD = 0.0043;
+
+/**
+ * Logs one transcription call alongside the LLM rows so /usage shows the
+ * whole bill. Tokens are meaningless for audio, so both token columns stay 0
+ * and the cost is derived from the audio duration Deepgram actually billed.
+ * Same fire-and-forget contract as logUsage.
+ */
+export async function logTranscriptionUsage(args: { audioSeconds: number; model?: string }): Promise<void> {
+  const sql = getStore();
+  if (!sql) return;
+  const cost = Math.round((args.audioSeconds / 60) * DEEPGRAM_PER_MINUTE_USD * 10_000) / 10_000;
+  await ensureUsageSchemaOnce(sql);
+  await withTimeout(sql`
+    INSERT INTO trace_usage (label, provider, model, prompt_tokens, completion_tokens, estimated_cost_usd)
+    VALUES ('transcribe', 'deepgram', ${args.model ?? "nova-3"}, 0, 0, ${cost})
+  `);
+}
+
 export interface UsagePeriodSummary {
   costUsd: number | null;
   callCount: number;

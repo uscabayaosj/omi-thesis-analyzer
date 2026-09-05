@@ -1,4 +1,5 @@
 import type { DeepgramUtterance } from "./transcribe-map";
+import { logTranscriptionUsage } from "../usage";
 
 export { utterancesToSegments, type DeepgramUtterance } from "./transcribe-map";
 
@@ -20,6 +21,12 @@ export async function transcribeWav(wav: Uint8Array<ArrayBuffer>): Promise<Deepg
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`Deepgram API ${res.status}: ${(await res.text()).slice(0, 300)}`);
-  const json = (await res.json()) as { results?: { utterances?: DeepgramUtterance[] } };
+  const json = (await res.json()) as {
+    metadata?: { duration?: number };
+    results?: { utterances?: DeepgramUtterance[] };
+  };
+  // Deepgram reports the seconds it billed; fall back to the WAV's own length.
+  const audioSeconds = json.metadata?.duration ?? Math.max(0, wav.byteLength - 44) / 32_000;
+  void logTranscriptionUsage({ audioSeconds }).catch((e) => console.error("transcription usage logging failed:", e));
   return json.results?.utterances ?? [];
 }
