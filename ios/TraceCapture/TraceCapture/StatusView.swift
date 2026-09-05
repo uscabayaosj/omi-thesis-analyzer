@@ -11,6 +11,9 @@ struct StatusView: View {
                     LabeledContent("Connection", value: coordinator.connection)
                     if let b = coordinator.battery { LabeledContent("Battery", value: "\(b)%") }
                     LabeledContent("This chunk", value: "\(coordinator.framesThisChunk) frames")
+                    if CaptureSettings.peripheralId == nil {
+                        Button("Find pendant") { showSettings = true }
+                    }
                 }
                 Section("Uploads") {
                     LabeledContent("Waiting to upload", value: coordinator.pending == 0 ? "none" : "\(coordinator.pending) chunks")
@@ -18,11 +21,14 @@ struct StatusView: View {
                     if let e = coordinator.lastError { Text(e).foregroundStyle(.orange) }
                 }
                 if !CaptureSettings.isConfigured {
-                    Section { Text("Add the TRACE address and token in Settings to start uploading.") }
+                    Section {
+                        Text("Add the TRACE address and token to start uploading.")
+                        Button("Open Settings") { showSettings = true }
+                    }
                 }
             }
             .navigationTitle("TRACE Capture")
-            .toolbar { Button("Settings") { showSettings = true } }
+            .toolbar { Button("Settings", systemImage: "gearshape") { showSettings = true } }
             .sheet(isPresented: $showSettings) { SettingsView() }
             .onAppear { coordinator.start() }
         }
