@@ -34,6 +34,12 @@ export function friendlyError(err: unknown): FriendlyError {
   if (raw.includes("Unknown AI_PROVIDER")) {
     return { error: "The AI provider setting isn't recognized. Use one of: OpenAI, Anthropic, Google, or OpenRouter.", status: 500 };
   }
+  if (raw.includes("DEEPGRAM_API_KEY")) {
+    return { error: "Transcription isn't set up yet. Add the Deepgram API key and redeploy.", status: 500 };
+  }
+  if (raw.includes("Deepgram API")) {
+    return { error: "The transcription service failed. The session will be retried.", status: 502 };
+  }
   if (raw.includes("API 401") || raw.includes("API 403")) {
     return { error: "AI service authentication failed. Check your API key.", status: 502 };
   }
