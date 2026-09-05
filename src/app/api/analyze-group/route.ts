@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getConversation, segmentsToText, type Conversation } from "@/lib/omi-api";
+import { loadConversation } from "@/lib/conversations";
+import { segmentsToText, type Conversation } from "@/lib/omi-api";
 import { chatCompletion, clampTranscript, extractJsonObject } from "@/lib/analysis";
 import { friendlyError } from "@/lib/api-error";
 
@@ -95,7 +96,7 @@ export async function POST(req: NextRequest) {
 
     // Fetch in parallel; tolerate individual failures (deleted conversations,
     // transient Omi errors) as long as 2+ transcripts survive.
-    const results = await Promise.allSettled(ids.map((id) => getConversation(id)));
+    const results = await Promise.allSettled(ids.map((id) => loadConversation(id)));
     const convos = results
       .filter((r): r is PromiseFulfilledResult<Conversation> => r.status === "fulfilled")
       .map((r) => r.value);

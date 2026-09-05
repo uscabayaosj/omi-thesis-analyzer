@@ -16,6 +16,9 @@ export function friendlyError(err: unknown): FriendlyError {
   if (raw.includes("OMI_API_KEY")) {
     return { error: "Your Omi connection isn't set up yet. Add your Omi API key and reload.", status: 500 };
   }
+  if (raw.includes("conversation not found in TRACE")) {
+    return { error: "That conversation isn't in TRACE's store.", status: 404 };
+  }
   if (raw.includes("Omi API 404")) {
     return { error: "That conversation no longer exists on Omi. It may have been deleted.", status: 404 };
   }

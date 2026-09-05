@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getConversation, segmentsToText } from "@/lib/omi-api";
+import { loadConversation } from "@/lib/conversations";
+import { segmentsToText } from "@/lib/omi-api";
 import { analyzeAdhd } from "@/lib/adhd";
 import { friendlyError } from "@/lib/api-error";
 
@@ -14,7 +15,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const convo = await getConversation(conversationId);
+    const convo = await loadConversation(conversationId);
 
     if (!convo.transcript_segments || convo.transcript_segments.length === 0) {
       return NextResponse.json(

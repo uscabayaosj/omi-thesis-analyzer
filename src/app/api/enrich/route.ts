@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getConversation, segmentsToText } from "@/lib/omi-api";
+import { loadConversation } from "@/lib/conversations";
+import { segmentsToText } from "@/lib/omi-api";
 import { enrichConversation } from "@/lib/enrich";
 import { countTranscriptWords, JUNK_WORD_FLOOR } from "@/lib/enrich-core";
 import { friendlyError } from "@/lib/api-error";
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const convo = await getConversation(conversationId);
+    const convo = await loadConversation(conversationId);
     const segments = convo.transcript_segments ?? [];
     const wordCount = countTranscriptWords(segments);
 

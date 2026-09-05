@@ -1,45 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getConversation, type Conversation } from "@/lib/omi-api";
-import { getStore } from "@/lib/kv";
-import { ensureCaptureSchemaOnce, getConversationRow } from "@/lib/capture/store";
+import { loadConversation } from "@/lib/conversations";
 import { friendlyError } from "@/lib/api-error";
 
-/** Neon returns timestamptz columns as Date objects; the UI (and the sort
- *  below) expects the ISO strings the Omi API has always used. */
-const iso = (v: unknown): string | undefined =>
-  v instanceof Date ? v.toISOString() : typeof v === "string" ? v : undefined;
-
-/** TRACE's own store first; Omi only while its key remains (see ../route.ts). */
+/** TRACE's own store first; Omi only while its key remains (see lib/conversations.ts). */
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    let conversation: Conversation | null = null;
-    const sql = getStore();
-    if (sql) {
-      await ensureCaptureSchemaOnce(sql);
-      const r = await getConversationRow(sql, id);
-      if (r) {
-        conversation = {
-          id: r.id,
-          created_at: iso(r.created_at) ?? "",
-          started_at: iso(r.started_at),
-          finished_at: iso(r.finished_at),
-          source: r.source,
-          structured: (r.structured as Conversation["structured"]) ?? undefined,
-          transcript_segments: r.transcript_segments as Conversation["transcript_segments"],
-          geolocation: (r.geolocation as Conversation["geolocation"]) ?? null,
-        };
-      }
-    }
-    if (!conversation) {
-      if (!process.env.OMI_API_KEY) {
-        return NextResponse.json({ error: "That conversation isn't in TRACE's store." }, { status: 404 });
-      }
-      conversation = await getConversation(id);
-    }
+    const conversation = await loadConversation(id);
     return NextResponse.json(conversation, {
       headers: {
         // A finished conversation (with transcript) never changes — cache hard.

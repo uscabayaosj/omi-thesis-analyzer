@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { loadConversation } from "@/lib/conversations";
 import { after } from "next/server";
-import { getConversation, segmentsToText } from "@/lib/omi-api";
+import { segmentsToText } from "@/lib/omi-api";
 import { analyzeAdhd, type AdhdAnalysis, type Rollup } from "@/lib/adhd";
 import { generateRollup, type DayConvoOutput } from "@/lib/rollup";
 import { getStore, ensureSchema, getNamespaceData, putNamespaceData, type Sql } from "@/lib/kv";
@@ -109,7 +110,7 @@ async function runRollupJob(sql: Sql, day: string, dayConvos: ConvoLite[]): Prom
     try {
       let stored = analysesMap[c.id];
       if (!stored) {
-        const convo = await getConversation(c.id);
+        const convo = await loadConversation(c.id);
         if (!convo.transcript_segments || convo.transcript_segments.length === 0) {
           throw new Error("no transcript");
         }
