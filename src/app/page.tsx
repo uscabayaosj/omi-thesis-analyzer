@@ -944,6 +944,13 @@ function HomeInner() {
               Usage
             </Link>
             <Link
+              href="/capture"
+              className={BUTTON_GHOST}
+            >
+              <MicIcon className="w-4 h-4 flex-shrink-0" />
+              Capture
+            </Link>
+            <Link
               href="/search"
               className={BUTTON_GHOST}
             >
