@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo, memo, Suspense } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef, memo, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getAnalyzedIds, getAnalysisAge } from "@/lib/storage";
@@ -21,11 +21,28 @@ import { CaptureBanner } from "@/components/CaptureBanner";
 import { pullAndMerge } from "@/lib/sync";
 import { useRovingRadioGroup } from "@/lib/roving";
 import { exportAllData } from "@/lib/export";
+import { conversationTitle } from "@/lib/titles";
 import { BUTTON_GHOST, BUTTON_SECONDARY } from "@/lib/ui";
 
 const FILTER_VALUES = ["all", "analyzed", "unanalyzed"] as const;
 
 const CONVERSATIONS_CACHE_KEY = "conversations";
+
+// How old the on-screen list may be before returning to the tab re-fetches it.
+const LIST_STALE_MS = 2 * 60_000;
+
+// The bare list is the newest N conversations. Anything older is fetched a
+// month at a time when the user browses there (see loadMonth below).
+const LIST_LIMIT = 200;
+
+/** Newest first, `fresh` winning on a shared id; `prev` supplies everything
+ *  else — the older months already fetched, which a refresh must not drop. */
+function unionById(fresh: Conversation[], prev: Conversation[]): Conversation[] {
+  const seen = new Set(fresh.map((c) => c.id));
+  const out = [...fresh, ...prev.filter((c) => !seen.has(c.id))];
+  out.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+  return out;
+}
 
 // Shared by every button in the selection toolbar (Group Thesis, Run ADHD):
 // these are parallel choices acting on the same selection, not a primary/
@@ -249,28 +266,6 @@ function CalendarMonth({
   );
 }
 
-/**
- * What to call a conversation.
- *
- * Omi leaves `structured.title` empty for most recordings, so the list used to
- * render "Untitled" on every row and the only discriminator across a whole day
- * was a timestamp — the screen the user opens most, carrying no information.
- * The ADHD pass already writes a plain-language summary of each conversation;
- * when Omi has no title, that sentence is a far better name than a placeholder.
- * The enrichment pass exists to name conversations, so its title outranks the
- * gist (a summary pressed into service). Falls back to the
- * timestamp-plus-category shape the rollup list uses, and only then to a label.
- */
-function conversationTitle(convo: Conversation, enrichment?: StoredEnrichment, gist?: string): string {
-  const omi = convo.structured?.title?.trim();
-  if (omi) return omi;
-  if (enrichment?.title) return enrichment.title;
-  if (gist) return gist;
-  const when = formatDateTime(convo.created_at);
-  const cat = convo.structured?.category?.trim();
-  return cat ? `${when} · ${cat}` : when;
-}
-
 /** The location mark. Rendered ONLY when a location exists: the absent state
  *  was a 1.23:1 smudge that also announced "No location attached" on every row.
  *  Absence is the absence of the mark. Shared by both row branches so the two
@@ -403,6 +398,15 @@ function HomeInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  /* Coverage of the archive. The newest-N list covers from its oldest row
+     forward; a month fetched on demand covers itself. Anything the user
+     browses to outside that is fetched, so the calendar can never say "No
+     conversations" about a day it simply never asked for. `null` until the
+     first list lands; "all" when the list came back short, meaning the whole
+     archive is already here. */
+  const [coveredFrom, setCoveredFrom] = useState<string | "all" | null>(null);
+  const loadedMonths = useRef(new Set<string>());
+  const [monthLoading, setMonthLoading] = useState<string | null>(null);
   // Lazy initializers, not an effect: both reads are synchronous, SSR-safe
   // (guarded on `typeof window`), and side-effect-free — an effect here would
   // only add a redundant render pass. Both need setters: adhdIds changes after
@@ -421,6 +425,9 @@ function HomeInner() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastSynced, setLastSynced] = useState<string | null>(null);
+  // Mirror of `lastSynced` for the return-to-tab check below, which lives in
+  // a mount-once effect and must not re-subscribe on every sync.
+  const lastSyncedRef = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Journal dateline for the masthead. Computed client-side only, after
   // mount: `new Date()` during SSR reads the server's clock/timezone, which
@@ -501,10 +508,13 @@ function HomeInner() {
         mode === "refresh" ? { cache: "no-store" } : undefined
       );
       const list = Array.isArray(data) ? data : [];
-      setConversations(list);
+      setConversations((prev) => unionById(list, prev));
+      setCoveredFrom(list.length < LIST_LIMIT ? "all" : dayOf(list[list.length - 1].created_at));
       setError(null);
       setStale(false);
-      setLastSynced(new Date().toISOString());
+      const now = new Date().toISOString();
+      lastSyncedRef.current = now;
+      setLastSynced(now);
       cacheSet(CONVERSATIONS_CACHE_KEY, list);
     } catch (e) {
       // On an explicit refresh, always report. On the initial load, only surface
@@ -521,6 +531,25 @@ function HomeInner() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  }, []);
+
+  /* Fetch one month of the archive and fold it into the list. Idempotent per
+     month; a failure is silent (the day simply keeps its "nothing here" state
+     and the next visit retries) because the bare list's own error card already
+     covers the "cannot reach the server" case. */
+  const loadMonth = useCallback(async (month: string) => {
+    if (loadedMonths.current.has(month)) return;
+    loadedMonths.current.add(month);
+    setMonthLoading(month);
+    try {
+      const data = await fetchJson<Conversation[]>(`/api/conversations?month=${month}`);
+      const list = Array.isArray(data) ? data : [];
+      setConversations((prev) => unionById(list, prev));
+    } catch {
+      loadedMonths.current.delete(month);
+    } finally {
+      setMonthLoading((cur) => (cur === month ? null : cur));
     }
   }, []);
 
@@ -562,7 +591,19 @@ function HomeInner() {
       if (timer) return;
       timer = setTimeout(() => {
         timer = null;
+        if (document.visibilityState !== "visible") return;
         resync();
+        // Coming back to the app is the moment the other device's work should
+        // appear. The pull is throttled inside pullAndMerge (five minutes), and
+        // the list is only re-fetched when the copy on screen is older than a
+        // couple of minutes — an installed PWA resumed the next morning used
+        // to show yesterday's list until Refresh was tapped, with only the
+        // quiet "Synced 9h ago" line to say so.
+        pullAndMerge().then((changed) => {
+          if (changed) resync();
+        });
+        const last = lastSyncedRef.current ? Date.parse(lastSyncedRef.current) : 0;
+        if (Date.now() - last > LIST_STALE_MS) loadConversations("initial");
       }, 50);
     };
     // Merge in anything analyzed on the user's other device before the first
@@ -579,7 +620,7 @@ function HomeInner() {
       window.removeEventListener("focus", resyncSoon);
       document.removeEventListener("visibilitychange", resyncSoon);
     };
-  }, []);
+  }, [loadConversations]);
 
   // Mirror the selected day into the URL without adding history entries —
   // `replace`, so the browser Back button still means "leave this page"
@@ -599,14 +640,36 @@ function HomeInner() {
     router.replace(next, { scroll: false });
   }, [selectedDate, todayStr, router]);
 
+  /* Which months the user is looking at, and whether the list already covers
+     them. The selected day always counts; the calendar's month counts while
+     the grid is open (its dots are the point). A month is covered when it lies
+     entirely after the bare list's oldest row; the row's own month is only
+     partly covered, so it is fetched too when browsed. */
+  useEffect(() => {
+    if (coveredFrom === null || coveredFrom === "all") return;
+    const oldestMonth = coveredFrom.slice(0, 7);
+    const wanted = new Set<string>([selectedDate.slice(0, 7)]);
+    if (calendarExpanded) wanted.add(`${calendarMonth.year}-${pad2(calendarMonth.month + 1)}`);
+    for (const m of wanted) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- deliberate: this effect exists to fetch from the server as the browsed day changes; the one synchronous setState is the loading flag that keeps the empty-day card from flashing before the month arrives
+      if (m <= oldestMonth) void loadMonth(m);
+    }
+  }, [coveredFrom, selectedDate, calendarExpanded, calendarMonth, loadMonth]);
+
   const isAnalyzedEither = useCallback(
     (cid: string) => analyzedIds.has(cid) || adhdIds.has(cid),
     [analyzedIds, adhdIds]
   );
 
+  // Same resolution the rows use, so the selection review and the "could not
+  // be analyzed" list name conversations the way the list does instead of
+  // reading "Untitled, Untitled, Untitled".
   const titleOf = useCallback(
-    (cid: string) => conversations.find((c) => c.id === cid)?.structured?.title || "Untitled",
-    [conversations]
+    (cid: string) => {
+      const convo = conversations.find((c) => c.id === cid);
+      return convo ? conversationTitle(convo, enrichments.get(cid), gists.get(cid)) : "Untitled";
+    },
+    [conversations, enrichments, gists]
   );
 
   // Group once per conversation-list change, not per render — feeds both the
@@ -800,9 +863,12 @@ function HomeInner() {
           }
         );
         // Persist via the storage lib (same shape the conversation page uses).
+        // The title goes through the shared resolver: a bare TRACE conversation
+        // used to be saved as "Untitled", and that string then followed it
+        // onto the promises ledger and into search results.
         saveAdhdAnalysis({
           conversationId: ids[i],
-          title: data.conversation?.structured?.title || "Untitled",
+          title: data.conversation?.structured?.title?.trim() || titleOf(ids[i]),
           date: data.conversation?.created_at,
           analysis: data.analysis,
         });
@@ -1314,7 +1380,8 @@ function HomeInner() {
               {pendingBatch.replacing} of the {pendingBatch.ids.length} selected{" "}
               {pendingBatch.replacing === 1 ? "conversation has" : "conversations have"} already been analyzed with
               ADHD Aid. Running again replaces {pendingBatch.replacing === 1 ? "it" : "them"} — ADHD analyses keep no
-              version history, so any commitments you have ticked off will reset.
+              version history. Ticks and let-gos are kept for promises that come back word for word; anything the
+              model rewords starts fresh.
             </>
           }
           confirmLabel={`Run all ${pendingBatch.ids.length}`}
@@ -1371,13 +1438,19 @@ function HomeInner() {
       )}
 
       {!loading && !error && conversations.length > 0 && !isSearching && dayConversations.length === 0 && (
-        <div className="card p-8 text-center">
-          <CalendarIcon className="w-8 h-8 mx-auto mb-4 text-slate-600" />
-          <p className="text-slate-300">
-            {selectedDate === todayStr ? "Nothing recorded today yet." : `No conversations on ${selectedDateLabel}.`}
-          </p>
-          <p className="text-slate-400 text-sm mt-2">Pick another day above, or search for something specific.</p>
-        </div>
+        monthLoading === selectedDate.slice(0, 7) ? (
+          <div className="space-y-4" aria-label="Loading that month" role="status">
+            {[1, 2].map((i) => <div key={i} className="skeleton h-24 w-full" />)}
+          </div>
+        ) : (
+          <div className="card p-8 text-center">
+            <CalendarIcon className="w-8 h-8 mx-auto mb-4 text-slate-600" />
+            <p className="text-slate-300">
+              {selectedDate === todayStr ? "Nothing recorded today yet." : `No conversations on ${selectedDateLabel}.`}
+            </p>
+            <p className="text-slate-400 text-sm mt-2">Pick another day above, or search for something specific.</p>
+          </div>
+        )
       )}
 
       {/* Two empty-list cases that used to render nothing between the scan

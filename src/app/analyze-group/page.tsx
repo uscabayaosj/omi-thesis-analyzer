@@ -22,7 +22,9 @@ import {
 } from "@/components/icons";
 import { BUTTON_PRIMARY, LINK_BACK, BUTTON_SECONDARY } from "@/lib/ui";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { useUndoOffer } from "@/components/UndoProvider";
 import { schedulePush, pullAndMerge } from "@/lib/sync";
+import { getEnrichments } from "@/lib/enrich-storage";
 
 interface ConvoRef {
   id: string;
@@ -121,6 +123,21 @@ function saveGroupCustom(
     existing.custom = { ...custom, timestamp: new Date().toISOString() };
     persistGroups(all);
   }
+}
+
+/**
+ * The route names each conversation from its own `structured.title`, which a
+ * TRACE-captured recording lacks, so the chips (and the saved group, and
+ * therefore search results) read "Untitled". The enrichment pass usually has
+ * the name on this device; fill it in before display and before saving.
+ */
+function nameConversations(list: ConvoRef[]): ConvoRef[] {
+  const enrichments = getEnrichments();
+  return list.map((c) => {
+    if (c.title && c.title !== "Untitled") return c;
+    const named = enrichments.get(c.id)?.title?.trim();
+    return named ? { ...c, title: named } : c;
+  });
 }
 
 function safeDay(date: string | undefined): string {
@@ -240,6 +257,13 @@ function GroupAnalysisContent() {
   const [exported, setExported] = useState(false);
   const [customResult, setCustomResult] = useState<string | null>(null);
   const [skipped, setSkipped] = useState(0);
+  const { offerUndo } = useUndoOffer();
+
+  const findStoredGroup = useCallback(() => {
+    const stored = getStoredGroupAnalyses();
+    const key = groupKey(ids);
+    return stored.find((a) => groupKey(a.conversationIds) === key);
+  }, [ids]);
 
   useEffect(() => {
     // Can't be a lazy useState initializer: this must re-run whenever `ids`
@@ -252,7 +276,7 @@ function GroupAnalysisContent() {
       const existing = stored.find((a) => groupKey(a.conversationIds) === key);
       if (!existing) return false;
       setAnalysis(existing.analysis);
-      setConversations(existing.conversations);
+      setConversations(nameConversations(existing.conversations));
       if (existing.custom) {
         setCustomPrompt(existing.custom.prompt);
         setCustomResult(existing.custom.result);
@@ -282,6 +306,9 @@ function GroupAnalysisContent() {
   const runAnalysis = useCallback(async () => {
     setAnalyzing(true);
     setError(null);
+    // Group analyses keep no version history; snapshot the one being replaced
+    // so the same ten-second undo the daily rollup offers can be offered here.
+    const replaced = findStoredGroup();
     try {
       const data = await fetchJson<{
         analysis: GroupAnalysis;
@@ -292,20 +319,39 @@ function GroupAnalysisContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conversationIds: ids }),
       });
+      const named = nameConversations(data.conversations);
       setAnalysis(data.analysis);
-      setConversations(data.conversations);
+      setConversations(named);
       setSkipped(data.skipped ?? 0);
       saveGroupAnalysis({
         conversationIds: ids,
-        conversations: data.conversations,
+        conversations: named,
         analysis: data.analysis,
       });
+      if (replaced) {
+        offerUndo("Previous group analysis replaced.", () => {
+          // Saved afresh (new merge clock) rather than replayed verbatim, so
+          // the restore beats the regenerated copy on the server too.
+          saveGroupAnalysis({
+            conversationIds: replaced.conversationIds,
+            conversations: replaced.conversations,
+            analysis: replaced.analysis,
+            custom: replaced.custom,
+          });
+          setAnalysis(replaced.analysis);
+          setConversations(nameConversations(replaced.conversations));
+          if (replaced.custom) {
+            setCustomPrompt(replaced.custom.prompt);
+            setCustomResult(replaced.custom.result);
+          }
+        });
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Analysis failed");
     } finally {
       setAnalyzing(false);
     }
-  }, [ids]);
+  }, [ids, findStoredGroup, offerUndo]);
 
   const runCustom = useCallback(async () => {
     if (!customPrompt.trim()) return;
@@ -325,12 +371,6 @@ function GroupAnalysisContent() {
       setCustomAnalyzing(false);
     }
   }, [ids, customPrompt]);
-
-  const findStoredGroup = useCallback(() => {
-    const stored = getStoredGroupAnalyses();
-    const key = groupKey(ids);
-    return stored.find((a) => groupKey(a.conversationIds) === key);
-  }, [ids]);
 
   const handleExportObsidian = () => {
     const existing = findStoredGroup();
