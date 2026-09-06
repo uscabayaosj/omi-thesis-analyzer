@@ -47,7 +47,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { pullAndMerge } from "@/lib/sync";
 import { useRovingRadioGroup } from "@/lib/roving";
 import { usePersistedPreference } from "@/lib/use-persisted-preference";
-import { runExtraction, suggestFromAdhdPeople } from "@/lib/people-pipeline";
+import { runExtraction, suggestFromAdhdPeople, suggestUnmatchedVoices } from "@/lib/people-pipeline";
 import dynamic from "next/dynamic";
 import { type MapMarker } from "@/components/MeetingMap";
 
@@ -349,6 +349,7 @@ export default function ConversationPage() {
       const cached = cacheGet<Conversation>(cacheKey);
       if (cached) {
         setConversation(cached.data);
+        suggestUnmatchedVoices(cached.data);
         setLastSynced(new Date(Date.now() - cached.ageMs).toISOString());
         setLoading(false);
         return;
@@ -364,6 +365,7 @@ export default function ConversationPage() {
         mode === "refresh" ? { cache: "no-store" } : undefined
       );
       setConversation(data);
+      suggestUnmatchedVoices(data);
       setError(null);
       setLastSynced(new Date().toISOString());
       if (data.transcript_segments?.length) cacheSet(cacheKey, data);
