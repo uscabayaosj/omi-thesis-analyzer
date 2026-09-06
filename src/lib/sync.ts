@@ -187,15 +187,27 @@ export async function flushPush(ns?: SyncedNamespace): Promise<void> {
   await Promise.all([...ownWanted, ...alreadyInFlight]);
 }
 
-let pulled = false;
+let lastPullAt = 0;
 
 /**
- * Pull the server's copy once per page load and merge it into localStorage.
- * Returns true if anything changed locally, so the caller can re-read.
+ * A non-forced pull is skipped while the last one is younger than this. The
+ * latch used to be permanent ("once per page load"), but with client-side
+ * navigation this module lives for the whole session — days, in an installed
+ * PWA — so the phone never saw the desktop's changes until a full reload. Five
+ * minutes keeps the cost to one GET per screen-change-after-a-while while
+ * making cross-device edits show up within a coffee break.
+ */
+const PULL_STALE_MS = 5 * 60_000;
+
+/**
+ * Pull the server's copy and merge it into localStorage. Throttled (see
+ * PULL_STALE_MS) unless `force` is set. Returns true if anything changed
+ * locally, so the caller can re-read.
  */
 export async function pullAndMerge(force = false): Promise<boolean> {
-  if (typeof window === "undefined" || (pulled && !force)) return false;
-  pulled = true;
+  if (typeof window === "undefined") return false;
+  if (!force && Date.now() - lastPullAt < PULL_STALE_MS) return false;
+  lastPullAt = Date.now();
   try {
     const res = await fetch("/api/store", { signal: AbortSignal.timeout(12_000) });
     if (!res.ok) return false;
