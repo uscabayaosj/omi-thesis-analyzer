@@ -230,6 +230,16 @@ export function DownloadIcon({ className }: IconProps) {
   );
 }
 
+/** The download glyph with the arrow reversed — Restore beside Backup. */
+export function UploadIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 15V3m0 0 4.5 4.5M12 3 7.5 7.5" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17" />
+    </svg>
+  );
+}
+
 export function ClipboardIcon({ className }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} aria-hidden="true">

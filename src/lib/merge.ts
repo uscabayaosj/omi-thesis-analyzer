@@ -231,7 +231,7 @@ export function mergeArrayNamespace(ns: string, local: ArrayRecord[], remote: Ar
 }
 
 /** Unwrap the `{ list: [...] }` transport wrapper (or accept a bare array). */
-function toList(v: unknown): ArrayRecord[] {
+export function toList(v: unknown): ArrayRecord[] {
   if (Array.isArray(v)) return v as ArrayRecord[];
   if (v && typeof v === "object" && Array.isArray((v as { list?: unknown }).list)) {
     return (v as { list: ArrayRecord[] }).list;
@@ -239,8 +239,13 @@ function toList(v: unknown): ArrayRecord[] {
   return [];
 }
 
-function toMap(v: unknown): RecordMap {
+export function toMap(v: unknown): RecordMap {
   return v && typeof v === "object" && !Array.isArray(v) ? (v as RecordMap) : {};
+}
+
+/** A deletion record — see people.ts's Tombstone; the same shape everywhere. */
+export function isTombstoneRecord(v: unknown): boolean {
+  return !!v && typeof v === "object" && (v as { deleted?: unknown }).deleted === true;
 }
 
 /**

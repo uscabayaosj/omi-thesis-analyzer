@@ -14,13 +14,14 @@ import { formatDateTime, dayOf, todayString } from "@/lib/format";
 import {
   TraceMark, SquareIcon, XIcon, CheckIcon, SparklesIcon, WarningIcon, MicIcon,
   FolderIcon, RefreshIcon, ClipboardIcon, CalendarIcon, ChevronRightIcon, SearchIcon, MapPinIcon, HelpIcon,
-  UsersIcon, TrendingUpIcon, DownloadIcon,
+  UsersIcon, TrendingUpIcon, DownloadIcon, UploadIcon,
 } from "@/components/icons";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { CaptureBanner } from "@/components/CaptureBanner";
 import { pullAndMerge } from "@/lib/sync";
 import { useRovingRadioGroup } from "@/lib/roving";
 import { exportAllData } from "@/lib/export";
+import { readBackupFile, applyRestore, type RestorePlan } from "@/lib/restore";
 import { conversationTitle } from "@/lib/titles";
 import { BUTTON_GHOST, BUTTON_SECONDARY } from "@/lib/ui";
 
@@ -443,6 +444,17 @@ function HomeInner() {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [exportNotice, setExportNotice] = useState<string | null>(null);
+  /* Restore: the other half of Backup. A file is read and planned before
+     anything is written; the plan is shown in a confirm dialog with exact
+     counts, then applied as a merge (newer wins, nothing replaced by an
+     older copy). */
+  const restoreInputRef = useRef<HTMLInputElement>(null);
+  const [pendingRestore, setPendingRestore] = useState<{
+    plan: RestorePlan; exportedAt?: string; source?: string; ignored: string[];
+  } | null>(null);
+  const [restoreNotice, setRestoreNotice] = useState<string | null>(null);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [restoring, setRestoring] = useState(false);
   const [filter, setFilter] = useState<"all" | "analyzed" | "unanalyzed">("all");
   const [stale, setStale] = useState(false);
   const rovingFilter = useRovingRadioGroup(FILTER_VALUES, filter, setFilter);
@@ -570,6 +582,15 @@ function HomeInner() {
     loadConversations("initial");
   }, [loadConversations]);
 
+  /* Everything this page derives from localStorage, re-read in one place:
+     after a restore, and whenever the page regains focus (below). */
+  const rereadLocal = useCallback(() => {
+    setAnalyzedIds(getAnalyzedIds());
+    setAdhdIds(getAdhdAnalyzedIds());
+    setGists(getAdhdSummaries());
+    setEnrichments(getEnrichments());
+  }, []);
+
   // Re-read the analyzed sets whenever this page regains focus. Both are
   // written on other pages (the conversation detail view runs either lens), so
   // a client-side nav back here would otherwise paint stale lens badges — the
@@ -577,10 +598,7 @@ function HomeInner() {
   useEffect(() => {
     const resync = () => {
       if (document.visibilityState !== "visible") return;
-      setAnalyzedIds(getAnalyzedIds());
-      setAdhdIds(getAdhdAnalyzedIds());
-      setGists(getAdhdSummaries());
-      setEnrichments(getEnrichments());
+      rereadLocal();
     };
     // Returning to the tab fires `focus` and `visibilitychange` back to back,
     // and each resync re-parses four namespaces from localStorage — so the
@@ -620,7 +638,7 @@ function HomeInner() {
       window.removeEventListener("focus", resyncSoon);
       document.removeEventListener("visibilitychange", resyncSoon);
     };
-  }, [loadConversations]);
+  }, [loadConversations, rereadLocal]);
 
   // Mirror the selected day into the URL without adding history entries —
   // `replace`, so the browser Back button still means "leave this page"
@@ -947,6 +965,48 @@ function HomeInner() {
     }
   };
 
+  const handleRestoreFile = async (file: File) => {
+    setRestoring(true);
+    setRestoreError(null);
+    setRestoreNotice(null);
+    try {
+      const result = await readBackupFile(file);
+      if (!result.plan.changed) {
+        setRestoreNotice("Nothing to restore — this device already holds everything in that backup.");
+        return;
+      }
+      setPendingRestore({
+        plan: result.plan,
+        exportedAt: result.backup.exportedAt,
+        source: result.backup.source,
+        ignored: result.ignored,
+      });
+    } catch (e) {
+      setRestoreError(e instanceof Error ? e.message : "Could not read that backup.");
+    } finally {
+      setRestoring(false);
+    }
+  };
+
+  const confirmRestore = () => {
+    if (!pendingRestore) return;
+    const { plan } = pendingRestore;
+    setPendingRestore(null);
+    const { failed } = applyRestore(plan);
+    rereadLocal();
+    const parts = [
+      `${plan.added} added`,
+      `${plan.updated} updated`,
+      ...(plan.deletions ? [`${plan.deletions} ${plan.deletions === 1 ? "deletion" : "deletions"} applied`] : []),
+    ];
+    setRestoreNotice(
+      `Restored: ${parts.join(", ")}.` +
+        (failed.length
+          ? ` ${failed.length} ${failed.length === 1 ? "section" : "sections"} could not be written — storage may be full.`
+          : " The merged copy syncs to the server as usual.")
+    );
+  };
+
   return (
     <main id="main" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-8">
       <header className="mb-6">
@@ -1041,7 +1101,7 @@ function HomeInner() {
         </nav>
 
         {/* Sync status + its two utilities — quiet meta row, read once per visit */}
-        <div className="flex items-center justify-between gap-2 mt-1 pb-3 border-b border-slate-800">
+        <div className="flex flex-wrap items-center justify-between gap-2 mt-1 pb-3 border-b border-slate-800">
           <span
             className={`text-sm min-w-0 truncate ${stale ? "text-amber-400" : "text-slate-400"}`}
             aria-live="polite"
@@ -1067,6 +1127,29 @@ function HomeInner() {
               {exporting ? "Backing up…" : "Backup"}
             </button>
             <button
+              onClick={() => restoreInputRef.current?.click()}
+              disabled={restoring}
+              aria-label="Restore analyses from a backup file"
+              className={BUTTON_GHOST}
+            >
+              <UploadIcon className="w-4 h-4 flex-shrink-0" />
+              {restoring ? "Reading…" : "Restore"}
+            </button>
+            <input
+              ref={restoreInputRef}
+              type="file"
+              accept=".json,application/json"
+              className="sr-only"
+              tabIndex={-1}
+              aria-hidden="true"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleRestoreFile(file);
+                // Reset so choosing the same file again re-fires onChange.
+                e.target.value = "";
+              }}
+            />
+            <button
               onClick={() => loadConversations("refresh")}
               disabled={loading || refreshing}
               aria-label="Refresh conversations"
@@ -1087,6 +1170,18 @@ function HomeInner() {
         {exportNotice && (
           <p className="text-sm text-slate-400 mt-2">
             {exportNotice}
+          </p>
+        )}
+
+        {restoreError && (
+          <p className="text-sm text-red-400 mt-2" role="alert">
+            {restoreError}
+          </p>
+        )}
+
+        {restoreNotice && (
+          <p className="text-sm text-slate-400 mt-2" role="status">
+            {restoreNotice}
           </p>
         )}
 
@@ -1371,6 +1466,42 @@ function HomeInner() {
           </div>
         )}
       </header>
+
+      {pendingRestore && (
+        <ConfirmDialog
+          title="Restore from this backup?"
+          body={
+            <>
+              Backup saved{" "}
+              <strong className="text-slate-200">
+                {pendingRestore.exportedAt ? formatDateTime(pendingRestore.exportedAt) : "at an unknown time"}
+              </strong>
+              {pendingRestore.source === "local"
+                ? " from a device's own storage"
+                : pendingRestore.source === "server"
+                ? " from the server"
+                : ""}
+              . Merging it here adds <strong className="text-slate-200">{pendingRestore.plan.added}</strong> and
+              updates <strong className="text-slate-200">{pendingRestore.plan.updated}</strong>{" "}
+              {pendingRestore.plan.added + pendingRestore.plan.updated === 1 ? "record" : "records"}
+              {pendingRestore.plan.deletions > 0 && (
+                <>
+                  , and applies <strong className="text-slate-200">{pendingRestore.plan.deletions}</strong>{" "}
+                  {pendingRestore.plan.deletions === 1 ? "deletion" : "deletions"} recorded after this device last
+                  saw {pendingRestore.plan.deletions === 1 ? "that record" : "those records"}
+                </>
+              )}
+              . Newer wins on every record, so nothing here is replaced by an older copy.
+              {pendingRestore.ignored.length > 0 && (
+                <> Sections this version doesn&apos;t know were skipped: {pendingRestore.ignored.join(", ")}.</>
+              )}
+            </>
+          }
+          confirmLabel="Restore"
+          onConfirm={confirmRestore}
+          onCancel={() => setPendingRestore(null)}
+        />
+      )}
 
       {pendingBatch && (
         <ConfirmDialog

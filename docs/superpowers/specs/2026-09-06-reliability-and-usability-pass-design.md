@@ -121,12 +121,14 @@ computed but nothing displayed.
 
 ## Not changed, and why
 
-- **Backup restore.** The 2026-08-24 export spec scoped restore out
-  explicitly. It remains the most valuable missing piece for a localStorage
-  app and is recommended as the next feature, not slipped in here.
 - **Rollup nudge timezone.** The London approximation is an approved decision
   in the 2026-08-24 nudge spec.
 - **iOS app.** Out of scope for a web pass.
+
+**Backup restore** was left out of the first draft of this pass because the
+2026-08-24 export spec had scoped it out; the user then asked for it, and it
+ships on the same branch under its own note,
+`2026-09-06-backup-restore-design.md`.
 
 ## Verification
 

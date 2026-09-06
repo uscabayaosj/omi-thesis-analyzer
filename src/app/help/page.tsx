@@ -153,6 +153,20 @@ export default function HelpPage() {
           </p>
         </Answer>
 
+        <Answer q="How do I back up, and how do I get a backup back in?">
+          <p>
+            <strong className="text-slate-100">Backup</strong>, on the conversations page, downloads every analysis,
+            rollup, person and place as one JSON file — from the server mirror when it is reachable, otherwise from
+            this device. Keep the file somewhere that isn&apos;t this browser.
+          </p>
+          <p>
+            <strong className="text-slate-100">Restore</strong> reads such a file back in. It is a merge, not a
+            replacement: you see exactly how many records would be added or updated before anything is written,
+            newer wins on every record, and nothing on this device is replaced by an older copy. What it merges then
+            syncs to the server like any other change, so the other device picks it up too.
+          </p>
+        </Answer>
+
         <Answer q="What does an analysis cost, and can I stop one?">
           <p>
             Each run is one API call against the full transcript. Running <strong className="text-slate-100">Both</strong> is

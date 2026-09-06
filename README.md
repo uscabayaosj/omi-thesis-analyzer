@@ -47,7 +47,7 @@ Both lenses, the rollups and the group analysis export to Obsidian or download a
 
 ## Data
 
-The browser is the working copy: everything is written to `localStorage` first, so the app works offline. With `DATABASE_URL` set, a private Neon store mirrors every namespace so the same data is on phone and desktop; the merge is per record, last-write-wins, with ticks and let-gos on their own clocks, and the server only ever adds or updates — a device can never wipe the server's copy. **Backup** on the home page downloads everything as one JSON file.
+The browser is the working copy: everything is written to `localStorage` first, so the app works offline. With `DATABASE_URL` set, a private Neon store mirrors every namespace so the same data is on phone and desktop; the merge is per record, last-write-wins, with ticks and let-gos on their own clocks, and the server only ever adds or updates — a device can never wipe the server's copy. **Backup** on the home page downloads everything as one JSON file; **Restore** merges such a file back in — newer records win, and nothing on the device is dropped unless the backup recorded that deletion later.
 
 ## Deploy to Vercel
 
