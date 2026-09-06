@@ -78,7 +78,7 @@ function runPendingPush(swallow: boolean): Promise<void>[] {
     const body = isArrayNamespace(n)
       ? { namespace: n, map: { list: JSON.parse(localStorage.getItem(n) || "[]") } }
       : { namespace: n, map: readLocal(n) };
-    let p = fetch("/api/store", {
+    const settled = fetch("/api/store", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -89,11 +89,17 @@ function runPendingPush(swallow: boolean): Promise<void>[] {
       // mirror silently reads as a successful one.
       if (!res.ok) throw new Error(`push ${n} failed: HTTP ${res.status}`);
     });
-    if (swallow) p = p.catch(() => {});
-    inFlightPushes.add(p);
-    const untrack = () => inFlightPushes.delete(p);
-    p.then(untrack, untrack);
-    return p;
+    // Track the *unswallowed* promise, so a later flushPush awaiting a push
+    // the scheduled path started still learns it failed. Swallowing before
+    // tracking would hand flushPush a promise that always resolves — the
+    // exact "reads as success" bug this function guards against above.
+    inFlightPushes.add(settled);
+    const untrack = () => inFlightPushes.delete(settled);
+    settled.then(untrack, untrack);
+    // Marks the rejection handled so a swallowed push cannot raise an
+    // unhandledrejection; `settled` itself stays rejected for any awaiter.
+    settled.catch(() => {});
+    return swallow ? settled.catch(() => {}) : settled;
   });
 }
 
