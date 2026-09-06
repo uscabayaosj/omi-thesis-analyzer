@@ -145,8 +145,8 @@ function extractPeopleWithVoicePrints(raw: unknown): { id: string; name: string;
 }
 
 /** Matches each speaker cluster against the People Directory's enrolled
- *  voiceprints. Never throws — an embedding failure (model unavailable,
- *  WASM init error) logs and leaves that cluster numeric, exactly like a
+ *  voiceprints. Never throws — an embedding failure (model unavailable, the
+ *  native onnxruntime binding failing to load) logs and leaves that cluster numeric, exactly like a
  *  cluster that legitimately has no match. */
 async function identifySpeakers(
   sql: Sql,
@@ -162,6 +162,13 @@ async function identifySpeakers(
     .filter((p): p is { id: string; name: string; voicePrint: number[] } => !!p.voicePrint)
     .map((p) => ({ personId: p.id, embedding: p.voicePrint }));
   const threshold = voiceMatchThreshold();
+
+  // Nobody is enrolled yet, so every cluster is unmatched by definition. Bail
+  // before the model load and one inference per cluster — compute that cannot
+  // change the answer.
+  if (gallery.length === 0) {
+    return { segments, unmatchedSpeakers: clusters.map((c) => c.speakerId) };
+  }
 
   const matchBySpeakerId = new Map<number, { personId: string; name: string }>();
   const unmatchedSpeakers: number[] = [];

@@ -4,7 +4,8 @@ import { AutoModel, AutoProcessor, env } from "@huggingface/transformers";
  * Loads the WavLM speaker-verification model once per Function instance and
  * embeds audio into a fixed-size vector.
  *
- * DEVIATION FROM PLAN (see task-2-report.md for full detail): the plan called
+ * DEVIATION FROM PLAN (see the "Engine decision" and "Open risks" entries in
+ * docs/superpowers/specs/2026-09-05-speaker-identification-design.md): the plan called
  * for `device: "wasm"` to force the pure-JS ONNX Runtime Web backend, on the
  * theory that this avoids the native onnxruntime-node binary. As installed
  * (@huggingface/transformers@4.2.0), that is not possible: the library
@@ -15,10 +16,12 @@ import { AutoModel, AutoProcessor, env } from "@huggingface/transformers";
  * exposes (transformers.node.mjs and transformers.web.js both contain the
  * same runtime check). So `device: "wasm"` throws immediately under Node
  * ("Unsupported device"). "cpu" is the closest equivalent Node offers, but it
- * still loads the native onnxruntime-node addon — the native-binary-on-Vercel
- * risk this design meant to dodge is NOT resolved by this option and needs
- * follow-up (flagged in the report as a concern for whoever owns deployment
- * packaging).
+ * still loads the native onnxruntime-node addon. The native-binary-on-Vercel
+ * risk that leaves behind is handled at the packaging layer instead:
+ * next.config.ts keeps @huggingface/transformers and onnxruntime-node
+ * external and traces onnxruntime-node's bin/ (the platform .node/.dylib/.so
+ * files, resolved dynamically and therefore invisible to the file tracer)
+ * into the capture function bundles.
  *
  * env.cacheDir is pointed at /tmp. Vercel Functions only allow writes
  * under /tmp; the library's default cache dir ("./.cache") would try to

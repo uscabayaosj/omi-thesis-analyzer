@@ -385,7 +385,10 @@ export function addVoicePending(s: { conversationId: string; date: string; speak
     details: [],
     timestamp: new Date().toISOString(),
   } satisfies PendingSuggestion;
-  writeMap(PENDING_NS, map);
+  // Only record the permanent "never raise this speaker again" key if the card
+  // actually landed. If writeMap was dropped (quota), recording it anyway would
+  // make that speaker unenrollable forever, silently.
+  if (!writeMap(PENDING_NS, map)) return;
   writeMeta(VOICE_SUGGESTED_KEY, [...raised, key].slice(-2000));
 }
 
