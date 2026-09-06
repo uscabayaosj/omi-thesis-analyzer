@@ -36,7 +36,7 @@ the user has confirmed; a standalone enrollment UI (see Decisions).
 
 | Decision | Choice | Why |
 |---|---|---|
-| Engine | `Xenova/wavlm-base-plus-sv` via `@huggingface/transformers`, WASM backend forced | Researched and rejected the alternative first: Picovoice Eagle (purpose-built, on-device) has an unverified glibc/native-binary risk on Vercel's Amazon-Linux-2023 Node runtime, and Picovoice is B2B-only with no personal/non-commercial plan — a 7-day trial would lapse mid-fieldwork. WavLM-SV is a documented ONNX speaker-embedding model with no native binary (once the WASM backend is forced — `transformers.js` otherwise auto-prefers `onnxruntime-node`, reintroducing the same problem), free, and already demonstrated (~0.96 cosine similarity same-speaker vs. ~0.62 different-speaker on its model card). |
+| Engine | `Xenova/wavlm-base-plus-sv` via `@huggingface/transformers`, `device: "cpu"` | Researched and rejected the alternative first: Picovoice Eagle (purpose-built, on-device) has an unverified glibc/native-binary risk on Vercel's Amazon-Linux-2023 Node runtime, and Picovoice is B2B-only with no personal/non-commercial plan — a 7-day trial would lapse mid-fieldwork. WavLM-SV was chosen expecting a forced WASM backend to avoid a native binary entirely; **that premise was wrong** (see the corrected Open risks entry below) — `@huggingface/transformers@4.2.0` binds the native `onnxruntime-node` addon unconditionally under real Node, with no supported `device` value that avoids it. The decision to proceed anyway stands on a narrower basis: `onnxruntime-node` is a mainstream, widely-deployed native binding with an established Vercel/Lambda packaging track record (unlike Eagle's obscure, zero-precedent binary), and remains free with no licensing dead end — a lower-probability version of the same risk Eagle had, not a different risk. |
 | Identity storage | New optional `Person.voicePrint` field | Rides the existing client-synced `Person` record (`trace_store.omi-people` via `/api/store`) — no new table, no new sync path. A recognized voice already **is** a Person; this just gives that Person a voiceprint alongside their name and facts. |
 | Where matching runs | Server, inside `transcribeSession()` (`pipeline.ts`) | Raw PCM only ever exists server-side (decoded from private Blob); the client has no path to audio today (confirmed — no route serves `audio_refs` bytes back). Matching happens right where the session's audio is already in memory, once, at close. |
 | Where enrollment runs | Server, triggered by a client confirmation | Same reason: computing an embedding needs raw PCM. The client only ever sends "this cluster is Person X"; the server re-fetches that cluster's audio from Blob (`transcribeSession()` already does this exact re-fetch) and computes the embedding there. |
@@ -94,8 +94,9 @@ conversation row saved as today      client's people-pipeline pass reads it,
   then convert Int16 PCM to normalized Float32 (`/ 32768`), the waveform
   shape the model's `AutoProcessor` expects.
 - Run the WavLM-SV model (via `AutoProcessor` + `AutoModel` from
-  `@huggingface/transformers`, WASM backend explicitly forced — see Open
-  risks) to get one embedding vector per cluster. Compare by cosine
+  `@huggingface/transformers`, `device: "cpu"` — see Open risks for why this
+  is `"cpu"` and not the originally-planned `"wasm"`) to get one embedding
+  vector per cluster. Compare by cosine
   similarity against every enrolled `Person.voicePrint` fetched via
   `getNamespaceData`. Highest score wins if it clears
   `CAPTURE_VOICE_MATCH_THRESHOLD` (new env var, default **0.8** — the
@@ -167,12 +168,27 @@ conversation row saved as today      client's people-pipeline pass reads it,
   decision boundary — "is this the same person" is a threshold *we* pick and
   validate against real field audio. Expect false accepts/rejects while
   tuning, same as the VAD threshold needed field tuning in phase 1.
-- **Forcing the WASM backend.** `transformers.js` auto-detects and prefers
-  the native `onnxruntime-node` binding even in a Node environment, which
-  would reintroduce the exact native-binary bundling problem this design
-  exists to avoid. This is a documented, solved configuration step, not a
-  design gap — but it must be verified working in this project's actual
-  Vercel deployment, not assumed from the docs.
+- **The native binary is not actually avoidable — verified false, not just
+  unverified.** The original plan for this risk was "force `device: 'wasm'`";
+  during implementation (Task 2) this was tried and traced directly in
+  `node_modules/@huggingface/transformers/dist/transformers.node.mjs`
+  (~line 11547-11569): under a real Node process, the library binds
+  `ONNX = ONNX_NODE` (the native `onnxruntime-node` addon) unconditionally,
+  before any device is selected, and `"wasm"` is never in `supportedDevices`
+  in that branch — it only exists in the browser/non-Node branch. No
+  supported `device` value avoids the native binary while running under
+  Node with this package version; `device: "cpu"` is what's actually used
+  now (see the Engine decision above for why this is still an acceptable
+  tradeoff rather than a blocker). **Concrete follow-up, before this ships**:
+  deploy a minimal Vercel Function that imports `@huggingface/transformers`
+  and confirms `AutoModel.from_pretrained(..., { device: "cpu" })` initializes
+  without a missing-native-file error (the failure mode look-alikes are
+  well documented for this exact package/platform combination: a missing
+  `.node`/`.so` file because Next's build-time file tracer misses a
+  dynamically-resolved native addon, fixable via `outputFileTracingIncludes`
+  in `next.config.ts` once the actual missing path is known from a real
+  deploy's error). Do this before investing further in later tasks that
+  assume this works.
 - **Model weight loading under Vercel's read-only filesystem.** `/tmp` is the
   only writable path in a Vercel Function; where `transformers.js` caches
   downloaded model weights (and whether that lands somewhere writable, or

@@ -12,6 +12,7 @@ export interface ConversationRow {
   session_id: string | null;
   word_count: number;
   audio_refs: string[] | null;
+  unmatched_speakers: number[] | null;
 }
 
 export function countWords(segments: { text?: string }[]): number {

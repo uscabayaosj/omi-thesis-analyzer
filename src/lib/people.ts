@@ -31,10 +31,23 @@ export interface Person {
   meetings: Meeting[];
   createdAt: string;
   timestamp: string; // last-write-wins key for sync merge
+  /** Voice-recognition fields — see 2026-09-05-speaker-identification-design.md.
+   *  Written server-side by POST /api/capture/enroll-voice, read server-side
+   *  by pipeline.ts's identifySpeakers. Plain JSON floats, not a binary
+   *  serialization, so they ride the same trace_store sync as everything
+   *  else in this file. */
+  voicePrint?: number[];
+  voicePrintSamples?: number;
+  voicePrintUpdatedAt?: string;
 }
 
 export interface PendingSuggestion {
   id: string;
+  /** "text" (default, and what every record predating this field is) comes
+   *  from LLM extraction with a guessed name; "voice" is an unrecognized
+   *  speaker cluster with no name to guess — the review card asks instead
+   *  of confirming a guess. */
+  kind: "text" | "voice";
   conversationId: string;
   date: string;
   extractedName: string;
@@ -44,6 +57,8 @@ export interface PendingSuggestion {
   lng?: number;
   matchedPersonId?: string;
   candidateIds?: string[];
+  /** Set only for kind: "voice" — the diarized speaker_id this card is about. */
+  speakerId?: number;
   timestamp: string;
 }
 
@@ -294,9 +309,10 @@ export function mergePeople(sourceId: string, targetId: string): Person | null {
 // ── Pending suggestions ──
 
 function isPendingRecord(v: unknown): v is PendingSuggestion {
-  return (
-    !!v && typeof v === "object" && !isTombstone(v) && typeof (v as PendingSuggestion).extractedName === "string"
-  );
+  if (!v || typeof v !== "object" || isTombstone(v)) return false;
+  const r = v as Record<string, unknown>;
+  if (r.kind === "voice") return typeof r.conversationId === "string" && typeof r.speakerId === "number";
+  return typeof r.extractedName === "string"; // "text" kind, and every record predating this field
 }
 
 export function getPending(): PendingSuggestion[] {
@@ -336,6 +352,44 @@ export function addPending(s: Omit<PendingSuggestion, "id" | "timestamp">): void
     timestamp: new Date().toISOString(),
   };
   writeMap(PENDING_NS, map);
+}
+
+/** Meta record of every (conversationId, speakerId) a voice suggestion has
+ *  ever been raised for — permanent, unlike the live pending queue itself.
+ *  A text suggestion's dedup only checks *live* suggestions (ignoreName is
+ *  the real "never again" signal for names), but a voice cluster has no
+ *  name to re-match against later: once raised, it must never come back,
+ *  resolved or not, or every page load would resurrect an already-confirmed
+ *  or already-ignored card. */
+const VOICE_SUGGESTED_KEY = "__voiceSuggested";
+
+function voiceSuggestionKey(conversationId: string, speakerId: number): string {
+  return `${conversationId}:${speakerId}`;
+}
+
+export function addVoicePending(s: { conversationId: string; date: string; speakerId: number }): void {
+  const key = voiceSuggestionKey(s.conversationId, s.speakerId);
+  const raised = readMeta(VOICE_SUGGESTED_KEY);
+  if (raised.includes(key)) return;
+  const map = pruneTombstones(readMap<unknown>(PENDING_NS));
+  const live = Object.values(map).filter(isPendingRecord);
+  if (live.length >= MAX_PENDING) return;
+  const id = crypto.randomUUID();
+  map[id] = {
+    id,
+    kind: "voice",
+    conversationId: s.conversationId,
+    date: s.date,
+    speakerId: s.speakerId,
+    extractedName: "",
+    details: [],
+    timestamp: new Date().toISOString(),
+  } satisfies PendingSuggestion;
+  // Only record the permanent "never raise this speaker again" key if the card
+  // actually landed. If writeMap was dropped (quota), recording it anyway would
+  // make that speaker unenrollable forever, silently.
+  if (!writeMap(PENDING_NS, map)) return;
+  writeMeta(VOICE_SUGGESTED_KEY, [...raised, key].slice(-2000));
 }
 
 /** Tombstoned, not removed: a resolved suggestion must stay resolved on every

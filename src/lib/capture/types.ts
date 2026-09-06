@@ -42,6 +42,16 @@ export interface SessionState {
 export interface TranscriptSegment {
   text: string;
   speaker_id: number;
+  /** The matched Person's name, frozen at transcription time. This is the
+   *  field the transcript UI renders (see identify.ts / pipeline.ts's
+   *  identifySpeakers). */
+  speaker_name?: string;
+  /** Set when a Person's voiceprint matched this segment's speaker cluster.
+   *  Deliberate scaffolding: nothing reads it yet, but it is stored so a
+   *  transcript can later resolve the Person's *current* name by id rather
+   *  than the name frozen into speaker_name above — a renamed informant
+   *  otherwise keeps a stale name on every past transcript. Not dead weight. */
+  speaker_person_id?: string;
   /** Seconds relative to the conversation start. */
   start: number;
   end: number;

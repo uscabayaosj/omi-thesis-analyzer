@@ -21,6 +21,7 @@ export async function GET() {
       source: r.source,
       structured: (r.structured as Conversation["structured"]) ?? undefined,
       geolocation: (r.geolocation as Conversation["geolocation"]) ?? null,
+      unmatched_speakers: (r.unmatched_speakers as Conversation["unmatched_speakers"]) ?? undefined,
     }));
     list.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
     return NextResponse.json(list, {

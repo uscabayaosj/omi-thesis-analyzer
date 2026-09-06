@@ -10,6 +10,7 @@ export interface TranscriptSegment {
   text: string;
   speaker_id?: number;
   speaker_name?: string;
+  speaker_person_id?: string;
   start?: number;
   end?: number;
 }
@@ -54,6 +55,7 @@ export interface Conversation {
   folder_id?: string;
   folder_name?: string;
   geolocation?: ConversationGeolocation | null;
+  unmatched_speakers?: number[];
 }
 
 export interface Analysis {

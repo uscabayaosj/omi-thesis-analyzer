@@ -26,8 +26,9 @@ import { useUndoOffer } from "@/components/UndoProvider";
 import { usePersistedPreference } from "@/lib/use-persisted-preference";
 import { getAnalyzedIds, getAnalysisAge } from "@/lib/storage";
 import { getAdhdAnalyzedIds } from "@/lib/adhd-storage";
-import { pullAndMerge } from "@/lib/sync";
+import { pullAndMerge, flushPush } from "@/lib/sync";
 import { getPlaces, createPlace, type Place } from "@/lib/places";
+import { fetchJson } from "@/lib/fetch-json";
 // Same treatment as MeetingMap: `leaflet/dist/leaflet.css` is imported at this
 // component's module scope, so a static import pulls the stylesheet into the
 // route bundle whether or not a picker is ever opened.
@@ -138,6 +139,7 @@ export default function PeoplePage() {
   const [addError, setAddError] = useState<string | null>(null);
   const [reassigning, setReassigning] = useState<string | null>(null); // pending suggestion id
   const [acceptErrorId, setAcceptErrorId] = useState<string | null>(null); // pending suggestion id
+  const [voiceNameDraft, setVoiceNameDraft] = useState<Record<string, string>>({});
   const [batchResult, setBatchResult] = useState<string | null>(null);
   const { offerUndo } = useUndoOffer();
   // Collapsed by default so the directory, search, and view toggle aren't
@@ -333,6 +335,71 @@ export default function PeoplePage() {
     });
   };
 
+  const acceptVoiceInto = async (s: PendingSuggestion, personId: string): Promise<boolean> => {
+    try {
+      await fetchJson("/api/capture/enroll-voice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId: s.conversationId, speakerId: s.speakerId, personId }),
+      });
+    } catch {
+      setAcceptErrorId(s.id);
+      refresh();
+      return false;
+    }
+    // The voiceprint was written server-side, into a namespace this browser
+    // also holds a copy of. PUT /api/store replaces the whole `omi-people`
+    // namespace (per-record last-write-wins only happens on pull), so the very
+    // next local write to it — e.g. addVoicePending → writeMeta on the next
+    // conversation with an unmatched speaker — would push the local map back
+    // and silently drop the voiceprint. Force-pull first so localStorage has
+    // it; the route stamps a fresh timestamp, so the merge favours the server.
+    // Do NOT remove this, and keep it ahead of anything touching omi-people.
+    await pullAndMerge(true);
+    setAcceptErrorId((cur) => (cur === s.id ? null : cur));
+    removePending(s.id);
+    refresh();
+    return true;
+  };
+
+  const acceptVoiceAsNew = async (s: PendingSuggestion, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    // The enroll route needs a Person that already exists in the store to
+    // enroll against, so the Person has to be created first — which means
+    // cleaning it up if the enroll fails, or a retry would make a duplicate.
+    const p = createPerson({ name: trimmed });
+    if (!p) {
+      setAcceptErrorId(s.id);
+      refresh();
+      return;
+    }
+    // /api/capture/enroll-voice resolves personId against the server's copy
+    // of the omi-people namespace, but createPerson only queued a debounced
+    // (1200ms) push. A user who confirms a name and clicks Add faster than
+    // that — the normal case — would hit the route before the new Person
+    // exists there, get a 404, and have the Person they just typed deleted
+    // out from under them. Flush synchronously so the server has it first.
+    try {
+      await flushPush();
+    } catch {
+      setAcceptErrorId(s.id);
+      deletePerson(p.id);
+      refresh();
+      return;
+    }
+    const ok = await acceptVoiceInto(s, p.id);
+    if (!ok) {
+      deletePerson(p.id);
+      refresh();
+    }
+  };
+
+  const doIgnoreVoice = (s: PendingSuggestion) => {
+    removePending(s.id);
+    refresh();
+  };
+
   /* A 43-item queue with only per-item buttons is a queue that does not get
      cleared: every accept re-renders the list and slides the next card under
      the thumb, and there is no way to dispatch the easy ones in one go. The
@@ -497,22 +564,36 @@ export default function PeoplePage() {
               <p role="status" className="text-sm text-slate-300 mb-3">{batchResult}</p>
             )}
             <div className="space-y-3">
-              {pending.map((s) => (
-                <PendingCard
-                  key={s.id}
-                  suggestion={s}
-                  people={people}
-                  showError={acceptErrorId === s.id}
-                  reassignOpen={reassigning === s.id}
-                  onOpenReassign={() => setReassigning(s.id)}
-                  onCloseReassign={() => setReassigning(null)}
-                  onAcceptMatched={(id) => acceptInto(s, id)}
-                  onAcceptCandidate={(id) => acceptInto(s, id)}
-                  onAcceptExisting={(id) => acceptInto(s, id)}
-                  onAcceptNew={() => acceptAsNew(s)}
-                  onIgnore={() => doIgnore(s)}
-                />
-              ))}
+              {pending.map((s) =>
+                s.kind === "voice" ? (
+                  <VoicePendingCard
+                    key={s.id}
+                    suggestion={s}
+                    people={people}
+                    showError={acceptErrorId === s.id}
+                    newName={voiceNameDraft[s.id] ?? ""}
+                    onNewNameChange={(v) => setVoiceNameDraft((cur) => ({ ...cur, [s.id]: v }))}
+                    onAcceptExisting={(id) => acceptVoiceInto(s, id)}
+                    onAcceptNew={(name) => acceptVoiceAsNew(s, name)}
+                    onIgnore={() => doIgnoreVoice(s)}
+                  />
+                ) : (
+                  <PendingCard
+                    key={s.id}
+                    suggestion={s}
+                    people={people}
+                    showError={acceptErrorId === s.id}
+                    reassignOpen={reassigning === s.id}
+                    onOpenReassign={() => setReassigning(s.id)}
+                    onCloseReassign={() => setReassigning(null)}
+                    onAcceptMatched={(id) => acceptInto(s, id)}
+                    onAcceptCandidate={(id) => acceptInto(s, id)}
+                    onAcceptExisting={(id) => acceptInto(s, id)}
+                    onAcceptNew={() => acceptAsNew(s)}
+                    onIgnore={() => doIgnore(s)}
+                  />
+                )
+              )}
             </div>
           </section>
         ) : (
@@ -998,6 +1079,83 @@ function PendingCard({
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function VoicePendingCard({
+  suggestion: s,
+  people,
+  showError,
+  newName,
+  onNewNameChange,
+  onAcceptExisting,
+  onAcceptNew,
+  onIgnore,
+}: {
+  suggestion: PendingSuggestion;
+  people: Person[];
+  showError: boolean;
+  newName: string;
+  onNewNameChange: (v: string) => void;
+  onAcceptExisting: (personId: string) => void;
+  onAcceptNew: (name: string) => void;
+  onIgnore: () => void;
+}) {
+  return (
+    <div className="card p-4">
+      <div className="mb-2">
+        <div className="text-white font-medium">Unrecognized voice</div>
+        <div className="text-slate-400 text-xs">{getAnalysisAge(s.date).label}</div>
+      </div>
+
+      {showError && (
+        <p className="text-red-400 text-xs mb-2" role="alert">
+          Couldn&rsquo;t save — try again.
+        </p>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2 mb-2 min-w-0">
+        <select
+          defaultValue=""
+          onChange={(e) => {
+            if (e.target.value) onAcceptExisting(e.target.value);
+          }}
+          aria-label="Select person"
+          className="flex-1 min-w-0 max-w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 min-h-[44px] text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-400"
+        >
+          <option value="" disabled>
+            Who is this?
+          </option>
+          {people.map((p) => (
+            <option key={p.id} value={p.id}>
+              {optionLabel(p.name)}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="flex flex-wrap gap-2 items-center min-w-0">
+        <input
+          value={newName}
+          onChange={(e) => onNewNameChange(e.target.value)}
+          placeholder="Or add a new person…"
+          className="flex-1 min-w-0 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 min-h-[44px] text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-400"
+        />
+        <button
+          onClick={() => onAcceptNew(newName)}
+          disabled={!newName.trim()}
+          className={`${BUTTON_PRIMARY} px-3 disabled:opacity-50`}
+        >
+          Add
+        </button>
+        <button
+          onClick={onIgnore}
+          className="text-sm min-h-[44px] px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+        >
+          Ignore
+        </button>
+      </div>
     </div>
   );
 }

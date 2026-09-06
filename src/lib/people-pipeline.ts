@@ -5,6 +5,7 @@ import type { Conversation, ConversationGeolocation } from "@/lib/conversation-t
 import type { AdhdPerson } from "@/lib/adhd";
 import {
   addPending,
+  addVoicePending,
   getExtractedConversationIds,
   getIgnoredNames,
   getPeople,
@@ -47,6 +48,7 @@ export async function runExtraction(
     if (ignored.has(normalize(ex.name))) continue;
     const match = matchPerson(ex.name, people);
     addPending({
+      kind: "text",
       conversationId,
       date,
       extractedName: ex.name,
@@ -106,6 +108,7 @@ export function suggestFromAdhdPeople(
       );
       const match = matchPerson(ap.name, existing);
       addPending({
+        kind: "text",
         conversationId,
         date,
         extractedName: ap.name,
@@ -125,5 +128,29 @@ export function suggestFromAdhdPeople(
     markConversationExtracted(conversationId);
   } catch (e) {
     console.error("suggestFromAdhdPeople failed", e);
+  }
+}
+
+/**
+ * Enqueues one "unrecognized voice" pending suggestion per unmatched
+ * speaker cluster the capture pipeline found on this conversation. Cheap
+ * and synchronous — no LLM call, just reading a field the conversation
+ * fetch already returned — so it's safe to call every time a conversation
+ * loads; addVoicePending's own permanent dedup keeps it idempotent.
+ *
+ * Never throws: touches localStorage synchronously (which can throw on quota),
+ * so failures are swallowed and logged rather than surfacing in load flows.
+ */
+export function suggestUnmatchedVoices(conversation: {
+  id: string;
+  created_at: string;
+  unmatched_speakers?: number[];
+}): void {
+  try {
+    for (const speakerId of conversation.unmatched_speakers ?? []) {
+      addVoicePending({ conversationId: conversation.id, date: conversation.created_at, speakerId });
+    }
+  } catch (e) {
+    console.error("suggestUnmatchedVoices failed", e);
   }
 }
