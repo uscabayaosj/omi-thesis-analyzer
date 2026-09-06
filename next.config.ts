@@ -13,17 +13,25 @@ const nextConfig: NextConfig = {
   // resolution, so without these entries the model load fails on Vercel —
   // and it fails quietly, leaving every conversation unlabeled (see the
   // per-cluster catch in pipeline.ts's identifySpeakers).
+  //
+  // Pinned to linux/x64 deliberately: the package ships five prebuilt
+  // platforms totalling 210 MB, and a `bin/**/*` glob drags all of them into
+  // every capture function, which alone exceeds Vercel's 250 MB unzipped
+  // limit and fails the deploy. Only linux/x64 (34 MB) is reachable there.
+  // The route scope stays broad because four of these five routes really do
+  // load the model: chunks, close and sweep all reach closeSession →
+  // transcribeSession → identifySpeakers, not just enroll-voice.
   serverExternalPackages: ["opusscript", "@huggingface/transformers", "onnxruntime-node"],
   outputFileTracingIncludes: {
     "/api/capture/*": [
       "./node_modules/opusscript/build/**/*",
-      "./node_modules/onnxruntime-node/bin/**/*",
+      "./node_modules/onnxruntime-node/bin/napi-v6/linux/x64/**/*",
       "./node_modules/onnxruntime-node/dist/**/*",
       "./node_modules/onnxruntime-node/lib/**/*",
     ],
     "/api/capture/**": [
       "./node_modules/opusscript/build/**/*",
-      "./node_modules/onnxruntime-node/bin/**/*",
+      "./node_modules/onnxruntime-node/bin/napi-v6/linux/x64/**/*",
       "./node_modules/onnxruntime-node/dist/**/*",
       "./node_modules/onnxruntime-node/lib/**/*",
     ],
