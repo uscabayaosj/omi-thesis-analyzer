@@ -15,6 +15,22 @@ function decoderCheck(): string {
   }
 }
 
+/** Proves the native onnxruntime binding loads in this deployment — the
+ *  other dependency that can silently go missing from a function bundle,
+ *  and the one the speaker-identification model sits on. Its index requires
+ *  the platform `.node` addon on import, so the import itself is the
+ *  dlopen; nothing else about the model needs to load to answer this.
+ *  A failure here would otherwise be invisible: identifySpeakers catches it
+ *  per cluster and the session still completes, just with no names. */
+async function onnxruntimeCheck(): Promise<string> {
+  try {
+    const ort = await import("onnxruntime-node");
+    return ort.InferenceSession ? "ok" : "loaded without InferenceSession";
+  } catch (err) {
+    return `failed: ${err instanceof Error ? err.message : String(err)}`;
+  }
+}
+
 /** Read-only feed for the /capture page. */
 export async function GET() {
   const sql = getStore();
@@ -22,7 +38,12 @@ export async function GET() {
   try {
     await ensureCaptureSchemaOnce(sql);
     return NextResponse.json(
-      { configured: true, decoder: decoderCheck(), ...(await captureStatus(sql)) },
+      {
+        configured: true,
+        decoder: decoderCheck(),
+        onnxruntime: await onnxruntimeCheck(),
+        ...(await captureStatus(sql)),
+      },
       { headers: { "Cache-Control": "no-store" } }
     );
   } catch (err) {

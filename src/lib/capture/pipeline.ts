@@ -20,20 +20,22 @@ import * as store from "./store";
 
 const SR = 16000;
 
-const vadThreshold = () => {
-  const v = Number(process.env.CAPTURE_VAD_DBFS);
-  return Number.isFinite(v) ? v : VAD_DEFAULTS.thresholdDbfs;
-};
+/** A tunable read from the environment, falling back to `fallback` when the
+ *  variable is unset, blank, non-numeric, or fails `valid`. Blank matters:
+ *  `Number("")` is 0, and a dashboard-created variable left empty is a
+ *  common state — for the match threshold that 0 would silently label every
+ *  speaker as whoever is first in the gallery. */
+function envNumber(name: string, fallback: number, valid: (v: number) => boolean = Number.isFinite): number {
+  const raw = process.env[name]?.trim();
+  if (!raw) return fallback;
+  const v = Number(raw);
+  return Number.isFinite(v) && valid(v) ? v : fallback;
+}
 
-const voiceMatchThreshold = () => {
-  const v = Number(process.env.CAPTURE_VOICE_MATCH_THRESHOLD);
-  return Number.isFinite(v) ? v : 0.8;
-};
-
-const minSpeakerMs = () => {
-  const v = Number(process.env.CAPTURE_MIN_SPEAKER_MS);
-  return Number.isFinite(v) ? v : 3000;
-};
+const vadThreshold = () => envNumber("CAPTURE_VAD_DBFS", VAD_DEFAULTS.thresholdDbfs);
+// Cosine similarity: only (0, 1] is a meaningful "same speaker" cutoff.
+const voiceMatchThreshold = () => envNumber("CAPTURE_VOICE_MATCH_THRESHOLD", 0.8, (v) => v > 0 && v <= 1);
+const minSpeakerMs = () => envNumber("CAPTURE_MIN_SPEAKER_MS", 3000, (v) => v >= 0);
 
 function blobPathFor(startedAtMs: number, chunkId: string): string {
   return `capture/${new Date(startedAtMs).toISOString().slice(0, 10)}/${chunkId}.trch`;
@@ -145,9 +147,12 @@ function extractPeopleWithVoicePrints(raw: unknown): { id: string; name: string;
 }
 
 /** Matches each speaker cluster against the People Directory's enrolled
- *  voiceprints. Never throws — an embedding failure (model unavailable, the
- *  native onnxruntime binding failing to load) logs and leaves that cluster numeric, exactly like a
- *  cluster that legitimately has no match. */
+ *  voiceprints. An embedding failure (model unavailable, the native
+ *  onnxruntime binding failing to load) is caught per cluster: it logs and
+ *  leaves that cluster numeric, exactly like a cluster that legitimately has
+ *  no match. Only the gallery read itself can throw, and that propagates to
+ *  closeSession, which marks the session failed and retryable — better than
+ *  writing a permanently unlabeled transcript over a transient store error. */
 async function identifySpeakers(
   sql: Sql,
   segments: TranscriptSegment[],

@@ -139,6 +139,11 @@ export default function PeoplePage() {
   const [addError, setAddError] = useState<string | null>(null);
   const [reassigning, setReassigning] = useState<string | null>(null); // pending suggestion id
   const [acceptErrorId, setAcceptErrorId] = useState<string | null>(null); // pending suggestion id
+  // Why the voice enrollment failed, when the route said. Text cards keep the
+  // generic message; voice enrollment has several distinct, actionable failure
+  // modes (store not configured, person not found, an enrollment already
+  // running) that the user needs to see to act on rather than just retry.
+  const [acceptErrorMsg, setAcceptErrorMsg] = useState<string | null>(null);
   const [voiceNameDraft, setVoiceNameDraft] = useState<Record<string, string>>({});
   const [batchResult, setBatchResult] = useState<string | null>(null);
   const { offerUndo } = useUndoOffer();
@@ -342,8 +347,9 @@ export default function PeoplePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conversationId: s.conversationId, speakerId: s.speakerId, personId }),
       });
-    } catch {
+    } catch (e) {
       setAcceptErrorId(s.id);
+      setAcceptErrorMsg(e instanceof Error ? e.message : null);
       refresh();
       return false;
     }
@@ -354,9 +360,17 @@ export default function PeoplePage() {
     // conversation with an unmatched speaker — would push the local map back
     // and silently drop the voiceprint. Force-pull first so localStorage has
     // it; the route stamps a fresh timestamp, so the merge favours the server.
-    // Do NOT remove this, and keep it ahead of anything touching omi-people.
+    // Keep this ahead of anything touching omi-people.
+    //
+    // Scope of this fix: it protects *this tab*. Another tab or device that
+    // loaded before the enrollment still holds the old map, pulls only once
+    // per page load, and would drop the voiceprint on its next write to this
+    // namespace. That is the store's wholesale-replace design, not something
+    // this call can close — a single-user app that keeps one tab open is the
+    // case it covers, and the next enrollment or reload self-heals the rest.
     await pullAndMerge(true);
     setAcceptErrorId((cur) => (cur === s.id ? null : cur));
+    setAcceptErrorMsg(null);
     removePending(s.id);
     refresh();
     return true;
@@ -371,6 +385,7 @@ export default function PeoplePage() {
     const p = createPerson({ name: trimmed });
     if (!p) {
       setAcceptErrorId(s.id);
+      setAcceptErrorMsg("Couldn’t save the new person — storage may be full.");
       refresh();
       return;
     }
@@ -379,11 +394,14 @@ export default function PeoplePage() {
     // (1200ms) push. A user who confirms a name and clicks Add faster than
     // that — the normal case — would hit the route before the new Person
     // exists there, get a 404, and have the Person they just typed deleted
-    // out from under them. Flush synchronously so the server has it first.
+    // out from under them. Flush synchronously so the server has it first —
+    // scoped to omi-people, so an unrelated namespace failing in the same
+    // batch cannot fail this action.
     try {
-      await flushPush();
+      await flushPush("omi-people");
     } catch {
       setAcceptErrorId(s.id);
+      setAcceptErrorMsg("Couldn’t sync the new person to the server — check your connection and try again.");
       deletePerson(p.id);
       refresh();
       return;
@@ -571,6 +589,7 @@ export default function PeoplePage() {
                     suggestion={s}
                     people={people}
                     showError={acceptErrorId === s.id}
+                    errorMessage={acceptErrorId === s.id ? acceptErrorMsg : null}
                     newName={voiceNameDraft[s.id] ?? ""}
                     onNewNameChange={(v) => setVoiceNameDraft((cur) => ({ ...cur, [s.id]: v }))}
                     onAcceptExisting={(id) => acceptVoiceInto(s, id)}
@@ -1087,6 +1106,7 @@ function VoicePendingCard({
   suggestion: s,
   people,
   showError,
+  errorMessage,
   newName,
   onNewNameChange,
   onAcceptExisting,
@@ -1096,6 +1116,7 @@ function VoicePendingCard({
   suggestion: PendingSuggestion;
   people: Person[];
   showError: boolean;
+  errorMessage?: string | null;
   newName: string;
   onNewNameChange: (v: string) => void;
   onAcceptExisting: (personId: string) => void;
@@ -1110,8 +1131,8 @@ function VoicePendingCard({
       </div>
 
       {showError && (
-        <p className="text-red-400 text-xs mb-2" role="alert">
-          Couldn&rsquo;t save — try again.
+        <p className="text-red-400 text-xs mb-2 break-words" role="alert">
+          {errorMessage || "Couldn’t save — try again."}
         </p>
       )}
 
