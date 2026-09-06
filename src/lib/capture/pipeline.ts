@@ -1,14 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { put, get } from "@vercel/blob";
-import { getStore, type Sql } from "../kv";
+import { getStore, getNamespaceData, type Sql } from "../kv";
 import { parseChunk } from "./container";
 import { decodeChunk, decodeFrames } from "./decode";
 import { detectSpeech, levelStats, VAD_DEFAULTS } from "./vad";
 import { placeSpan, isStale, disposition, SESSION_GAP_MS } from "./sessions";
 import { assembleVoiced, encodeWav, type VoicedPiece } from "./assemble";
 import { transcribeWav, utterancesToSegments } from "./transcribe";
+import { groupBySpeaker, bestMatch, extractSpeakerPcm, int16ToFloat32 } from "./identify";
+import { embedAudio } from "./embed";
 import { countWords, type ConversationRow } from "./rows";
-import type { AbsSpan, SessionState } from "./types";
+import type { AbsSpan, SessionState, TranscriptSegment } from "./types";
 import * as store from "./store";
 
 /**
@@ -21,6 +23,16 @@ const SR = 16000;
 const vadThreshold = () => {
   const v = Number(process.env.CAPTURE_VAD_DBFS);
   return Number.isFinite(v) ? v : VAD_DEFAULTS.thresholdDbfs;
+};
+
+const voiceMatchThreshold = () => {
+  const v = Number(process.env.CAPTURE_VOICE_MATCH_THRESHOLD);
+  return Number.isFinite(v) ? v : 0.8;
+};
+
+const minSpeakerMs = () => {
+  const v = Number(process.env.CAPTURE_MIN_SPEAKER_MS);
+  return Number.isFinite(v) ? v : 3000;
 };
 
 function blobPathFor(startedAtMs: number, chunkId: string): string {
@@ -92,8 +104,10 @@ export async function ingestChunk(input: { chunkId: string; deviceId: string; by
   return { duplicate: false, durationMs: chunk.durationMs, voicedMs, sessionId: open?.id ?? null, toClose };
 }
 
-async function transcribeSession(sql: Sql, s: SessionState): Promise<ConversationRow> {
-  // Re-fetch and decode only the chunks the session's spans point at.
+async function assembleSessionAudio(
+  sql: Sql,
+  s: SessionState
+): Promise<{ assembled: ReturnType<typeof assembleVoiced>; chunkIds: string[]; paths: Map<string, string> }> {
   const chunkIds = Array.from(new Set(s.spans.map((sp) => sp.chunkId)));
   const paths = await store.getChunkBlobPaths(sql, chunkIds);
   const decoded = new Map<string, { startedAtMs: number; pcm: Int16Array }>();
@@ -111,22 +125,88 @@ async function transcribeSession(sql: Sql, s: SessionState): Promise<Conversatio
     const to = Math.round(((sp.endMs - d.startedAtMs) / 1000) * SR);
     pieces.push({ span: sp, pcm: d.pcm.subarray(Math.max(0, from), Math.min(d.pcm.length, to)) });
   }
-  const assembled = assembleVoiced(pieces);
+  return { assembled: assembleVoiced(pieces), chunkIds, paths };
+}
+
+function extractPeopleWithVoicePrints(raw: unknown): { id: string; name: string; voicePrint?: number[] }[] {
+  if (!raw || typeof raw !== "object") return [];
+  const out: { id: string; name: string; voicePrint?: number[] }[] = [];
+  for (const [id, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (id.startsWith("__") || !v || typeof v !== "object") continue;
+    const r = v as Record<string, unknown>;
+    if ("deleted" in r || typeof r.name !== "string") continue; // skip tombstones + malformed
+    const voicePrint =
+      Array.isArray(r.voicePrint) && r.voicePrint.every((n) => typeof n === "number")
+        ? (r.voicePrint as number[])
+        : undefined;
+    out.push({ id, name: r.name, voicePrint });
+  }
+  return out;
+}
+
+/** Matches each speaker cluster against the People Directory's enrolled
+ *  voiceprints. Never throws — an embedding failure (model unavailable,
+ *  WASM init error) logs and leaves that cluster numeric, exactly like a
+ *  cluster that legitimately has no match. */
+async function identifySpeakers(
+  sql: Sql,
+  segments: TranscriptSegment[],
+  assembled: ReturnType<typeof assembleVoiced>,
+  conversationStartMs: number
+): Promise<{ segments: TranscriptSegment[]; unmatchedSpeakers: number[] }> {
+  const clusters = groupBySpeaker(segments).filter((c) => c.totalMs >= minSpeakerMs());
+  if (clusters.length === 0) return { segments, unmatchedSpeakers: [] };
+
+  const people = extractPeopleWithVoicePrints(await getNamespaceData(sql, "omi-people"));
+  const gallery = people
+    .filter((p): p is { id: string; name: string; voicePrint: number[] } => !!p.voicePrint)
+    .map((p) => ({ personId: p.id, embedding: p.voicePrint }));
+  const threshold = voiceMatchThreshold();
+
+  const matchBySpeakerId = new Map<number, { personId: string; name: string }>();
+  const unmatchedSpeakers: number[] = [];
+
+  for (const cluster of clusters) {
+    try {
+      const pcm = extractSpeakerPcm(assembled, conversationStartMs, cluster);
+      const embedding = await embedAudio(int16ToFloat32(pcm));
+      const match = bestMatch(embedding, gallery, threshold);
+      if (match) {
+        const person = people.find((p) => p.id === match.personId)!;
+        matchBySpeakerId.set(cluster.speakerId, { personId: person.id, name: person.name });
+      } else {
+        unmatchedSpeakers.push(cluster.speakerId);
+      }
+    } catch (e) {
+      console.error(`speaker identification failed for cluster ${cluster.speakerId}:`, e);
+    }
+  }
+
+  const out = segments.map((seg) => {
+    const m = matchBySpeakerId.get(seg.speaker_id);
+    return m ? { ...seg, speaker_name: m.name, speaker_person_id: m.personId } : seg;
+  });
+  return { segments: out, unmatchedSpeakers };
+}
+
+async function transcribeSession(sql: Sql, s: SessionState): Promise<ConversationRow> {
+  const { assembled, chunkIds, paths } = await assembleSessionAudio(sql, s);
   const utterances = await transcribeWav(encodeWav(assembled.pcm));
   const segments = utterancesToSegments(utterances, assembled.map, s.startedAtMs);
+  const { segments: identified, unmatchedSpeakers } = await identifySpeakers(sql, segments, assembled, s.startedAtMs);
   return {
     id: randomUUID(),
     source: "trace",
     created_at: new Date(s.startedAtMs).toISOString(),
     started_at: new Date(s.startedAtMs).toISOString(),
     finished_at: new Date(s.lastSpeechAtMs).toISOString(),
-    transcript_segments: segments,
+    transcript_segments: identified,
     structured: null,
     geolocation: null,
     session_id: s.id,
-    word_count: countWords(segments),
+    word_count: countWords(identified),
     audio_refs: chunkIds.map((id) => paths.get(id)).filter((p): p is string => !!p),
-    unmatched_speakers: null,
+    unmatched_speakers: unmatchedSpeakers.length ? unmatchedSpeakers : null,
   };
 }
 
