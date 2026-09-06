@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { fetchJson } from "@/lib/fetch-json";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatTime } from "@/lib/format";
 import { ArrowLeftIcon, RefreshIcon } from "@/components/icons";
-import { BUTTON_GHOST } from "@/lib/ui";
+import { BUTTON_GHOST, BUTTON_SECONDARY } from "@/lib/ui";
+import { describeClose } from "@/components/CaptureBanner";
 
 interface Status {
   configured: boolean;
@@ -18,8 +19,19 @@ interface Status {
   open?: { id: string; deviceId: string; startedAt: string; lastSpeechAt: string; voicedMs: number }[];
   byStatus7d?: Record<string, number>;
   failed?: { id: string; startedAt: string; error: string; attempts: number }[];
+  /** Newest chunks with their level percentiles — the VAD tuning readout the
+   *  route has always returned and this page never showed. */
+  recentChunks?: { startedAt: string; durationMs: number; voicedMs: number; p10: number | null; p50: number | null; p90: number | null }[];
   error?: string;
 }
+
+interface Outcome {
+  transcribed?: number;
+  discarded?: number;
+  failed?: number;
+}
+
+const dbfs = (v: number | null) => (v == null ? "—" : `${Math.round(v)} dB`);
 
 const minutes = (ms: number) => `${Math.round(ms / 60_000)} min`;
 
@@ -34,7 +46,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 export default function CapturePage() {
   const [status, setStatus] = useState<Status | null>(null);
-  const [busy, setBusy] = useState<"refresh" | null>(null);
+  const [busy, setBusy] = useState<"refresh" | "end" | "retry" | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
   // No synchronous setState in the effect body: state changes only land after
@@ -57,6 +69,45 @@ export default function CapturePage() {
     setBusy("refresh");
     await fetchStatus();
     setBusy(null);
+  };
+
+  // The same "End conversation now" the home banner offers. This page showed
+  // an in-progress session and gave no way to act on it.
+  const endNow = async () => {
+    setBusy("end");
+    setNote(null);
+    try {
+      const r = await fetchJson<{ closed: string[] } & Outcome>("/api/capture/close", { method: "POST" });
+      await fetchStatus();
+      setNote(describeClose(r));
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : "Could not end the conversation.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  // A failed transcription used to wait for the daily sweep and be abandoned
+  // after three tries, with nothing here able to touch it.
+  const retryFailed = async () => {
+    setBusy("retry");
+    setNote(null);
+    try {
+      const r = await fetchJson<{ retried: string[] } & Outcome>("/api/capture/retry", { method: "POST" });
+      await fetchStatus();
+      if (r.retried.length === 0) setNote("Nothing needed retrying.");
+      else {
+        const parts: string[] = [];
+        if (r.transcribed) parts.push(`${r.transcribed} transcribed`);
+        if (r.discarded) parts.push(`${r.discarded} too short to keep`);
+        if (r.failed) parts.push(`${r.failed} still failing`);
+        setNote(`Retried ${r.retried.length}: ${parts.join(", ") || "done"}.`);
+      }
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : "Could not retry.");
+    } finally {
+      setBusy(null);
+    }
   };
 
 
@@ -100,12 +151,17 @@ export default function CapturePage() {
             {(status.open ?? []).length === 0 ? (
               <p className="text-slate-400 text-sm mt-1">No conversation in progress.</p>
             ) : (
-              status.open!.map((o) => (
-                <p key={o.id} className="text-slate-400 text-sm mt-1">
-                  In progress since {formatDateTime(o.startedAt)} — {minutes(o.voicedMs)} of speech, last heard{" "}
-                  {formatDateTime(o.lastSpeechAt)}.
-                </p>
-              ))
+              <>
+                {status.open!.map((o) => (
+                  <p key={o.id} className="text-slate-400 text-sm mt-1">
+                    In progress since {formatDateTime(o.startedAt)} — {minutes(o.voicedMs)} of speech, last heard{" "}
+                    {formatDateTime(o.lastSpeechAt)}.
+                  </p>
+                ))}
+                <button onClick={endNow} disabled={busy !== null} className={`${BUTTON_SECONDARY} mt-3`}>
+                  {busy === "end" ? "Ending…" : "End conversation now"}
+                </button>
+              </>
             )}
           </div>
 
@@ -131,6 +187,32 @@ export default function CapturePage() {
                       {formatDateTime(f.startedAt)} · {f.attempts} {f.attempts === 1 ? "try" : "tries"}
                     </span>
                     <span className="block break-words">{f.error}</span>
+                  </li>
+                ))}
+              </ul>
+              <button onClick={retryFailed} disabled={busy !== null} className={`${BUTTON_SECONDARY} mt-3`}>
+                <RefreshIcon className={`w-4 h-4 ${busy === "retry" ? "animate-spin" : ""}`} />
+                {busy === "retry" ? "Retrying…" : `Retry ${status.failed!.length === 1 ? "it" : "all"} now`}
+              </button>
+              <p className="text-xs text-slate-400 mt-2">
+                Each retry is another transcription call. The nightly sweep also retries, up to three times per recording.
+              </p>
+            </div>
+          )}
+
+          {(status.recentChunks ?? []).length > 0 && (
+            <div className="card p-4">
+              <p className="text-slate-300 mb-1">Recent audio</p>
+              <p className="text-xs text-slate-400 mb-2">
+                The last few 30-second chunks: how much of each was speech, and its quiet / typical / loud levels.
+                Speech being missed or noise being kept is tuned with <span className="font-mono">CAPTURE_VAD_DBFS</span>.
+              </p>
+              <ul className="text-sm text-slate-400 space-y-1 font-mono">
+                {status.recentChunks!.map((c, i) => (
+                  <li key={`${c.startedAt}-${i}`} className="flex flex-wrap gap-x-3">
+                    <span>{formatTime(c.startedAt)}</span>
+                    <span>{Math.round(c.voicedMs / 1000)}s / {Math.round(c.durationMs / 1000)}s speech</span>
+                    <span>{dbfs(c.p10)} · {dbfs(c.p50)} · {dbfs(c.p90)}</span>
                   </li>
                 ))}
               </ul>

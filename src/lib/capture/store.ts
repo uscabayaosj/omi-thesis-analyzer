@@ -224,6 +224,16 @@ export async function listRetryable(sql: Sql): Promise<string[]> {
   return rows.map((r) => r.id);
 }
 
+/** Every failed session, attempts notwithstanding — for the user's explicit
+ *  "retry now", where the three-try cap that protects the cron from looping
+ *  on a permanently broken session does not apply. */
+export async function listFailed(sql: Sql): Promise<string[]> {
+  const rows = (await withTimeout(
+    sql`SELECT id FROM capture_sessions WHERE status = 'failed' ORDER BY started_at DESC LIMIT 50`
+  )) as { id: string }[];
+  return rows.map((r) => r.id);
+}
+
 // ── conversations ──
 
 export async function upsertConversations(sql: Sql, rows: ConversationRow[]): Promise<void> {
@@ -251,6 +261,21 @@ export async function listConversationsLite(sql: Sql, limit = 200): Promise<Conv
   return (await withTimeout(sql`
     SELECT id, source, created_at, started_at, finished_at, structured, geolocation, session_id, word_count, audio_refs, unmatched_speakers
     FROM conversations ORDER BY created_at DESC LIMIT ${limit}`)) as ConversationLite[];
+}
+
+/** The same lite rows for one time window — how the calendar reaches days
+ *  older than the newest-200 list. The cap is a safety net, not a page size:
+ *  a month of this pendant runs to a few hundred rows. */
+export async function listConversationsLiteBetween(
+  sql: Sql,
+  fromIso: string,
+  toIso: string,
+  limit = 2000
+): Promise<ConversationLite[]> {
+  return (await withTimeout(sql`
+    SELECT id, source, created_at, started_at, finished_at, structured, geolocation, session_id, word_count, audio_refs, unmatched_speakers
+    FROM conversations WHERE created_at >= ${fromIso} AND created_at < ${toIso}
+    ORDER BY created_at DESC LIMIT ${limit}`)) as ConversationLite[];
 }
 
 export async function getConversationRow(sql: Sql, id: string): Promise<ConversationRow | null> {
