@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getStore, getNamespaceData, putNamespaceData } from "@/lib/kv";
 import { ensureCaptureSchemaOnce, getSessionByConversationId, getConversationRow } from "@/lib/capture/store";
 import { assembleSessionAudio } from "@/lib/capture/pipeline";
-import { isBearerAuthorized } from "@/lib/capture/auth";
 import { groupBySpeaker, extractSpeakerPcm, int16ToFloat32, averageEmbeddings } from "@/lib/capture/identify";
 import { embedAudio } from "@/lib/capture/embed";
 import { friendlyError } from "@/lib/api-error";
+
+export const maxDuration = 300;
 
 interface EnrollBody {
   conversationId: string;
@@ -21,11 +22,15 @@ function isEnrollBody(v: unknown): v is EnrollBody {
 
 /** Enrolls (or strengthens) a Person's voiceprint from one already-transcribed
  *  conversation's speaker cluster. Triggered by confirming a name on an
- *  "unrecognized voice" pending suggestion (see people-pipeline.ts). */
+ *  "unrecognized voice" pending suggestion (see people-pipeline.ts).
+ *
+ *  Unauthenticated, like the app's other single-user actions (see
+ *  /api/capture/close and the threat-model note on /api/store): it is called
+ *  straight from the browser, it only writes the user's own data, and the
+ *  `omi-people` namespace it touches is already fully readable and writable
+ *  unauthenticated through /api/store. A bearer check here would only mean a
+ *  server-only token the browser cannot send — i.e. a feature that never works. */
 export async function POST(req: NextRequest) {
-  if (!isBearerAuthorized(req, process.env.CAPTURE_INGEST_TOKEN)) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
   let body: unknown;
   try {
     body = await req.json();
@@ -58,16 +63,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `no segments for speaker ${body.speakerId}` }, { status: 404 });
     }
 
+    // Validate the person before the expensive audio re-assembly + embed, so a
+    // bad personId fails fast. The namespace is re-read after the embed below:
+    // the write must still be the last thing that happens, over fresh data.
+    const preRaw = (await getNamespaceData(sql, "omi-people")) as Record<string, unknown> | null;
+    const pre = preRaw?.[body.personId] as Record<string, unknown> | undefined;
+    if (!pre || typeof pre.name !== "string") {
+      return NextResponse.json({ error: `person ${body.personId} not found` }, { status: 404 });
+    }
+
     const { assembled } = await assembleSessionAudio(sql, session);
     const pcm = extractSpeakerPcm(assembled, session.startedAtMs, cluster);
     const embedding = await embedAudio(int16ToFloat32(pcm));
 
     const peopleRaw = (await getNamespaceData(sql, "omi-people")) as Record<string, unknown> | null;
     const people = peopleRaw ? { ...peopleRaw } : {};
-    const existing = people[body.personId] as Record<string, unknown> | undefined;
-    if (!existing || typeof existing.name !== "string") {
-      return NextResponse.json({ error: `person ${body.personId} not found` }, { status: 404 });
-    }
+    const existing = (people[body.personId] as Record<string, unknown> | undefined) ?? pre;
 
     const existingPrint = Array.isArray(existing.voicePrint) ? (existing.voicePrint as number[]) : undefined;
     const existingCount = typeof existing.voicePrintSamples === "number" ? existing.voicePrintSamples : 0;

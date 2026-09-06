@@ -335,7 +335,7 @@ export default function PeoplePage() {
     });
   };
 
-  const acceptVoiceInto = async (s: PendingSuggestion, personId: string) => {
+  const acceptVoiceInto = async (s: PendingSuggestion, personId: string): Promise<boolean> => {
     try {
       await fetchJson("/api/capture/enroll-voice", {
         method: "POST",
@@ -345,23 +345,40 @@ export default function PeoplePage() {
     } catch {
       setAcceptErrorId(s.id);
       refresh();
-      return;
+      return false;
     }
+    // The voiceprint was written server-side, into a namespace this browser
+    // also holds a copy of. PUT /api/store replaces the whole `omi-people`
+    // namespace (per-record last-write-wins only happens on pull), so the very
+    // next local write to it — e.g. addVoicePending → writeMeta on the next
+    // conversation with an unmatched speaker — would push the local map back
+    // and silently drop the voiceprint. Force-pull first so localStorage has
+    // it; the route stamps a fresh timestamp, so the merge favours the server.
+    // Do NOT remove this, and keep it ahead of anything touching omi-people.
+    await pullAndMerge(true);
     setAcceptErrorId((cur) => (cur === s.id ? null : cur));
     removePending(s.id);
     refresh();
+    return true;
   };
 
   const acceptVoiceAsNew = async (s: PendingSuggestion, name: string) => {
     const trimmed = name.trim();
     if (!trimmed) return;
+    // The enroll route needs a Person that already exists in the store to
+    // enroll against, so the Person has to be created first — which means
+    // cleaning it up if the enroll fails, or a retry would make a duplicate.
     const p = createPerson({ name: trimmed });
     if (!p) {
       setAcceptErrorId(s.id);
       refresh();
       return;
     }
-    await acceptVoiceInto(s, p.id);
+    const ok = await acceptVoiceInto(s, p.id);
+    if (!ok) {
+      deletePerson(p.id);
+      refresh();
+    }
   };
 
   const doIgnoreVoice = (s: PendingSuggestion) => {
