@@ -52,11 +52,17 @@ function writeLocal(ns: string, map: RecordMap): void {
 let pushTimer: ReturnType<typeof setTimeout> | null = null;
 const pendingPush = new Set<SyncedNamespace>();
 
-// Every push currently in flight (from either path), so flushPush can wait on
-// pushes the scheduled path already started firing before flush was called.
-// Entries remove themselves the instant they settle, success or failure, so
-// this can never grow unbounded or leak stale promises.
-const inFlightPushes = new Set<Promise<void>>();
+// Every push currently in flight (from either path), keyed by the namespace
+// it carries, so flushPush can wait on pushes the scheduled path already
+// started firing before flush was called — and wait on only the namespace
+// its caller cares about. Entries remove themselves the instant they settle,
+// success or failure, so this can never grow unbounded or leak stale promises.
+const inFlightPushes = new Map<Promise<void>, SyncedNamespace>();
+
+interface PushHandle {
+  ns: SyncedNamespace;
+  promise: Promise<void>;
+}
 
 /**
  * Push every currently-pending namespace to the server. Shared by the
@@ -71,10 +77,10 @@ const inFlightPushes = new Set<Promise<void>>();
  * caller needs to know), but see flushPush's docstring for how it handles
  * pushes it did *not* start.
  */
-function runPendingPush(swallow: boolean): Promise<void>[] {
+function runPendingPush(swallow: boolean): PushHandle[] {
   const namespaces = Array.from(pendingPush);
   pendingPush.clear();
-  return namespaces.map((n) => {
+  return namespaces.map((n): PushHandle => {
     const body = isArrayNamespace(n)
       ? { namespace: n, map: { list: JSON.parse(localStorage.getItem(n) || "[]") } }
       : { namespace: n, map: readLocal(n) };
@@ -93,13 +99,13 @@ function runPendingPush(swallow: boolean): Promise<void>[] {
     // the scheduled path started still learns it failed. Swallowing before
     // tracking would hand flushPush a promise that always resolves — the
     // exact "reads as success" bug this function guards against above.
-    inFlightPushes.add(settled);
+    inFlightPushes.set(settled, n);
     const untrack = () => inFlightPushes.delete(settled);
     settled.then(untrack, untrack);
     // Marks the rejection handled so a swallowed push cannot raise an
     // unhandledrejection; `settled` itself stays rejected for any awaiter.
     settled.catch(() => {});
-    return swallow ? settled.catch(() => {}) : settled;
+    return { ns: n, promise: swallow ? settled.catch(() => {}) : settled };
   });
 }
 
@@ -156,16 +162,29 @@ export function schedulePush(ns: SyncedNamespace): void {
  * *UI* on its own debounced timer, not about hiding the outcome from a
  * caller that explicitly asked to be told. The scheduled path itself is
  * unaffected: it still never awaits or reacts to these promises.
+ *
+ * Pass `ns` to await only that namespace. Everything pending is still pushed
+ * (batching is unchanged), but a caller who needs `omi-people` on the server
+ * should not have its action fail because an unrelated namespace's push
+ * happened to error in the same batch — pushes for other namespaces keep the
+ * scheduled path's swallowed, fire-and-forget posture.
  */
-export async function flushPush(): Promise<void> {
+export async function flushPush(ns?: SyncedNamespace): Promise<void> {
   if (typeof window === "undefined") return;
   if (pushTimer) {
     clearTimeout(pushTimer);
     pushTimer = null;
   }
-  const ownPushes = runPendingPush(false);
-  const alreadyInFlight = Array.from(inFlightPushes).filter((p) => !ownPushes.includes(p));
-  await Promise.all([...ownPushes, ...alreadyInFlight]);
+  const wanted = (n: SyncedNamespace) => ns === undefined || n === ns;
+  const own = runPendingPush(false);
+  // Own pushes for namespaces the caller did not ask about are already marked
+  // handled inside runPendingPush, so leaving them un-awaited cannot raise an
+  // unhandledrejection.
+  const ownWanted = own.filter((h) => wanted(h.ns)).map((h) => h.promise);
+  const alreadyInFlight = Array.from(inFlightPushes)
+    .filter(([p, n]) => wanted(n) && !own.some((h) => h.promise === p))
+    .map(([p]) => p);
+  await Promise.all([...ownWanted, ...alreadyInFlight]);
 }
 
 let pulled = false;

@@ -29,8 +29,29 @@ function isEnrollBody(v: unknown): v is EnrollBody {
  *  straight from the browser, it only writes the user's own data, and the
  *  `omi-people` namespace it touches is already fully readable and writable
  *  unauthenticated through /api/store. A bearer check here would only mean a
- *  server-only token the browser cannot send — i.e. a feature that never works. */
+ *  server-only token the browser cannot send — i.e. a feature that never works.
+ *
+ *  One way this route's exposure is wider than those precedents: it is
+ *  unauthenticated *compute*, not just a cheap write — a blob re-fetch, an
+ *  Opus decode, a possible cold-start model download and an inference, under
+ *  a 300 s ceiling. The single-flight guard below caps that at one enrollment
+ *  per function instance at a time, which also covers a double-clicked Add.
+ *  It is a per-instance limit, not a global one, and is acknowledged as such. */
+let enrollInFlight = false;
+
 export async function POST(req: NextRequest) {
+  if (enrollInFlight) {
+    return NextResponse.json({ error: "An enrollment is already running — try again in a moment." }, { status: 429 });
+  }
+  enrollInFlight = true;
+  try {
+    return await handleEnroll(req);
+  } finally {
+    enrollInFlight = false;
+  }
+}
+
+async function handleEnroll(req: NextRequest) {
   let body: unknown;
   try {
     body = await req.json();
