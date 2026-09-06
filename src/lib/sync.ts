@@ -53,6 +53,28 @@ let pushTimer: ReturnType<typeof setTimeout> | null = null;
 const pendingPush = new Set<SyncedNamespace>();
 
 /**
+ * Push every currently-pending namespace to the server. Shared by the
+ * debounced path (schedulePush's timer, fire-and-forget) and the explicit
+ * flush path (flushPush, awaited) so both stay in lockstep on batching and
+ * body shape.
+ */
+function runPendingPush(): Promise<void>[] {
+  const namespaces = Array.from(pendingPush);
+  pendingPush.clear();
+  return namespaces.map((n) => {
+    const body = isArrayNamespace(n)
+      ? { namespace: n, map: { list: JSON.parse(localStorage.getItem(n) || "[]") } }
+      : { namespace: n, map: readLocal(n) };
+    return fetch("/api/store", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      keepalive: true,
+    }).then(() => {});
+  });
+}
+
+/**
  * Queue a namespace to be mirrored to the server. Debounced: a batch run
  * writes the same namespace once per conversation, and each of those would
  * otherwise be its own request.
@@ -62,24 +84,38 @@ export function schedulePush(ns: SyncedNamespace): void {
   pendingPush.add(ns);
   if (pushTimer) clearTimeout(pushTimer);
   pushTimer = setTimeout(() => {
-    const namespaces = Array.from(pendingPush);
-    pendingPush.clear();
     pushTimer = null;
-    for (const n of namespaces) {
-      const body = isArrayNamespace(n)
-        ? { namespace: n, map: { list: JSON.parse(localStorage.getItem(n) || "[]") } }
-        : { namespace: n, map: readLocal(n) };
-      // Fire-and-forget: a failed mirror must never block or surface in the
-      // UI — localStorage already holds the write, and the next successful
-      // push carries it.
-      fetch("/api/store", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        keepalive: true,
-      }).catch(() => {});
-    }
+    // Fire-and-forget: a failed mirror must never block or surface in the
+    // UI — localStorage already holds the write, and the next successful
+    // push carries it.
+    for (const p of runPendingPush()) p.catch(() => {});
   }, 1200);
+}
+
+/**
+ * Cancel any pending debounced push and run it immediately, awaiting the
+ * fetch(es) so the caller can be sure the server has the data before
+ * proceeding — e.g. before hitting a route that resolves an id against the
+ * server's copy of a namespace this push just wrote.
+ *
+ * Unlike schedulePush, a failure here is NOT swallowed: it rejects, so the
+ * caller can tell "server has it" from "server doesn't" and avoid acting as
+ * though the push succeeded (which would just recreate the race it exists to
+ * prevent). The namespace(s) are already removed from `pendingPush` once this
+ * runs, matching the scheduled path's batching behavior — a failed flush
+ * does not leave the namespace queued for a later retry, since a caller that
+ * needs certainty is expected to handle the failure itself (e.g. surface an
+ * error and let the user retry the whole action).
+ */
+export async function flushPush(): Promise<void> {
+  if (typeof window === "undefined") return;
+  if (pushTimer) {
+    clearTimeout(pushTimer);
+    pushTimer = null;
+  }
+  const pushes = runPendingPush();
+  if (!pushes.length) return;
+  await Promise.all(pushes);
 }
 
 let pulled = false;

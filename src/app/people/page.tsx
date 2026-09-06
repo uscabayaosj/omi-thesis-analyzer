@@ -26,7 +26,7 @@ import { useUndoOffer } from "@/components/UndoProvider";
 import { usePersistedPreference } from "@/lib/use-persisted-preference";
 import { getAnalyzedIds, getAnalysisAge } from "@/lib/storage";
 import { getAdhdAnalyzedIds } from "@/lib/adhd-storage";
-import { pullAndMerge } from "@/lib/sync";
+import { pullAndMerge, flushPush } from "@/lib/sync";
 import { getPlaces, createPlace, type Place } from "@/lib/places";
 import { fetchJson } from "@/lib/fetch-json";
 // Same treatment as MeetingMap: `leaflet/dist/leaflet.css` is imported at this
@@ -371,6 +371,20 @@ export default function PeoplePage() {
     const p = createPerson({ name: trimmed });
     if (!p) {
       setAcceptErrorId(s.id);
+      refresh();
+      return;
+    }
+    // /api/capture/enroll-voice resolves personId against the server's copy
+    // of the omi-people namespace, but createPerson only queued a debounced
+    // (1200ms) push. A user who confirms a name and clicks Add faster than
+    // that — the normal case — would hit the route before the new Person
+    // exists there, get a 404, and have the Person they just typed deleted
+    // out from under them. Flush synchronously so the server has it first.
+    try {
+      await flushPush();
+    } catch {
+      setAcceptErrorId(s.id);
+      deletePerson(p.id);
       refresh();
       return;
     }
