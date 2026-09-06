@@ -221,10 +221,18 @@ export default function ConversationPage() {
   // stored value is the source of truth, not a copy held in state.
   const [locationVersion, setLocationVersion] = useState(0);
   const [scanState, setScanState] = useState<"idle" | "scanning" | "done" | "error">("idle");
+  // How many suggestions the last scan raised. "Review suggestions →" after a
+  // scan that found nobody sent the user to an empty queue.
+  const [scanFound, setScanFound] = useState(0);
   const scanForPeople = useCallback(async () => {
     setScanState("scanning");
     const res = await runExtraction(id, { force: true });
-    setScanState("error" in res ? "error" : "done");
+    if ("error" in res) {
+      setScanState("error");
+    } else {
+      setScanFound(res.suggested);
+      setScanState("done");
+    }
   }, [id]);
 
   /* The lens you last chose, remembered per device. This never overrides the
@@ -285,6 +293,26 @@ export default function ConversationPage() {
     // locationVersion re-reads storage after a save; it has no other use.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, conversation, locationVersion]);
+
+  // Memoized: MeetingMap rebuilds the whole Leaflet map when its `markers`
+  // prop changes identity, and an inline array literal changed it on every
+  // render — including the once-a-second elapsed-time tick during an
+  // analysis, which re-fetched the tiles sixty times a minute.
+  const mapTitle = conversation?.structured?.title || enrichedTitle || "This conversation";
+  const mapMarkers = useMemo<MapMarker[]>(
+    () =>
+      effectiveLocation
+        ? [
+            {
+              lat: effectiveLocation.lat,
+              lng: effectiveLocation.lng,
+              label: mapTitle,
+              sublabel: effectiveLocation.label || undefined,
+            },
+          ]
+        : [],
+    [effectiveLocation, mapTitle]
+  );
 
   // Load stored analysis (both lenses) + pick the default lens. Can't be a
   // lazy useState initializer: this must re-run whenever `id` changes
@@ -611,12 +639,18 @@ export default function ConversationPage() {
           </button>
           )}
           {isGone ? null : scanState === "done" ? (
-            <Link
-              href="/people"
-              className="text-sm min-h-[44px] px-3 py-2 rounded-lg text-cyan-300 hover:text-cyan-200 hover:bg-slate-800 transition-colors flex items-center"
-            >
-              Review suggestions →
-            </Link>
+            scanFound > 0 ? (
+              <Link
+                href="/people"
+                className="text-sm min-h-[44px] px-3 py-2 rounded-lg text-cyan-300 hover:text-cyan-200 hover:bg-slate-800 transition-colors flex items-center"
+              >
+                Review {scanFound} {scanFound === 1 ? "suggestion" : "suggestions"} →
+              </Link>
+            ) : (
+              <span className="text-sm min-h-[44px] px-3 py-2 text-slate-400 flex items-center" role="status">
+                No new people found
+              </span>
+            )
           ) : scanState === "error" ? (
             <button
               onClick={scanForPeople}
@@ -786,18 +820,7 @@ export default function ConversationPage() {
                     )}
                   </p>
                 )}
-                <MeetingMap
-                  markers={
-                    [
-                      {
-                        lat: effectiveLocation.lat,
-                        lng: effectiveLocation.lng,
-                        label: conversation.structured?.title || enrichedTitle || "This conversation",
-                        sublabel: effectiveLocation.label || undefined,
-                      },
-                    ] satisfies MapMarker[]
-                  }
-                />
+                <MeetingMap markers={mapMarkers} />
               </>
             ) : (
               !editingLocation && (

@@ -15,8 +15,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getAllCommitments, groupByPerson, type OpenCommitment } from "@/lib/commitments";
-import { toggleCommitmentDone, toggleCommitmentLetGo, getAllAdhdAnalyses } from "@/lib/adhd-storage";
-import { notifyAnalysesChanged, syncAppBadge } from "@/lib/badge";
+import { toggleCommitmentDone, toggleCommitmentLetGo } from "@/lib/adhd-storage";
 import { confidenceLabel } from "@/lib/adhd";
 import { Inline } from "@/components/Prose";
 import { pullAndMerge } from "@/lib/sync";
@@ -120,9 +119,9 @@ export default function CommitmentsPage() {
   }, [reload, showDone]);
 
   const letGo = useCallback((it: OpenCommitment) => {
+    // The badge is kept in step by adhd-storage's write path itself; the two
+    // extra syncs that used to sit here each re-parsed the whole namespace.
     toggleCommitmentLetGo(it.conversationId, it.key);
-    notifyAnalysesChanged();
-    syncAppBadge(getAllAdhdAnalyses());
     // Kept on screen for the session, like a tick, so the list does not reflow
     // out from under the thumb mid-tap.
     setItems((prev) =>
@@ -136,8 +135,6 @@ export default function CommitmentsPage() {
 
   const toggle = useCallback((it: OpenCommitment) => {
     toggleCommitmentDone(it.conversationId, it.key);
-    notifyAnalysesChanged();
-    syncAppBadge(getAllAdhdAnalyses());
     // Keep ticked rows on screen for this session so the list doesn't reflow
     // out from under the thumb mid-tap — the exact failure the review queue has.
     setItems((prev) =>

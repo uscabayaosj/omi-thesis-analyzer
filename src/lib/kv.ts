@@ -104,17 +104,49 @@ export async function putNamespaceData(sql: Sql, namespace: string, data: unknow
   `);
 }
 
-/** Created on first use so there's no migration step to run or forget. */
+/**
+ * Created on first use so there's no migration step to run or forget.
+ *
+ * Memoized per function instance: this used to run its CREATE TABLE on every
+ * call, so every GET/PUT of /api/store, every rollup-job poll (once per two
+ * seconds while a day is generating), the export, and the enrich lookup each
+ * paid one extra Neon round-trip before doing any real work. A warm instance
+ * now pays it once; a failed attempt clears the memo so the next call retries.
+ */
+let schemaReady: Promise<void> | null = null;
+
 export async function ensureSchema(sql: Sql): Promise<void> {
-  await withTimeout(
-    sql`
-      CREATE TABLE IF NOT EXISTS trace_store (
-        namespace   TEXT PRIMARY KEY,
-        data        JSONB NOT NULL,
-        updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-      )
-    `
-  );
+  if (!schemaReady) {
+    schemaReady = withTimeout(
+      sql`
+        CREATE TABLE IF NOT EXISTS trace_store (
+          namespace   TEXT PRIMARY KEY,
+          data        JSONB NOT NULL,
+          updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `
+    ).then(() => undefined);
+  }
+  try {
+    await schemaReady;
+  } catch (e) {
+    schemaReady = null;
+    throw e;
+  }
+}
+
+/**
+ * Read one record out of a namespace's JSONB document, without shipping the
+ * whole document over the wire. The enrich route calls this once per
+ * conversation inside the "Name new" batch; fetching the full enrichments map
+ * (every title and overview ever produced) per call scaled the batch's cost
+ * with the size of the archive instead of with the number of names requested.
+ */
+export async function getNamespaceRecord(sql: Sql, namespace: string, key: string): Promise<unknown | null> {
+  const rows = (await withTimeout(sql`
+    SELECT data -> ${key} AS record FROM trace_store WHERE namespace = ${namespace}
+  `)) as { record: unknown }[];
+  return rows[0]?.record ?? null;
 }
 
 /** The localStorage keys mirrored to the server. Anything outside this list

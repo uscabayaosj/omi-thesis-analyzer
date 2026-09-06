@@ -23,62 +23,76 @@ export interface ChunkRow {
   levels?: { p10: number; p50: number; p90: number };
 }
 
+/**
+ * Eleven DDL statements, sent as ONE request. Each `sql\`...\`` call is its own
+ * HTTPS round-trip to Neon, and this ran them one after another on every cold
+ * start of every function that touches conversations — the list, the detail
+ * page, all four analysis routes — before the first real query could go out.
+ * `sql.transaction([...])` carries them in a single fetch, so a cold start
+ * pays one round-trip here instead of eleven. The statements are unchanged;
+ * only their transport is.
+ */
 async function ensureCaptureSchema(sql: Sql): Promise<void> {
-  await withTimeout(sql`
-    CREATE TABLE IF NOT EXISTS capture_chunks (
-      id           UUID PRIMARY KEY,
-      device_id    TEXT NOT NULL,
-      codec        SMALLINT NOT NULL,
-      started_at   TIMESTAMPTZ NOT NULL,
-      duration_ms  INT NOT NULL,
-      packets      INT NOT NULL,
-      voiced_ms    INT NOT NULL DEFAULT 0,
-      blob_path    TEXT NOT NULL,
-      bytes        INT NOT NULL,
-      session_id   UUID,
-      received_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-    )`);
-  await withTimeout(sql`CREATE INDEX IF NOT EXISTS capture_chunks_started_idx ON capture_chunks (started_at)`);
-  // Level percentiles per chunk (dBFS): the VAD tuning signal. Added after
-  // first deploy, hence ALTER rather than a column in the CREATE.
-  await withTimeout(sql`ALTER TABLE capture_chunks ADD COLUMN IF NOT EXISTS level_p10 REAL`);
-  await withTimeout(sql`ALTER TABLE capture_chunks ADD COLUMN IF NOT EXISTS level_p50 REAL`);
-  await withTimeout(sql`ALTER TABLE capture_chunks ADD COLUMN IF NOT EXISTS level_p90 REAL`);
-  await withTimeout(sql`
-    CREATE TABLE IF NOT EXISTS capture_sessions (
-      id              UUID PRIMARY KEY,
-      device_id       TEXT NOT NULL,
-      started_at      TIMESTAMPTZ NOT NULL,
-      last_speech_at  TIMESTAMPTZ NOT NULL,
-      ended_at        TIMESTAMPTZ,
-      status          TEXT NOT NULL,
-      attempts        INT NOT NULL DEFAULT 0,
-      conversation_id TEXT,
-      voiced_ms       INT NOT NULL DEFAULT 0,
-      spans           JSONB NOT NULL DEFAULT '[]'::jsonb,
-      error           TEXT
-    )`);
-  await withTimeout(sql`CREATE INDEX IF NOT EXISTS capture_sessions_status_idx ON capture_sessions (status, last_speech_at)`);
-  await withTimeout(sql`
-    CREATE TABLE IF NOT EXISTS conversations (
-      id                  TEXT PRIMARY KEY,
-      source              TEXT NOT NULL,
-      created_at          TIMESTAMPTZ NOT NULL,
-      started_at          TIMESTAMPTZ,
-      finished_at         TIMESTAMPTZ,
-      transcript_segments JSONB NOT NULL DEFAULT '[]'::jsonb,
-      structured          JSONB,
-      geolocation         JSONB,
-      session_id          UUID,
-      word_count          INT NOT NULL DEFAULT 0,
-      audio_refs          JSONB,
-      inserted_at         TIMESTAMPTZ NOT NULL DEFAULT now()
-    )`);
-  await withTimeout(sql`CREATE INDEX IF NOT EXISTS conversations_created_idx ON conversations (created_at DESC)`);
-  // Speaker-cluster ids that didn't match anyone in the People Directory at
-  // transcription time (spec: 2026-09-05-speaker-identification-design.md).
-  // Added after first deploy, hence ALTER rather than a column in the CREATE.
-  await withTimeout(sql`ALTER TABLE conversations ADD COLUMN IF NOT EXISTS unmatched_speakers JSONB`);
+  await withTimeout(
+    sql.transaction([
+      sql`
+        CREATE TABLE IF NOT EXISTS capture_chunks (
+          id           UUID PRIMARY KEY,
+          device_id    TEXT NOT NULL,
+          codec        SMALLINT NOT NULL,
+          started_at   TIMESTAMPTZ NOT NULL,
+          duration_ms  INT NOT NULL,
+          packets      INT NOT NULL,
+          voiced_ms    INT NOT NULL DEFAULT 0,
+          blob_path    TEXT NOT NULL,
+          bytes        INT NOT NULL,
+          session_id   UUID,
+          received_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+        )`,
+      sql`CREATE INDEX IF NOT EXISTS capture_chunks_started_idx ON capture_chunks (started_at)`,
+      // Level percentiles per chunk (dBFS): the VAD tuning signal. Added after
+      // first deploy, hence ALTER rather than a column in the CREATE.
+      sql`ALTER TABLE capture_chunks ADD COLUMN IF NOT EXISTS level_p10 REAL`,
+      sql`ALTER TABLE capture_chunks ADD COLUMN IF NOT EXISTS level_p50 REAL`,
+      sql`ALTER TABLE capture_chunks ADD COLUMN IF NOT EXISTS level_p90 REAL`,
+      sql`
+        CREATE TABLE IF NOT EXISTS capture_sessions (
+          id              UUID PRIMARY KEY,
+          device_id       TEXT NOT NULL,
+          started_at      TIMESTAMPTZ NOT NULL,
+          last_speech_at  TIMESTAMPTZ NOT NULL,
+          ended_at        TIMESTAMPTZ,
+          status          TEXT NOT NULL,
+          attempts        INT NOT NULL DEFAULT 0,
+          conversation_id TEXT,
+          voiced_ms       INT NOT NULL DEFAULT 0,
+          spans           JSONB NOT NULL DEFAULT '[]'::jsonb,
+          error           TEXT
+        )`,
+      sql`CREATE INDEX IF NOT EXISTS capture_sessions_status_idx ON capture_sessions (status, last_speech_at)`,
+      sql`
+        CREATE TABLE IF NOT EXISTS conversations (
+          id                  TEXT PRIMARY KEY,
+          source              TEXT NOT NULL,
+          created_at          TIMESTAMPTZ NOT NULL,
+          started_at          TIMESTAMPTZ,
+          finished_at         TIMESTAMPTZ,
+          transcript_segments JSONB NOT NULL DEFAULT '[]'::jsonb,
+          structured          JSONB,
+          geolocation         JSONB,
+          session_id          UUID,
+          word_count          INT NOT NULL DEFAULT 0,
+          audio_refs          JSONB,
+          inserted_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+        )`,
+      sql`CREATE INDEX IF NOT EXISTS conversations_created_idx ON conversations (created_at DESC)`,
+      // Speaker-cluster ids that didn't match anyone in the People Directory at
+      // transcription time (spec: 2026-09-05-speaker-identification-design.md).
+      // Added after first deploy, hence ALTER rather than a column in the CREATE.
+      sql`ALTER TABLE conversations ADD COLUMN IF NOT EXISTS unmatched_speakers JSONB`,
+    ]),
+    20_000
+  );
 }
 
 let ready: Promise<void> | null = null;
@@ -255,12 +269,21 @@ export interface CaptureStatus {
   recentChunks: { startedAt: string; durationMs: number; voicedMs: number; p10: number | null; p50: number | null; p90: number | null }[];
 }
 
+/** Just the sessions being captured right now — the one thing the home
+ *  page's banner needs. It polls every minute, so this deliberately runs a
+ *  single query rather than the five (plus two native-module checks) the full
+ *  status page pays. */
+export async function listOpenSessions(sql: Sql): Promise<CaptureStatus["open"]> {
+  const rows = (await withTimeout(
+    sql`SELECT id, device_id, started_at, last_speech_at, voiced_ms FROM capture_sessions WHERE status = 'open'`
+  )) as { id: string; device_id: string; started_at: string; last_speech_at: string; voiced_ms: number }[];
+  return rows.map((o) => ({ id: o.id, deviceId: o.device_id, startedAt: o.started_at, lastSpeechAt: o.last_speech_at, voicedMs: o.voiced_ms }));
+}
+
 export async function captureStatus(sql: Sql): Promise<CaptureStatus> {
   const [last, open, counts, failed, recent] = await Promise.all([
     withTimeout(sql`SELECT MAX(received_at) AS at FROM capture_chunks`) as Promise<{ at: string | null }[]>,
-    withTimeout(
-      sql`SELECT id, device_id, started_at, last_speech_at, voiced_ms FROM capture_sessions WHERE status = 'open'`
-    ) as Promise<{ id: string; device_id: string; started_at: string; last_speech_at: string; voiced_ms: number }[]>,
+    listOpenSessions(sql),
     withTimeout(
       sql`SELECT status, COUNT(*)::int AS n FROM capture_sessions WHERE started_at >= now() - interval '7 days' GROUP BY status`
     ) as Promise<{ status: string; n: number }[]>,
@@ -273,7 +296,7 @@ export async function captureStatus(sql: Sql): Promise<CaptureStatus> {
   ]);
   return {
     lastChunkAt: last[0]?.at ?? null,
-    open: open.map((o) => ({ id: o.id, deviceId: o.device_id, startedAt: o.started_at, lastSpeechAt: o.last_speech_at, voicedMs: o.voiced_ms })),
+    open,
     byStatus7d: Object.fromEntries(counts.map((c) => [c.status, c.n])),
     failed: failed.map((f) => ({ id: f.id, startedAt: f.started_at, error: f.error ?? "", attempts: f.attempts })),
     recentChunks: recent.map((c) => ({ startedAt: c.started_at, durationMs: c.duration_ms, voicedMs: c.voiced_ms, p10: c.level_p10, p50: c.level_p50, p90: c.level_p90 })),

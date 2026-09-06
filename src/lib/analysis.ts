@@ -14,9 +14,17 @@ interface ProviderConfig {
   headers: Record<string, string>;
 }
 
+// Tolerant of the ways an env var arrives in practice — "OpenAI", a stray
+// space, a quoted value pasted from a dashboard. A provider that fails to
+// match takes every analysis route down with "Unknown AI_PROVIDER", which is
+// a hard fail for what is only a casing or whitespace difference.
+function providerName(): string {
+  return (process.env.AI_PROVIDER || "openai").trim().replace(/^["']|["']$/g, "").toLowerCase() || "openai";
+}
+
 function getProviderConfig(): ProviderConfig {
-  const provider = process.env.AI_PROVIDER || "openai";
-  const model = process.env.AI_MODEL || "";
+  const provider = providerName();
+  const model = (process.env.AI_MODEL || "").trim();
 
   switch (provider) {
     case "openai":
@@ -70,7 +78,7 @@ function getProviderConfig(): ProviderConfig {
 }
 
 function buildRequestBody(config: ProviderConfig, messages: ChatMessage[], jsonMode: boolean) {
-  const provider = process.env.AI_PROVIDER || "openai";
+  const provider = providerName();
 
   if (provider === "anthropic") {
     const systemMsg = messages.find((m) => m.role === "system");
@@ -252,11 +260,10 @@ export async function chatCompletion(
   label?: string
 ): Promise<string> {
   const config = getProviderConfig();
+  const provider = providerName();
   if (!config.apiKey) {
-    throw new Error(`API key not set for provider '${process.env.AI_PROVIDER || "openai"}'. Check your .env.local.`);
+    throw new Error(`API key not set for provider '${provider}'. Check your .env.local.`);
   }
-
-  const provider = process.env.AI_PROVIDER || "openai";
   const url = config.baseUrl;
 
   const body = buildRequestBody(config, messages, jsonMode);

@@ -2,18 +2,18 @@
 
 import { useEffect } from "react";
 import { ANALYSES_CHANGED_EVENT, syncAppBadge } from "@/lib/badge";
-import { getAdhdAnalysis } from "@/lib/adhd-storage";
+import { getAllAdhdAnalyses } from "@/lib/adhd-storage";
 
 const ANALYSES_KEY = "omi-adhd-analyses";
 
+// One parse of the namespace. The previous version listed the keys and then
+// called getAdhdAnalysis() per key — each of which re-read and re-parsed the
+// entire map — so a resync cost O(n²) JSON parsing: with a hundred analyses
+// of ~10 KB each, roughly 100 MB of parsing on every page load, tab switch,
+// and cross-device merge, on the main thread.
 function readAnalyses() {
   try {
-    const raw = localStorage.getItem(ANALYSES_KEY);
-    const parsed = raw ? JSON.parse(raw) : {};
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return [];
-    return Object.keys(parsed)
-      .map((id) => getAdhdAnalysis(id))
-      .filter((a): a is NonNullable<typeof a> => a !== null);
+    return getAllAdhdAnalyses();
   } catch {
     return [];
   }

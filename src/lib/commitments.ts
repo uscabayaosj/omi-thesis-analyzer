@@ -2,6 +2,7 @@
 
 import { getAllAdhdAnalyses, type StoredAdhdAnalysis } from "./adhd-storage";
 import type { AdhdCommitment } from "./adhd";
+import { dayOf as localDayOf } from "./format";
 
 /**
  * A commitment lifted out of the conversation it was spoken in.
@@ -36,7 +37,9 @@ function dayOf(a: StoredAdhdAnalysis): string {
   // produced an unparseable string, so every age silently computed as NaN and
   // clamped to 0 — the ageing bands never rendered and the sort was inert on a
   // ledger whose entire premise is that a promise gets older.
-  return (a.date ?? a.timestamp).slice(0, 10);
+  // Local day, the same rule the calendar and the rollup use, so a promise's
+  // date here matches the day its conversation is listed under.
+  return localDayOf(a.date ?? a.timestamp);
 }
 
 function daysBetween(day: string, now: number): number {

@@ -449,15 +449,6 @@ function GroupAnalysisContent() {
         )}
       </header>
 
-      {loading && (
-        <div className="space-y-4" role="status" aria-label="Loading group analysis">
-          <div className="skeleton h-8 w-3/4" />
-          <div className="skeleton h-4 w-1/2" />
-          <div className="skeleton h-32 w-full" />
-          <div className="skeleton h-32 w-full" />
-        </div>
-      )}
-
       {error && (
         <div className="card p-6 border-red-500/50 mb-6" role="alert">
           <p className="text-red-400 flex items-center gap-2">
@@ -474,15 +465,24 @@ function GroupAnalysisContent() {
         </div>
       )}
 
-      {/* Analyze button */}
-      {!analysis && !loading && (
+      {/* Analyze button. While the durable store is being checked for a copy
+          made on another device, the button is shown disabled and says so,
+          rather than replacing the whole page with a skeleton for as long as
+          that check takes (up to its 12 s timeout when the store is slow). */}
+      {!analysis && (
         <button
           onClick={runAnalysis}
-          disabled={analyzing}
+          disabled={analyzing || loading}
           aria-label={`Run group analysis on ${ids.length} conversations`}
+          aria-busy={loading || analyzing || undefined}
           className="w-full card p-6 text-center hover:border-cyan-500/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mb-8 min-h-[44px]"
         >
-          {analyzing ? (
+          {loading ? (
+            <div className="flex items-center justify-center gap-3">
+              <LoaderIcon className="w-6 h-6 text-cyan-400 animate-spin flex-shrink-0" />
+              <p className="font-semibold text-white">Checking for a saved analysis…</p>
+            </div>
+          ) : analyzing ? (
             <div className="flex items-center justify-center gap-3">
               <LoaderIcon className="w-6 h-6 text-cyan-400 animate-spin flex-shrink-0" />
               <div>

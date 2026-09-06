@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -156,6 +156,9 @@ export default function PeoplePage() {
   const [backfillTotal, setBackfillTotal] = useState<number | null>(null);
   const [backfillDone, setBackfillDone] = useState(0);
   const [backfillFailures, setBackfillFailures] = useState<number | null>(null);
+  // "Scan past conversations" used to do nothing at all when there was
+  // nothing left to scan — a tap with no response reads as a broken button.
+  const [backfillNote, setBackfillNote] = useState<string | null>(null);
   const cancelBackfillRef = useRef(false);
 
   const refresh = () => {
@@ -166,11 +169,18 @@ export default function PeoplePage() {
 
   useEffect(() => {
     let cancelled = false;
-    pullAndMerge().then(() => {
-      if (!cancelled) {
-        refresh();
-        setLoading(false);
-      }
+    // Paint from this device first. The page used to show "Loading…" until
+    // the server pull settled — up to its 12 s timeout on a poor connection —
+    // even though the whole directory was already in localStorage. The
+    // browser is the working copy; the pull only adds what another device
+    // wrote, and re-renders if it changed anything.
+    const paint = () => {
+      refresh();
+      setLoading(false);
+    };
+    paint();
+    pullAndMerge().then((changed) => {
+      if (!cancelled && changed) refresh();
     });
     return () => {
       cancelled = true;
@@ -262,6 +272,15 @@ export default function PeoplePage() {
     }),
     [places, placeStats, nameById]
   );
+
+  // Stable identity on purpose: MeetingMap rebuilds the whole Leaflet map
+  // (tiles included) whenever this prop changes, and an inline arrow changed
+  // it on every keystroke in the search box.
+  const nameLocation = useCallback((lat: number, lng: number, raw?: string) => {
+    setPrefill({ lat, lng, raw });
+    setAddingPlace(true);
+    setView("places");
+  }, [setView]);
 
   // ── review queue actions ──
 
@@ -498,7 +517,15 @@ export default function PeoplePage() {
     const analyzed = new Set([...getAnalyzedIds(), ...getAdhdAnalyzedIds()]);
     const extracted = getExtractedConversationIds();
     const candidates = [...analyzed].filter((id) => !extracted.has(id));
-    if (candidates.length === 0) return;
+    setBackfillNote(null);
+    if (candidates.length === 0) {
+      setBackfillNote(
+        analyzed.size === 0
+          ? "Nothing to scan yet — analyze a conversation first, and its people will be suggested here."
+          : "Nothing new to scan — every analyzed conversation has already been scanned for people."
+      );
+      return;
+    }
     cancelBackfillRef.current = false;
     setBackfillTotal(candidates.length);
     setBackfillDone(0);
@@ -711,6 +738,11 @@ export default function PeoplePage() {
           again.
         </p>
       )}
+      {backfillNote && (
+        <p className="text-slate-400 text-xs -mt-4 mb-6" role="status">
+          {backfillNote}
+        </p>
+      )}
 
       {addingPerson && (
         <div className="card p-4 mb-6">
@@ -837,7 +869,7 @@ export default function PeoplePage() {
           <MeetingMap
             markers={mapMarkers}
             places={placeMarkers}
-            onNameLocation={(lat, lng, raw) => { setPrefill({ lat, lng, raw }); setAddingPlace(true); setView("places"); }}
+            onNameLocation={nameLocation}
             className="h-[60dvh] w-full rounded-xl overflow-hidden"
           />
         )

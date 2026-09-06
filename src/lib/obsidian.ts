@@ -1,6 +1,7 @@
 import type { StoredAnalysis } from "./storage";
 import type { StoredAdhdAnalysis, StoredRollup } from "./adhd-storage";
 import { confidenceLabel, type Confidence } from "./adhd";
+import { dayOf, todayString } from "./format";
 
 interface ObsidianExport {
   uri: string;
@@ -13,14 +14,15 @@ interface ObsidianExport {
 // Windows caps ShellExecute URIs around 32KB; stay well under it.
 const MAX_URI_LENGTH = 30_000;
 
+// Local day, matching the day the conversation is filed under in the app —
+// the note's `date:` and its filename used to carry the UTC day instead.
 function toISODate(value: string | undefined, fallback: string): string {
-  if (value) {
-    const d = new Date(value);
-    if (!Number.isNaN(d.getTime())) return d.toISOString().split("T")[0];
+  for (const v of [value, fallback]) {
+    if (!v) continue;
+    const day = dayOf(v);
+    if (day !== "unknown-date" && /^\d{4}-\d{2}-\d{2}$/.test(day)) return day;
   }
-  const f = new Date(fallback);
-  if (!Number.isNaN(f.getTime())) return f.toISOString().split("T")[0];
-  return new Date().toISOString().split("T")[0];
+  return todayString();
 }
 
 function buildNoteContent(analysis: StoredAnalysis, date: string): string {

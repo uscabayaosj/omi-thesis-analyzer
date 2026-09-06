@@ -159,14 +159,24 @@ export default function PersonDetailPage() {
 
   useEffect(() => {
     let cancelled = false;
-    pullAndMerge().then(() => {
-      if (cancelled) return;
+    // Local copy first, then the server's — same reasoning as /people: this
+    // profile is already on the device, and gating it on a pull that can
+    // take twelve seconds to time out made a saved record look missing.
+    // "Not found" is only trusted once the pull has also had its say, so a
+    // person created on the other device doesn't flash the missing state.
+    const load = (settled: boolean) => {
       const p = getPerson(id);
       setPerson(p);
       setPeople(getPeople());
       setRels(getRelationshipsFor(id));
-      if (!p) setNotFound(true);
-      setLoading(false);
+      setNotFound(!p);
+      if (p || settled) setLoading(false);
+    };
+    load(false);
+    pullAndMerge().then((changed) => {
+      if (cancelled) return;
+      if (changed) load(true);
+      else setLoading(false);
     });
     return () => {
       cancelled = true;

@@ -9,7 +9,7 @@ import type { AdhdAnalysis, Rollup } from "@/lib/adhd";
 import type { DayConvoOutput } from "@/lib/rollup";
 import type { RollupJobState } from "@/lib/rollup-job";
 import {
-  getAdhdAnalysis, saveAdhdAnalysis, getRollup, saveRollup, getPreviousRollup, getRollupDays, togglePlanStepDone, restoreRollup,
+  getAdhdAnalysis, getAdhdAnalyzedIds, saveAdhdAnalysis, getRollup, saveRollup, getPreviousRollup, getRollupDays, togglePlanStepDone, restoreRollup,
 } from "@/lib/adhd-storage";
 import { getEnrichments, type StoredEnrichment } from "@/lib/enrich-storage";
 import { isHiddenJunk } from "@/lib/enrich-core";
@@ -241,17 +241,37 @@ function RollupPageInner() {
      before" prose, so the closing line agrees with the ledger and the badge. */
   const carriedCount = useMemo(() => (mounted ? countOpen() : 0), [mounted]);
 
+  /* Which days have a saved rollup and which conversations have an ADHD pass —
+     each read ONCE per change, not per row per render. These were looked up
+     inline (`getRollup(day)` per day in the list, `getAdhdAnalysis(c.id)` per
+     conversation in the coverage list and again in the cost forecast), and
+     every lookup re-parses its whole namespace from localStorage. During a
+     run the elapsed clock re-renders this page every second, so a 27-
+     conversation day was parsing the analyses map ~55 times a second. */
+  const rollupDays = useMemo(
+    () => new Set(mounted ? getRollupDays() : []),
+    // `rollup` changes whenever a day's rollup is saved, restored, or arrives
+    // from the server; it is the signal to re-read, not a value used here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [mounted, rollup]
+  );
+  const analyzedIds = useMemo(
+    () => (mounted ? getAdhdAnalyzedIds() : new Set<string>()),
+    // progress.done advances once per analysis saved by either run path;
+    // `rollup` changes when a server job lands its batch via pullAndMerge.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [mounted, progress.done, rollup]
+  );
+
   const days = useMemo(() => {
     const m = new Map<string, ConvoLite[]>();
     for (const c of convos) {
       const d = dayOf(c.created_at);
       (m.get(d) ?? m.set(d, []).get(d)!).push(c);
     }
-    if (mounted) {
-      for (const d of getRollupDays()) if (!m.has(d)) m.set(d, []);
-    }
+    for (const d of rollupDays) if (!m.has(d)) m.set(d, []);
     return Array.from(m).sort((a, b) => (a[0] < b[0] ? 1 : -1));
-  }, [convos, mounted]);
+  }, [convos, rollupDays]);
 
   const selectDay = useCallback((day: string) => {
     setSelectedDay(day);
@@ -517,7 +537,7 @@ function RollupPageInner() {
   // Conversations already analysed are reused rather than re-billed, so the
   // forecast has to net them off or it overstates the cost every time.
   const planOpen = Boolean(selectedDay && rollup);
-  const analyzedCount = mounted ? rollupConvos.filter((c) => getAdhdAnalysis(c.id)).length : 0;
+  const analyzedCount = rollupConvos.filter((c) => analyzedIds.has(c.id)).length;
   // Offline-buffered audio syncs late: a day can gain conversations *after*
   // its rollup was generated, and the rollup then silently under-reports the
   // day. Compare the day's current (non-junk) conversations against the ids
@@ -534,7 +554,10 @@ function RollupPageInner() {
 
   return (
     <main id="main" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-8">
-      <Link href="/" className={LINK_BACK}>
+      {/* Carries the day back. The hub hands its day to this page via
+          ?day=, but this link dropped it on the way home, so closing out
+          25 August landed on today's (usually empty) list. */}
+      <Link href={selectedDay ? `/?day=${selectedDay}` : "/"} className={LINK_BACK}>
         <ArrowLeftIcon className="w-4 h-4" />
         Back to conversations
       </Link>
@@ -613,7 +636,7 @@ function RollupPageInner() {
       {!loading && !selectedDay && (
         <ul className="space-y-3 list-none" aria-label="Days with conversations">
           {days.map(([day, list]) => {
-            const hasRollup = !!getRollup(day);
+            const hasRollup = rollupDays.has(day);
             return (
               <li key={day}>
                 <button
@@ -735,7 +758,7 @@ function RollupPageInner() {
                   {label && <p className="font-mono text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1.5">{label}</p>}
                   <div className="space-y-1.5" role="list" aria-label={label ? `${label} conversations` : "Conversations this day"}>
                     {group.map((c) => {
-                      const analyzed = !!getAdhdAnalysis(c.id);
+                      const analyzed = analyzedIds.has(c.id);
                       return (
                         <div key={c.id} role="listitem" className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-slate-900/60">
                           {/* Omi returns an empty `structured.title` for most

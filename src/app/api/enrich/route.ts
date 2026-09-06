@@ -4,7 +4,7 @@ import { segmentsToText } from "@/lib/conversation-types";
 import { enrichConversation } from "@/lib/enrich";
 import { countTranscriptWords, JUNK_WORD_FLOOR } from "@/lib/enrich-core";
 import { friendlyError } from "@/lib/api-error";
-import { getStore, getNamespaceData } from "@/lib/kv";
+import { getStore, getNamespaceRecord } from "@/lib/kv";
 import type { StoredEnrichment } from "@/lib/enrich-storage";
 
 export async function POST(req: NextRequest) {
@@ -24,12 +24,13 @@ export async function POST(req: NextRequest) {
     // two devices both name the same still-unnamed conversation at once.
     const sql = getStore();
     if (sql) {
-      const data = (await getNamespaceData(sql, "omi-enrichments")) as Record<
-        string,
-        StoredEnrichment
-      > | null;
-      const existing = data?.[conversationId];
-      if (existing) {
+      // One record, not the whole namespace: this runs once per conversation
+      // in the "Name new" batch, and shipping every stored enrichment each
+      // time scaled the batch with the archive rather than with the request.
+      const existing = (await getNamespaceRecord(sql, "omi-enrichments", conversationId)) as
+        | StoredEnrichment
+        | null;
+      if (existing && typeof existing === "object") {
         return NextResponse.json({
           enrichment: {
             junk: existing.junk,

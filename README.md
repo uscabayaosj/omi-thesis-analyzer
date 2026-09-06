@@ -8,7 +8,7 @@ Turns conversations captured by an Omi DK2 pendant — through TRACE's own iOS r
 2. Add your OpenAI API key
 3. On Vercel: `DEEPGRAM_API_KEY`, `CAPTURE_INGEST_TOKEN` (any long random string), a private Blob store, and the Neon integration
 4. Build `ios/TraceCapture` onto your iPhone (see `docs/superpowers/specs/2026-09-05-trace-capture-design.md`), enter the same URL + token in its Settings, pair the pendant
-5. `npm run dev` or deploy to Vercel
+5. `npm run dev` or deploy to Vercel. Local dev has no store, so the conversation screens are empty; `npm run dev:fixtures` serves a fixed set of sample conversations instead (see `src/lib/dev-fixtures.ts`)
 
 ## Analysis Dimensions
 

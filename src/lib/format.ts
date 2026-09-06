@@ -3,27 +3,68 @@
 // Date formatting that survives missing/garbage timestamps from the API —
 // never renders "Invalid Date" and never throws.
 
+const DEFAULT_DATE_TIME: Intl.DateTimeFormatOptions = {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+};
+
+// `toLocaleDateString` builds a fresh Intl.DateTimeFormat on every call, and
+// constructing one is the expensive part (locale data lookup, ~0.1 ms). A
+// day's list formats a timestamp per row and the calendar formats one per
+// cell per render, so the same handful of option sets were being rebuilt a
+// few hundred times per paint. Formatters are immutable, so keep one per
+// option set and reuse it.
+const formatters = new Map<string, Intl.DateTimeFormat>();
+
+function formatterFor(options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const key = JSON.stringify(options);
+  let f = formatters.get(key);
+  if (!f) {
+    f = new Intl.DateTimeFormat("en-GB", options);
+    formatters.set(key, f);
+  }
+  return f;
+}
+
 export function formatDateTime(
   value: string | undefined | null,
-  options: Intl.DateTimeFormatOptions = {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }
+  options: Intl.DateTimeFormatOptions = DEFAULT_DATE_TIME
 ): string {
   if (!value) return "Unknown date";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Unknown date";
-  return date.toLocaleDateString("en-GB", options);
+  return formatterFor(options).format(date);
 }
 
-/** The calendar day (YYYY-MM-DD) a timestamp belongs to — the ISO date
- *  portion taken directly, matching how conversations are already grouped
- *  by day everywhere in this app (Daily Rollup, and the calendar view). */
+/**
+ * The calendar day (YYYY-MM-DD) a timestamp belongs to, in the device's own
+ * timezone.
+ *
+ * This used to take the ISO string's date portion — the UTC day. For a user
+ * in Montana that filed every conversation after 6 pm under tomorrow, and in
+ * Manila it filed every morning conversation under yesterday, so the daily
+ * rollup, the calendar, and the "· Today" dateline all disagreed with the
+ * clock on the wall. Every screen that groups by day goes through here, so
+ * they move together; rollups made under the old rule keep their keys, and a
+ * day whose membership shifted simply reports the newcomer as a late arrival.
+ *
+ * A bare date (no time) is returned as-is: parsing it would read as UTC
+ * midnight and could land a day early west of Greenwich.
+ */
 export function dayOf(iso: string): string {
-  return iso.length >= 10 ? iso.split("T")[0] : "unknown-date";
+  if (typeof iso !== "string" || iso.length < 10) return "unknown-date";
+  if (iso.length === 10) return iso;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "unknown-date";
+  return toDayString(d);
+}
+
+/** Today's calendar day (YYYY-MM-DD), local time. */
+export function todayString(): string {
+  return toDayString(new Date());
 }
 
 // Both helpers anchor at noon, not midnight — the same convention already
@@ -70,5 +111,7 @@ export function formatTime(value: string | undefined | null): string {
   if (!value) return "Unknown time";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Unknown time";
-  return date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return formatterFor(TIME_ONLY).format(date);
 }
+
+const TIME_ONLY: Intl.DateTimeFormatOptions = { hour: "2-digit", minute: "2-digit" };

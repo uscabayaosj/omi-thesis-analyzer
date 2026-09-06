@@ -3,6 +3,7 @@ import type { Conversation } from "@/lib/conversation-types";
 import { getStore } from "@/lib/kv";
 import { ensureCaptureSchemaOnce, listConversationsLite } from "@/lib/capture/store";
 import { friendlyError } from "@/lib/api-error";
+import { fixturesEnabled, fixtureConversations } from "@/lib/dev-fixtures";
 
 const iso = (v: unknown): string | undefined =>
   v instanceof Date ? v.toISOString() : typeof v === "string" ? v : undefined;
@@ -11,7 +12,11 @@ const iso = (v: unknown): string | undefined =>
 export async function GET() {
   try {
     const sql = getStore();
-    if (!sql) return NextResponse.json([], { headers: { "Cache-Control": "no-store" } });
+    if (!sql) {
+      return NextResponse.json(fixturesEnabled() ? fixtureConversations() : [], {
+        headers: { "Cache-Control": "no-store" },
+      });
+    }
     await ensureCaptureSchemaOnce(sql);
     const list: Conversation[] = (await listConversationsLite(sql, 200)).map((r) => ({
       id: r.id,

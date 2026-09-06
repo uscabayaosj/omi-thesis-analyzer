@@ -1,6 +1,7 @@
 import type { Conversation } from "./conversation-types";
 import { getStore } from "./kv";
 import { ensureCaptureSchemaOnce, getConversationRow } from "./capture/store";
+import { fixturesEnabled, fixtureConversation } from "./dev-fixtures";
 
 /**
  * The one way to load a conversation by id: TRACE's own store, which holds
@@ -12,7 +13,14 @@ const iso = (v: unknown): string | undefined =>
 
 export async function loadConversation(id: string): Promise<Conversation> {
   const sql = getStore();
-  if (!sql) throw new Error("store not configured");
+  if (!sql) {
+    if (fixturesEnabled()) {
+      const fx = fixtureConversation(id);
+      if (fx) return fx;
+      throw new Error("conversation not found in TRACE");
+    }
+    throw new Error("store not configured");
+  }
   await ensureCaptureSchemaOnce(sql);
   const r = await getConversationRow(sql, id);
   if (!r) throw new Error("conversation not found in TRACE");

@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getStore } from "@/lib/kv";
-import { captureStatus, ensureCaptureSchemaOnce } from "@/lib/capture/store";
+import { captureStatus, ensureCaptureSchemaOnce, listOpenSessions } from "@/lib/capture/store";
 import { decodeFrames } from "@/lib/capture/decode";
 
 /** Proves the WASM decoder loads in this deployment — the one dependency
@@ -31,12 +31,27 @@ async function onnxruntimeCheck(): Promise<string> {
   }
 }
 
-/** Read-only feed for the /capture page. */
-export async function GET() {
+/**
+ * Read-only feed for the /capture page — and, with `?scope=open`, for the
+ * home page's capture banner.
+ *
+ * The banner polls once a minute and needs only the open sessions. Before
+ * the scope existed every poll ran the full report: five queries, an Opus
+ * decode, and a dynamic import of onnxruntime-node (a 34 MB native addon on
+ * a cold instance) — all to answer "is anything being captured right now".
+ */
+export async function GET(req: NextRequest) {
   const sql = getStore();
   if (!sql) return NextResponse.json({ configured: false });
+  const scope = req.nextUrl.searchParams.get("scope");
   try {
     await ensureCaptureSchemaOnce(sql);
+    if (scope === "open") {
+      return NextResponse.json(
+        { configured: true, open: await listOpenSessions(sql) },
+        { headers: { "Cache-Control": "no-store" } }
+      );
+    }
     return NextResponse.json(
       {
         configured: true,

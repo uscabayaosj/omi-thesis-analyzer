@@ -9,6 +9,11 @@ import { BUTTON_GHOST } from "@/lib/ui";
 
 interface Status {
   configured: boolean;
+  /** Deployment self-checks: the WASM Opus decoder and the native
+   *  onnxruntime binding — the two dependencies that can silently go missing
+   *  from a function bundle. "ok", or the failure text. */
+  decoder?: string;
+  onnxruntime?: string;
   lastChunkAt?: string | null;
   open?: { id: string; deviceId: string; startedAt: string; lastSpeechAt: string; voicedMs: number }[];
   byStatus7d?: Record<string, number>;
@@ -37,6 +42,7 @@ export default function CapturePage() {
   const fetchStatus = useCallback(async () => {
     try {
       setStatus(await fetchJson<Status>("/api/capture/status", { cache: "no-store" }));
+      setNote(null);
     } catch (e) {
       setNote(e instanceof Error ? e.message : "Could not read capture status.");
     }
@@ -65,6 +71,23 @@ export default function CapturePage() {
 
       {status && !status.configured && (
         <p className="text-slate-400">The store isn&apos;t configured here, so there is nothing to show.</p>
+      )}
+
+      {/* A failed read used to leave this page as a bare heading: the note was
+          rendered only inside the configured branch, which never appears when
+          the fetch is what failed. */}
+      {!status && note && (
+        <div className="card p-6 border-red-500/50" role="alert">
+          <p className="text-red-400 break-words">{note}</p>
+          <button onClick={load} disabled={busy !== null} className={`${BUTTON_GHOST} mt-3 -ml-3`}>
+            <RefreshIcon className={`w-4 h-4 ${busy === "refresh" ? "animate-spin" : ""}`} />
+            Try again
+          </button>
+        </div>
+      )}
+
+      {!status && !note && (
+        <p className="text-slate-400 text-sm font-mono" role="status">Loading…</p>
       )}
 
       {status?.configured && (
@@ -110,6 +133,29 @@ export default function CapturePage() {
                     <span className="block break-words">{f.error}</span>
                   </li>
                 ))}
+              </ul>
+            </div>
+          )}
+
+          {(status.decoder || status.onnxruntime) && (
+            <div className="card p-4">
+              <p className="text-slate-300 mb-2">Deployment checks</p>
+              <ul className="text-sm text-slate-400 space-y-1">
+                {(
+                  [
+                    ["Opus decoder", status.decoder],
+                    ["Speaker model runtime", status.onnxruntime],
+                  ] as const
+                ).map(([label, value]) =>
+                  value ? (
+                    <li key={label} className="break-words">
+                      {label}:{" "}
+                      <span className={`font-mono ${value === "ok" ? "text-emerald-400" : "text-amber-300"}`}>
+                        {value}
+                      </span>
+                    </li>
+                  ) : null
+                )}
               </ul>
             </div>
           )}

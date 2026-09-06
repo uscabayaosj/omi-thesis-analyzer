@@ -10,7 +10,7 @@ import { isHiddenJunk as isHiddenJunkRecord, type Enrichment } from "@/lib/enric
 import type { AdhdAnalysis } from "@/lib/adhd";
 import { cacheGet, cacheSet } from "@/lib/cache";
 import { fetchJson } from "@/lib/fetch-json";
-import { formatDateTime, dayOf } from "@/lib/format";
+import { formatDateTime, dayOf, todayString } from "@/lib/format";
 import {
   TraceMark, SquareIcon, XIcon, CheckIcon, SparklesIcon, WarningIcon, MicIcon,
   FolderIcon, RefreshIcon, ClipboardIcon, CalendarIcon, ChevronRightIcon, SearchIcon, MapPinIcon, HelpIcon,
@@ -457,7 +457,7 @@ function HomeInner() {
   // Recomputed each render (cheap) so "today" stays correct if the tab is
   // left open past midnight. selectedDate is pinned at mount instead —
   // jumping the view out from under the user mid-session would be jarring.
-  const todayStr = dayOf(new Date().toISOString());
+  const todayStr = todayString();
   // Seeded from ?day= so the chosen day survives a reload, a PWA relaunch, and
   // a shared link. Anything that isn't a plain YYYY-MM-DD falls back to today
   // rather than rendering an empty view for a malformed param.
@@ -553,6 +553,18 @@ function HomeInner() {
       setGists(getAdhdSummaries());
       setEnrichments(getEnrichments());
     };
+    // Returning to the tab fires `focus` and `visibilitychange` back to back,
+    // and each resync re-parses four namespaces from localStorage — so the
+    // most common return-to-app gesture paid for that parse twice. Coalesce
+    // the pair into one run.
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const resyncSoon = () => {
+      if (timer) return;
+      timer = setTimeout(() => {
+        timer = null;
+        resync();
+      }, 50);
+    };
     // Merge in anything analyzed on the user's other device before the first
     // resync, so badges reflect the full picture rather than this device's
     // history. No-ops when the durable store isn't configured.
@@ -560,11 +572,12 @@ function HomeInner() {
       if (changed) resync();
     });
     resync();
-    window.addEventListener("focus", resync);
-    document.addEventListener("visibilitychange", resync);
+    window.addEventListener("focus", resyncSoon);
+    document.addEventListener("visibilitychange", resyncSoon);
     return () => {
-      window.removeEventListener("focus", resync);
-      document.removeEventListener("visibilitychange", resync);
+      if (timer) clearTimeout(timer);
+      window.removeEventListener("focus", resyncSoon);
+      document.removeEventListener("visibilitychange", resyncSoon);
     };
   }, []);
 
@@ -1211,10 +1224,14 @@ function HomeInner() {
                   app's own low-cognitive-load principle. */}
               {!(batchFailures.length > 0 && !batchRunning) && (
                 <div className="flex items-center gap-2 flex-wrap">
+                  {/* Disabled below two, not merely guarded: with one selected
+                      this used to look pressable and then do nothing at all,
+                      the guard living inside the click handler. */}
                   <button
                     onClick={startGroupAnalysis}
-                    disabled={selected.size === 0 || batchRunning}
+                    disabled={selected.size < 2 || batchRunning}
                     aria-label={`Group thesis analysis on ${selected.size} conversations${selected.size === 1 ? " (select at least 2)" : ""}`}
+                    title={selected.size === 1 ? "Select at least two conversations" : undefined}
                     className={TOOLBAR_ACTION_CLASS}
                   >
                     <SparklesIcon className="w-4 h-4" />
@@ -1232,6 +1249,11 @@ function HomeInner() {
                 </div>
               )}
             </div>
+            {selected.size === 1 && !batchRunning && batchFailures.length === 0 && (
+              <p className="text-xs text-slate-400 mt-2 px-1 font-mono" role="status">
+                Group Thesis needs at least two conversations. Run ADHD works on one.
+              </p>
+            )}
             {/* Selection review — opened from the count above so a cross-day, cross-search
                 batch run is never a leap of faith. Each row can deselect individually. */}
             {selectionListOpen && selected.size > 0 && (
@@ -1358,14 +1380,25 @@ function HomeInner() {
         </div>
       )}
 
-      {!loading && visibleConversations.length > 0 && shown.length === 0 && ignored.length === 0 && (
+      {/* Two empty-list cases that used to render nothing between the scan
+          row and the Ignored disclosure: a day whose every recording was
+          marked as noise, and a filter that hides every remaining row. */}
+      {!loading && visibleConversations.length > 0 && shown.length === 0 && (
         <div className="card p-8 text-center">
-          <p className="text-slate-400">
-            {filter === "analyzed" ? "No analyzed conversations here yet." : "Everything here has been analyzed!"}
-          </p>
-          <button onClick={() => setFilter("all")} className="text-cyan-400 text-sm mt-2 hover:underline min-h-[44px] px-2">
-            Show all
-          </button>
+          {countable.length === 0 ? (
+            <p className="text-slate-400">
+              Everything recorded here was marked as noise. It&apos;s listed under Ignored below, where any of it can be kept.
+            </p>
+          ) : (
+            <>
+              <p className="text-slate-400">
+                {filter === "analyzed" ? "No analyzed conversations here yet." : "Everything here has been analyzed!"}
+              </p>
+              <button onClick={() => setFilter("all")} className="text-cyan-400 text-sm mt-2 hover:underline min-h-[44px] px-2">
+                Show all
+              </button>
+            </>
+          )}
         </div>
       )}
 

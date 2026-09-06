@@ -32,14 +32,30 @@ export default function PlaceDetailPage() {
 
   useEffect(() => {
     let cancelled = false;
-    pullAndMerge().then(() => {
-      if (cancelled) return;
-      setPlace(getPlace(id));
+    // Local copy first; the pull fills in the other device's changes. "Not
+    // found" waits for the pull, so a place named on the other device
+    // doesn't flash the missing state.
+    const load = (settled: boolean) => {
+      const p = getPlace(id);
+      setPlace(p);
       setPeople(getPeople());
-      setLoading(false);
+      if (p || settled) setLoading(false);
+    };
+    load(false);
+    pullAndMerge().then((changed) => {
+      if (cancelled) return;
+      if (changed) load(true);
+      else setLoading(false);
     });
     return () => { cancelled = true; };
   }, [id]);
+
+  // Memoized so MeetingMap isn't torn down and rebuilt (tiles refetched) on
+  // every keystroke in the edit form.
+  const markers = useMemo<MapMarker[]>(
+    () => (place ? [{ lat: place.lat, lng: place.lng, label: place.name }] : []),
+    [place]
+  );
 
   // People met here, with counts, via resolution against this one place —
   // including meetings pinned here by hand, which proximity alone would miss.
@@ -66,8 +82,6 @@ export default function PlaceDetailPage() {
       </main>
     );
   }
-
-  const marker: MapMarker = { lat: place.lat, lng: place.lng, label: place.name };
 
   const saveEdit = () => {
     setError(null);
@@ -118,7 +132,7 @@ export default function PlaceDetailPage() {
 
       {!editing && (
         <div className="card p-2 mb-4">
-          <MeetingMap markers={[marker]} className="h-48 w-full rounded-lg overflow-hidden" />
+          <MeetingMap markers={markers} className="h-48 w-full rounded-lg overflow-hidden" />
         </div>
       )}
 
@@ -148,6 +162,7 @@ export default function PlaceDetailPage() {
       <button onClick={() => setShowDelete(true)} className="text-sm text-red-400 hover:text-red-300 min-h-[44px] px-2">
         Delete this place
       </button>
+      {error && !editing && <p className="text-sm text-red-400 mt-2" role="alert">{error}</p>}
 
       {showDelete && (
         <ConfirmDialog
@@ -155,7 +170,14 @@ export default function PlaceDetailPage() {
           body="Meetings keep their locations; they just lose this name."
           confirmLabel="Delete"
           onConfirm={() => {
-            if (!deletePlace(id)) return;
+            // Always close: ConfirmDialog has already played its exit by the
+            // time this runs, so returning early with the dialog still mounted
+            // left an invisible full-screen backdrop swallowing every tap.
+            setShowDelete(false);
+            if (!deletePlace(id)) {
+              setError("Couldn’t delete this place — the change didn’t save. Try again.");
+              return;
+            }
             // Meetings pinned here by hand would otherwise keep pointing at a
             // place that no longer exists; drop those assignments so they fall
             // back to proximity (or to no place at all).

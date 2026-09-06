@@ -212,17 +212,19 @@ export async function pullAndMerge(force = false): Promise<boolean> {
         const localRaw = localStorage.getItem(ns);
         const localList: ArrayRecord[] = localRaw ? JSON.parse(localRaw) : [];
         const merged = mergeArrayNamespace(ns, localList, remoteList);
-        if (stableStringify(merged) !== stableStringify(localList)) {
+        const { differsFromLocal, differsFromRemote } = compare(merged, localList, remoteList);
+        if (differsFromLocal) {
           localStorage.setItem(ns, JSON.stringify(merged));
           changed = true;
         }
-        if (stableStringify(merged) !== stableStringify(remoteList)) schedulePush(ns);
+        if (differsFromRemote) schedulePush(ns);
         continue;
       }
 
       const local = readLocal(ns);
       const merged = mergeMaps(local, remote as RecordMap);
-      if (stableStringify(merged) !== stableStringify(local)) {
+      const { differsFromLocal, differsFromRemote } = compare(merged, local, remote);
+      if (differsFromLocal) {
         writeLocal(ns, merged);
         changed = true;
         // This write bypasses adhd-storage's writeMap, so the badge listener
@@ -231,10 +233,68 @@ export async function pullAndMerge(force = false): Promise<boolean> {
       }
       // Push back whenever the local copy held anything the server lacked, so
       // the first device to run this seeds the server with its history.
-      if (stableStringify(merged) !== stableStringify(remote)) schedulePush(ns);
+      if (differsFromRemote) schedulePush(ns);
     }
     return changed;
   } catch {
     return false;
   }
+}
+
+/**
+ * Whether the merge result differs from each side.
+ *
+ * `stableStringify` walks and re-sorts every key of the value, and these
+ * namespaces are the largest documents the app holds (every analysis ever
+ * produced; every person, photo included). The old code serialised `merged`
+ * twice per namespace — once against each side — so a page load did four
+ * full serialisations of each of eleven namespaces on the main thread.
+ * `merged` is serialised once here. Two more shortcuts avoid touching the
+ * big documents at all in the common cases: a side that is empty cannot
+ * equal a non-empty merge, and the merge of an empty local side IS the remote
+ * document (`mergeMaps` seeds from remote; the array merges return one side).
+ */
+function compare(
+  merged: unknown,
+  local: unknown,
+  remote: unknown
+): { differsFromLocal: boolean; differsFromRemote: boolean } {
+  const localEmpty = isEmpty(local);
+  const remoteEmpty = isEmpty(remote);
+  const mergedEmpty = isEmpty(merged);
+  if (localEmpty && remoteEmpty) return { differsFromLocal: false, differsFromRemote: false };
+  if (localEmpty) return { differsFromLocal: !mergedEmpty, differsFromRemote: false };
+  if (remoteEmpty) return { differsFromLocal: false, differsFromRemote: !mergedEmpty };
+  const m = stableStringify(merged);
+  return {
+    differsFromLocal: m !== stableStringify(local),
+    differsFromRemote: m !== stableStringify(remote),
+  };
+}
+
+function isEmpty(v: unknown): boolean {
+  if (v === null || v === undefined) return true;
+  if (Array.isArray(v)) return v.length === 0;
+  if (typeof v === "object") return Object.keys(v as object).length === 0;
+  return false;
+}
+
+/**
+ * A push still sitting in the 1200 ms debounce when the tab is hidden or
+ * closed used to be lost until the next write to that namespace happened to
+ * fire one — a ticked promise, then a swipe to another app, and the other
+ * device kept showing it unticked. `fetch` runs with `keepalive`, so firing
+ * the pending batch here lets the request outlive the page.
+ */
+if (typeof window !== "undefined") {
+  const flushIfHidden = () => {
+    if (document.visibilityState !== "hidden" || pendingPush.size === 0) return;
+    if (pushTimer) {
+      clearTimeout(pushTimer);
+      pushTimer = null;
+    }
+    runPendingPush(true);
+  };
+  document.addEventListener("visibilitychange", flushIfHidden);
+  window.addEventListener("pagehide", flushIfHidden);
 }
