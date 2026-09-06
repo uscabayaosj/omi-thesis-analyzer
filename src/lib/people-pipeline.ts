@@ -47,6 +47,7 @@ export async function runExtraction(
     if (ignored.has(normalize(ex.name))) continue;
     const match = matchPerson(ex.name, people);
     addPending({
+      kind: "text",
       conversationId,
       date,
       extractedName: ex.name,
@@ -106,6 +107,7 @@ export function suggestFromAdhdPeople(
       );
       const match = matchPerson(ap.name, existing);
       addPending({
+        kind: "text",
         conversationId,
         date,
         extractedName: ap.name,
