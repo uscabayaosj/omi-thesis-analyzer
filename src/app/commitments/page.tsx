@@ -16,7 +16,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getAllCommitments, groupByPerson, type OpenCommitment } from "@/lib/commitments";
 import { toggleCommitmentDone, toggleCommitmentLetGo } from "@/lib/adhd-storage";
-import { confidenceLabel } from "@/lib/adhd";
+import { confidenceLabel, formatDeadline } from "@/lib/adhd";
 import { Inline } from "@/components/Prose";
 import { pullAndMerge } from "@/lib/sync";
 import { ArrowLeftIcon, CheckSquareIcon, SquareIcon, ClipboardIcon } from "@/components/icons";
@@ -65,20 +65,6 @@ function FilterRow<T extends string>({
   );
 }
 
-/**
- * Normalise the three shapes a deadline arrives in.
- *
- * "None." means there is no deadline and the row should simply not claim one;
- * an "Estimated: " prefix means the model inferred it, which is worth saying
- * once rather than twice.
- */
-function formatDeadline(raw: string): { label: string; value: string } | null {
-  const t = (raw ?? "").trim();
-  if (!t || /^none\.?$/i.test(t)) return null;
-  const est = t.match(/^estimated:\s*(.+)$/i);
-  if (est) return { label: "Estimated deadline:", value: est[1] };
-  return { label: "Deadline:", value: t };
-}
 
 /** Ageing bands. A promise that has carried for a week is a different object
  *  from one made this morning, and the ledger's whole job is to say so. */

@@ -26,7 +26,7 @@ import { ThesisResults, type Analysis } from "@/components/ThesisResults";
 import { AdhdResults } from "@/components/AdhdResults";
 import type { AdhdAnalysis } from "@/lib/adhd";
 import type { ConversationGeolocation } from "@/lib/conversation-types";
-import { getAdhdAnalysis, saveAdhdAnalysis, toggleCommitmentDone } from "@/lib/adhd-storage";
+import { getAdhdAnalysis, saveAdhdAnalysis, toggleCommitmentDone, toggleCommitmentLetGo } from "@/lib/adhd-storage";
 import { getEnrichments } from "@/lib/enrich-storage";
 import {
   RefreshIcon,
@@ -47,6 +47,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { pullAndMerge } from "@/lib/sync";
 import { useRovingRadioGroup } from "@/lib/roving";
 import { usePersistedPreference } from "@/lib/use-persisted-preference";
+import { conversationTitle } from "@/lib/titles";
 import { runExtraction, suggestFromAdhdPeople, suggestUnmatchedVoices } from "@/lib/people-pipeline";
 import dynamic from "next/dynamic";
 import { type MapMarker } from "@/components/MeetingMap";
@@ -93,6 +94,61 @@ interface Conversation {
 }
 
 // ── Components ──
+
+/**
+ * Who is speaking, once, above the transcript.
+ *
+ * A matched speaker's name is frozen into every segment, but nothing linked it
+ * to the person it names, and an unmatched one was a bare "S2" with no hint
+ * that the People queue was holding a "who is this?" card for it. The legend
+ * is where both belong: one 44px chip per distinct voice, not a link squeezed
+ * into every 20px transcript row.
+ */
+function SpeakerLegend({ segments, unmatched }: { segments: TranscriptSegment[]; unmatched: number[] }) {
+  const seen = new Map<number, TranscriptSegment>();
+  for (const s of segments) {
+    const id = s.speaker_id ?? 0;
+    if (!seen.has(id)) seen.set(id, s);
+  }
+  if (seen.size < 2 && !unmatched.length) return null;
+  const unmatchedSet = new Set(unmatched);
+  const unknown = [...seen.values()].filter((s) => !s.speaker_person_id && unmatchedSet.has(s.speaker_id ?? 0));
+  return (
+    <div className="mb-4">
+      <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400 mb-1.5">Speakers</p>
+      <ul className="flex flex-wrap gap-2">
+        {[...seen.values()].map((s) => {
+          const label = s.speaker_name || `S${s.speaker_id ?? 0}`;
+          return (
+            <li key={s.speaker_id ?? 0}>
+              {s.speaker_person_id ? (
+                <Link
+                  href={`/people/${s.speaker_person_id}`}
+                  className="inline-flex items-center min-h-[44px] px-3 rounded-full bg-slate-800 border border-slate-700 font-serif text-sm text-slate-200 hover:border-cyan-500/50 transition-colors"
+                >
+                  {label}
+                </Link>
+              ) : (
+                <span className="inline-flex items-center min-h-[44px] px-3 rounded-full bg-slate-800/60 border border-slate-700 font-mono text-sm text-slate-300">
+                  {label}
+                  {unmatchedSet.has(s.speaker_id ?? 0) && <span className="ml-1.5 text-xs text-slate-400">· unrecognized</span>}
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      {unknown.length > 0 && (
+        <p className="text-xs text-slate-400 mt-2">
+          {unknown.length === 1 ? "One voice wasn't" : `${unknown.length} voices weren't`} matched to anyone when this was
+          transcribed. Naming {unknown.length === 1 ? "it" : "them"} in{" "}
+          <Link href="/people" className="text-cyan-400 hover:underline">People → Review</Link> teaches the app that
+          voice for future conversations. Labels here stay as they were transcribed.
+        </p>
+      )}
+    </div>
+  );
+}
 
 // Renders the full transcript. Long text wraps (min-w-0 + break-words) instead
 // of overflowing horizontally, and there is no inner scroll box — the whole
@@ -256,8 +312,14 @@ export default function ConversationPage() {
   const rovingLens = useRovingRadioGroup(LENS_VALUES, lens, setLens);
   const [adhd, setAdhd] = useState<AdhdAnalysis | null>(null);
   const [adhdDoneKeys, setAdhdDoneKeys] = useState<string[]>([]);
+  const [adhdLetGoKeys, setAdhdLetGoKeys] = useState<string[]>([]);
   const [adhdTitle, setAdhdTitle] = useState<string | null>(null);
   const [adhdAnalyzing, setAdhdAnalyzing] = useState(false);
+  /* Same treatment the thesis run has: a minute-scale paid call should show
+     how long it has been going and be stoppable. */
+  const [adhdStartedAt, setAdhdStartedAt] = useState<number | null>(null);
+  const [adhdElapsed, setAdhdElapsed] = useState(0);
+  const adhdAbortRef = useRef<AbortController | null>(null);
 
   // Results sections stagger in on first reveal, but the lens toggle
   // unmounts/remounts them as the user switches tabs — a frequent action
@@ -353,6 +415,7 @@ export default function ConversationPage() {
     if (storedAdhd) {
       setAdhd(storedAdhd.analysis);
       setAdhdDoneKeys(storedAdhd.doneKeys);
+      setAdhdLetGoKeys(storedAdhd.letGoKeys ?? []);
       // Kept so the degraded view has a real title when the shell can't load.
       setAdhdTitle(storedAdhd.title);
     }
@@ -426,6 +489,12 @@ export default function ConversationPage() {
     return () => clearInterval(t);
   }, [startedAt]);
 
+  useEffect(() => {
+    if (adhdStartedAt === null) return;
+    const t = setInterval(() => setAdhdElapsed(Math.floor((Date.now() - adhdStartedAt) / 1000)), 1000);
+    return () => clearInterval(t);
+  }, [adhdStartedAt]);
+
   const executeAnalysis = useCallback(async () => {
     setAnalyzing(true);
     setStartedAt(Date.now());
@@ -448,9 +517,13 @@ export default function ConversationPage() {
           cacheSet(`conversation:${id}`, data.conversation);
         }
       }
+      // Through the shared resolver, so a TRACE conversation the enrichment
+      // pass has named is saved under that name — not "Untitled", which then
+      // followed it into search results and the export filename.
+      const source = data.conversation ?? conversation;
       const stored = saveAnalysis({
         conversationId: id,
-        title: data.conversation?.structured?.title || conversation?.structured?.title || "Untitled",
+        title: source ? conversationTitle(source, enrichment) : "Untitled",
         category: data.conversation?.structured?.category,
         date: data.conversation?.created_at,
         ...data.analysis,
@@ -472,7 +545,7 @@ export default function ConversationPage() {
       analysisAbortRef.current = null;
       setShowRerunConfirm(false);
     }
-  }, [id, conversation]);
+  }, [id, conversation, enrichment]);
 
   const stopAnalysis = useCallback(() => {
     analysisAbortRef.current?.abort();
@@ -533,25 +606,32 @@ export default function ConversationPage() {
 
   const executeAdhd = useCallback(async () => {
     setAdhdAnalyzing(true);
+    setAdhdStartedAt(Date.now());
+    setAdhdElapsed(0);
     setError(null);
+    const controller = new AbortController();
+    adhdAbortRef.current = controller;
     try {
       const data = await fetchJson<{ analysis: AdhdAnalysis; conversation?: Conversation }>("/api/analyze-adhd", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conversationId: id }),
+        signal: controller.signal,
       });
       setAdhd(data.analysis);
       if (data.conversation?.transcript_segments?.length) {
         setConversation(data.conversation);
         cacheSet(`conversation:${id}`, data.conversation);
       }
+      const source = data.conversation ?? conversation;
       const stored = saveAdhdAnalysis({
         conversationId: id,
-        title: data.conversation?.structured?.title || conversation?.structured?.title || "Untitled",
+        title: source ? conversationTitle(source, enrichment) : "Untitled",
         date: data.conversation?.created_at || conversation?.created_at,
         analysis: data.analysis,
       });
       setAdhdDoneKeys(stored.doneKeys);
+      setAdhdLetGoKeys(stored.letGoKeys ?? []);
       // People come from this lens's own output — no second transcript pass.
       // See suggestFromAdhdPeople for why runExtraction isn't called here.
       const adhdDate = data.conversation?.created_at || conversation?.created_at;
@@ -560,14 +640,34 @@ export default function ConversationPage() {
         suggestFromAdhdPeople(id, adhdDate, data.analysis.people, geo);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "ADHD analysis failed");
+      // A deliberate stop is not an error and gets no error card.
+      if (!(e instanceof DOMException && e.name === "AbortError")) {
+        setError(e instanceof Error ? e.message : "ADHD analysis failed");
+      }
     } finally {
       setAdhdAnalyzing(false);
+      setAdhdStartedAt(null);
+      adhdAbortRef.current = null;
     }
-  }, [id, conversation]);
+  }, [id, conversation, enrichment]);
 
+  const stopAdhd = useCallback(() => {
+    adhdAbortRef.current?.abort();
+    adhdAbortRef.current = null;
+    setAdhdAnalyzing(false);
+    setAdhdStartedAt(null);
+  }, []);
+
+  // Done and let-go are exclusive dispositions: setting one clears the other
+  // in storage, so both lists are re-read after either toggle.
   const handleToggleDone = useCallback((key: string) => {
     setAdhdDoneKeys(toggleCommitmentDone(id, key));
+    setAdhdLetGoKeys(getAdhdAnalysis(id)?.letGoKeys ?? []);
+  }, [id]);
+
+  const handleToggleLetGo = useCallback((key: string) => {
+    setAdhdLetGoKeys(toggleCommitmentLetGo(id, key));
+    setAdhdDoneKeys(getAdhdAnalysis(id)?.doneKeys ?? []);
   }, [id]);
 
   const handleAdhdExport = useCallback(() => {
@@ -736,7 +836,9 @@ export default function ConversationPage() {
               <AdhdResults
                 analysis={adhd}
                 doneKeys={adhdDoneKeys}
+                letGoKeys={adhdLetGoKeys}
                 onToggleDone={handleToggleDone}
+                onToggleLetGo={handleToggleLetGo}
                 animate={false}
               />
             </section>
@@ -1011,25 +1113,38 @@ export default function ConversationPage() {
           {(lens === "adhd" || lens === "both") && (
             <section className="mb-8" aria-label="ADHD Aid analysis">
               {!adhd && (
-                <button
-                  onClick={executeAdhd}
-                  disabled={adhdAnalyzing}
-                  aria-label="Run ADHD Aid analysis on this conversation"
-                  className="w-full card p-6 text-center hover:border-cyan-500/50 transition-colors cursor-pointer disabled:opacity-50 mb-6 min-h-[44px]"
-                >
-                  {adhdAnalyzing ? (
-                    <div className="flex items-center justify-center gap-3">
-                      <LoaderIcon className="w-6 h-6 text-cyan-400 animate-spin flex-shrink-0" />
-                      <p className="font-semibold text-white">Running ADHD Aid…</p>
-                    </div>
-                  ) : (
-                    <div>
-                      <ClipboardIcon className="w-7 h-7 mx-auto mb-2 text-cyan-400" />
-                      <p className="font-semibold text-white">Run ADHD Aid</p>
-                      <p className="text-slate-400 font-serif italic text-sm mt-1">Commitments, people, open loops, and next actions</p>
-                    </div>
+                <div className="mb-6">
+                  <button
+                    onClick={executeAdhd}
+                    disabled={adhdAnalyzing}
+                    aria-label="Run ADHD Aid analysis on this conversation"
+                    className="w-full card p-6 text-center hover:border-cyan-500/50 transition-colors cursor-pointer disabled:opacity-50 min-h-[44px]"
+                  >
+                    {adhdAnalyzing ? (
+                      <div className="flex items-center justify-center gap-3">
+                        <LoaderIcon className="w-6 h-6 text-cyan-400 animate-spin flex-shrink-0" />
+                        <p className="font-semibold text-white">
+                          Running ADHD Aid…{adhdElapsed > 0 && <span className="font-mono text-sm text-slate-400"> {fmtElapsed(adhdElapsed)}</span>}
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        <ClipboardIcon className="w-7 h-7 mx-auto mb-2 text-cyan-400" />
+                        <p className="font-semibold text-white">Run ADHD Aid</p>
+                        <p className="text-slate-400 font-serif italic text-sm mt-1">Commitments, people, open loops, and next actions</p>
+                        <p className="text-slate-400 font-mono text-xs mt-2">1 API call · usually under a minute</p>
+                      </div>
+                    )}
+                  </button>
+                  {adhdAnalyzing && (
+                    <button
+                      onClick={stopAdhd}
+                      className="mt-2 w-full bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm px-3 py-2 min-h-[44px] rounded-lg transition-colors"
+                    >
+                      Stop
+                    </button>
                   )}
-                </button>
+                </div>
               )}
               {adhd && (
                 <>
@@ -1069,12 +1184,26 @@ export default function ConversationPage() {
                           )}
                         </span>
                       </button>
-                      <button onClick={() => setShowAdhdRerunConfirm(true)} disabled={adhdAnalyzing} aria-label="Re-run ADHD Aid" className="text-slate-400 hover:text-cyan-400 disabled:opacity-50 transition-colors p-2 min-h-[44px] min-w-[44px] flex items-center justify-center">
-                        <RefreshIcon className={`w-4 h-4 ${adhdAnalyzing ? "animate-spin" : ""}`} />
-                      </button>
+                      {adhdAnalyzing ? (
+                        <button onClick={stopAdhd} className={`${BUTTON_SECONDARY} whitespace-nowrap`}>
+                          <LoaderIcon className="w-3.5 h-3.5 animate-spin" />
+                          Stop{adhdElapsed > 0 ? ` · ${fmtElapsed(adhdElapsed)}` : ""}
+                        </button>
+                      ) : (
+                        <button onClick={() => setShowAdhdRerunConfirm(true)} aria-label="Re-run ADHD Aid" className="text-slate-400 hover:text-cyan-400 transition-colors p-2 min-h-[44px] min-w-[44px] flex items-center justify-center">
+                          <RefreshIcon className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <AdhdResults analysis={adhd} doneKeys={adhdDoneKeys} onToggleDone={handleToggleDone} animate={animateAdhd} />
+                  <AdhdResults
+                    analysis={adhd}
+                    doneKeys={adhdDoneKeys}
+                    letGoKeys={adhdLetGoKeys}
+                    onToggleDone={handleToggleDone}
+                    onToggleLetGo={handleToggleLetGo}
+                    animate={animateAdhd}
+                  />
                 </>
               )}
             </section>
@@ -1109,8 +1238,8 @@ export default function ConversationPage() {
               tone="danger"
               body={
                 <>
-                  ADHD Aid analyses keep no version history, so the current one will be gone. Any commitments
-                  you have ticked off will reset to unchecked.
+                  ADHD Aid analyses keep no version history, so the current one will be gone. Ticks and let-gos
+                  are kept for promises that come back word for word; anything the model rewords starts fresh.
                 </>
               }
               confirmLabel="Replace it"
@@ -1237,6 +1366,10 @@ export default function ConversationPage() {
                 Transcript ({conversation.transcript_segments.length} segments)
               </summary>
               <div className="px-5 pb-5">
+                <SpeakerLegend
+                  segments={conversation.transcript_segments}
+                  unmatched={conversation.unmatched_speakers ?? []}
+                />
                 <TranscriptViewer segments={conversation.transcript_segments} />
               </div>
             </details>
