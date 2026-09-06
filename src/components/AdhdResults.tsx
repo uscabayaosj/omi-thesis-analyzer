@@ -1,7 +1,7 @@
 "use client";
 
 import type { ComponentType, ReactNode } from "react";
-import { confidenceLabel, type AdhdAnalysis } from "@/lib/adhd";
+import { confidenceLabel, formatDeadline, meaningful, type AdhdAnalysis } from "@/lib/adhd";
 import { Inline } from "@/components/Prose";
 import SectionNav, { sectionId } from "@/components/SectionNav";
 import {
@@ -34,18 +34,36 @@ function Empty() {
   return <p className="text-slate-400">None.</p>;
 }
 
+/** A labelled line that is omitted when the model said "None" — six "None"
+ *  rows under every person read as gaps, not as the good news they are. */
+function Meta({ label, value, tone }: { label: string; value: string | undefined; tone?: string }) {
+  const v = meaningful(value);
+  if (!v) return null;
+  return <p className={`text-xs ${tone ?? "text-slate-400"}`}>{label}: {v}</p>;
+}
+
 export function AdhdResults({
   analysis,
   doneKeys,
+  letGoKeys = [],
   onToggleDone,
+  onToggleLetGo,
   animate = true,
 }: {
   analysis: AdhdAnalysis;
   doneKeys: string[];
+  /** Promises retired without being done. The conversation page showed these
+   *  as open, unticked boxes — the ledger and the page disagreed about the
+   *  same promise. */
+  letGoKeys?: string[];
   onToggleDone: (key: string) => void;
+  /** Optional: when absent (the read-only saved-copy view) no let-go control
+   *  is rendered, but a let-go state is still shown. */
+  onToggleLetGo?: (key: string) => void;
   animate?: boolean;
 }) {
   const done = new Set(doneKeys);
+  const letGo = new Set(letGoKeys);
 
   // A conversation with nothing actionable in it is a normal outcome (small
   // talk, a lecture, background noise). Rendering six stacked "None." cards
@@ -118,7 +136,9 @@ export function AdhdResults({
           <ul className="space-y-3">
             {analysis.commitments.map((c) => {
               const isDone = done.has(c.key);
+              const isLetGo = letGo.has(c.key);
               const dir = c.direction === "other_to_user" ? `${c.who} → me` : `me → ${c.who}`;
+              const deadline = formatDeadline(c.deadline);
               return (
                 <li key={c.key} className="flex gap-3">
                   <button
@@ -142,14 +162,37 @@ export function AdhdResults({
                       hardest thing on the page to re-read, which is exactly
                       backwards when you are checking what you already did.
                       The line-through already says "done". */}
-                  <div className={`min-w-0 ${isDone ? "line-through decoration-slate-500" : ""}`}>
+                  <div className={`min-w-0 flex-1 ${isDone || isLetGo ? "line-through decoration-slate-500" : ""}`}>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-xs font-mono text-slate-400">{dir}</span>
                       <span className="text-xs px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-300">{confidenceLabel(c.confidence)}</span>
+                      {isLetGo && (
+                        <span className="text-xs px-1.5 py-0.5 rounded-full border border-slate-600 bg-slate-800 text-slate-300">
+                          let go
+                        </span>
+                      )}
                     </div>
                     <p className="text-slate-200 mt-0.5">{c.what}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">Deadline: <strong className="text-slate-200">{c.deadline}</strong></p>
+                    {/* The raw value used to render behind a fixed "Deadline:"
+                        label — "Deadline: Estimated: 2026-08-15", "Deadline:
+                        None." — while the ledger normalised the same field. */}
+                    {deadline && (
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {deadline.label} <strong className="text-slate-200"><Inline text={deadline.value} /></strong>
+                      </p>
+                    )}
                     {c.quote && <p className="text-xs text-slate-400 italic mt-1">&ldquo;{c.quote}&rdquo;</p>}
+                    {onToggleLetGo && (
+                      <button
+                        onClick={() => onToggleLetGo(c.key)}
+                        aria-pressed={isLetGo}
+                        className={`text-xs min-h-[44px] px-2 -ml-2 rounded-lg transition-colors ${
+                          isLetGo ? "text-slate-300 hover:text-white" : "text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        {isLetGo ? "Bring back" : "Let go"}
+                      </button>
+                    )}
                   </div>
                 </li>
               );
@@ -172,9 +215,12 @@ export function AdhdResults({
             {analysis.people.map((p, i) => (
               <div key={i} className="rounded-lg bg-slate-900/60 p-3">
                 <p className="font-medium text-slate-200">{p.name} <span className="text-slate-400 font-normal">— {p.relationship}</span></p>
-                <p className="text-xs text-slate-400 mt-1">Shared: {p.shared}</p>
-                <p className="text-xs text-slate-400">Tone: {p.tone}</p>
-                <p className="text-xs text-slate-400">Owed: {p.owed}</p>
+                <div className="mt-1 space-y-0.5">
+                  <Meta label="Shared" value={p.shared} />
+                  <Meta label="Tone" value={p.tone} />
+                  <Meta label="Owed" value={p.owed} tone="text-slate-300" />
+                  <Meta label="Met at" value={p.place} />
+                </div>
               </div>
             ))}
           </div>
@@ -195,11 +241,11 @@ export function AdhdResults({
             {analysis.ahead.map((x, i) => (
               <div key={i} className="rounded-lg bg-slate-900/60 p-3">
                 <p className="font-medium text-slate-200">{x.event} <span className="text-slate-400 font-normal">({x.date})</span></p>
-                <p className="text-xs text-slate-400 mt-1">Prep: {x.prep}</p>
-                <p className="text-xs text-slate-400">Start: {x.start_when}</p>
-                {x.conflict && x.conflict !== "None" && (
-                  <p className="text-xs text-amber-300 mt-1">Conflict: {x.conflict}</p>
-                )}
+                <div className="mt-1 space-y-0.5">
+                  <Meta label="Prep" value={x.prep} />
+                  <Meta label="Start" value={x.start_when} />
+                  <Meta label="Conflict" value={x.conflict} tone="text-amber-300" />
+                </div>
               </div>
             ))}
           </div>

@@ -20,6 +20,18 @@ interface OpenSession {
   voicedMs: number;
 }
 
+/** Plain words for what "End now" actually did. Exported for the status page,
+ *  which offers the same action. */
+export function describeClose(r: { closed: string[]; transcribed?: number; discarded?: number; failed?: number }): string {
+  if (r.closed.length === 0) return "Nothing was being captured.";
+  if (r.transcribed) return r.transcribed === 1
+    ? "Ended — the conversation is transcribed and in the list."
+    : `Ended — ${r.transcribed} conversations are transcribed and in the list.`;
+  if (r.failed) return "Ended, but transcribing failed. It will be retried — or retry it now from Capture status.";
+  if (r.discarded) return "Ended — too little speech to keep, so nothing was transcribed.";
+  return "Ended.";
+}
+
 /**
  * The conversation being captured right now. A session only becomes a
  * conversation ninety seconds after the talking stops, and until this banner
@@ -69,8 +81,14 @@ export function CaptureBanner({ onEnded }: { onEnded: () => void }) {
     setEnding(true);
     setNote(null);
     try {
-      const r = await fetchJson<{ closed: string[] }>("/api/capture/close", { method: "POST" });
-      setNote(r.closed.length ? "Ended — transcribing now; it will appear in a moment." : "Nothing was being captured.");
+      // The route awaits transcription, so by the time it answers the
+      // outcome is known — it used to say "transcribing now" for a
+      // conversation that was already in the list, or already discarded.
+      const r = await fetchJson<{ closed: string[]; transcribed?: number; discarded?: number; failed?: number }>(
+        "/api/capture/close",
+        { method: "POST" }
+      );
+      setNote(describeClose(r));
       await load();
       onEnded();
     } catch (e) {

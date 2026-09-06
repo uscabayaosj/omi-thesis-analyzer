@@ -254,14 +254,52 @@ export async function sweep(nowMs = Date.now()): Promise<{ closed: string[]; ret
   return { closed: stale.map((s) => s.id), retried };
 }
 
+/** What became of each session a manual action closed or retried. Counted
+ *  from the session rows after the fact, because closeSession never throws —
+ *  a failure is recorded on the row, so the row is the only honest source. */
+export interface CloseOutcome {
+  transcribed: number;
+  discarded: number;
+  failed: number;
+}
+
+async function tally(sql: Sql, ids: string[]): Promise<CloseOutcome> {
+  const out: CloseOutcome = { transcribed: 0, discarded: 0, failed: 0 };
+  for (const id of ids) {
+    const s = await store.getSession(sql, id);
+    if (s?.status === "done") out.transcribed++;
+    else if (s?.status === "discarded") out.discarded++;
+    else if (s?.status === "failed") out.failed++;
+  }
+  return out;
+}
+
 /** Close every open session now, regardless of the silence gap — the user's
  *  "I'm done, transcribe it" button. Awaited (not deferred) so the caller can
- *  refresh the list the moment the conversation exists. */
-export async function closeAllOpen(): Promise<{ closed: string[] }> {
+ *  refresh the list the moment the conversation exists — and so the outcome
+ *  can be reported: by the time this returns, transcription has already
+ *  succeeded, been skipped as too short, or failed. The banner used to say
+ *  "transcribing now" for all three. */
+export async function closeAllOpen(): Promise<{ closed: string[] } & CloseOutcome> {
   const sql = getStore();
-  if (!sql) return { closed: [] };
+  if (!sql) return { closed: [], transcribed: 0, discarded: 0, failed: 0 };
   await store.ensureCaptureSchemaOnce(sql);
   const open = await store.listStaleOpen(sql, Date.now() + 60_000);
   for (const s of open) await closeSession(s.id);
-  return { closed: open.map((s) => s.id) };
+  const ids = open.map((s) => s.id);
+  return { closed: ids, ...(await tally(sql, ids)) };
+}
+
+/** Re-run every failed session on demand. The daily sweep retries at most
+ *  three times, then leaves the session failed for good with nothing in the
+ *  UI able to touch it — a Deepgram blip on a long conversation was a day's
+ *  wait at best and a permanent hole at worst. This is the user's own retry,
+ *  so the attempt cap is deliberately not applied. */
+export async function retryFailed(): Promise<{ retried: string[] } & CloseOutcome> {
+  const sql = getStore();
+  if (!sql) return { retried: [], transcribed: 0, discarded: 0, failed: 0 };
+  await store.ensureCaptureSchemaOnce(sql);
+  const ids = await store.listFailed(sql);
+  for (const id of ids) await closeSession(id);
+  return { retried: ids, ...(await tally(sql, ids)) };
 }

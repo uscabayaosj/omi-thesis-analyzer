@@ -22,7 +22,7 @@ export default function GroupAnalysisError({
         <CompassIcon className="w-10 h-10 mx-auto mb-4 text-red-400" />
         <h1 className="font-bold text-white mb-2">Group analysis failed</h1>
         <p className="text-slate-400 mb-6 text-sm">
-          {error.message || "The group analysis could not be loaded. Try selecting conversations again."}
+          The group analysis could not be loaded. Try selecting conversations again.
         </p>
         <div className="flex gap-3 justify-center">
           <button

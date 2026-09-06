@@ -6,6 +6,7 @@ import { analyzeAdhd, type AdhdAnalysis, type Rollup } from "@/lib/adhd";
 import { generateRollup, type DayConvoOutput } from "@/lib/rollup";
 import { getStore, ensureSchema, getNamespaceData, putNamespaceData, type Sql } from "@/lib/kv";
 import { getRollupJob, setRollupJob, tryClaimRollupJob } from "@/lib/rollup-job";
+import { mergeMaps, type RecordMap } from "@/lib/merge";
 
 /**
  * Server-side daily rollup: unlike the per-conversation analyze/rollup
@@ -31,13 +32,36 @@ interface StoredAdhdAnalysis {
   date?: string;
   analysis: AdhdAnalysis;
   doneKeys: string[];
+  /** Retired promises — read here so the rollup prompt does not report them
+   *  as open (see fmtCommitment in rollup.ts). Never written by this route. */
+  letGoKeys?: string[];
 }
 
 interface StoredRollup {
   day: string;
   timestamp: string;
+  /** When the rollup was produced; `timestamp` is the merge clock. Mirrors the
+   *  client's StoredRollup so the export reports the right time either way. */
+  generatedAt?: string;
   conversationIds: string[];
   rollup: Rollup;
+}
+
+/**
+ * Write new records into a namespace without clobbering anything else in it.
+ *
+ * The job used to read a namespace at the start of a run, spend minutes in
+ * LLM calls, then write the whole map back — discarding every record the
+ * phone pushed in between (a ticked promise, a let-go, an analysis run on the
+ * other device). Re-reading immediately before the write and merging with the
+ * same rule the sync layer uses (newest record wins; done-state fields on
+ * their own clocks) means this route can only ever add.
+ */
+async function mergeIntoNamespace(sql: Sql, ns: string, created: RecordMap): Promise<void> {
+  if (Object.keys(created).length === 0) return;
+  const fresh = (await getNamespaceData(sql, ns)) as RecordMap | null;
+  const base: RecordMap = fresh && typeof fresh === "object" && !Array.isArray(fresh) ? fresh : {};
+  await putNamespaceData(sql, ns, mergeMaps(created, base));
 }
 
 const ANALYSES_NS = "omi-adhd-analyses";
@@ -105,6 +129,9 @@ async function runRollupJob(sql: Sql, day: string, dayConvos: ConvoLite[]): Prom
     existingAnalyses && typeof existingAnalyses === "object" ? { ...existingAnalyses } : {};
 
   const outputs: DayConvoOutput[] = [];
+  // Only what this run produced. Written back through a merge, never as the
+  // whole map (see mergeIntoNamespace).
+  const created: Record<string, StoredAdhdAnalysis> = {};
 
   for (const c of dayConvos) {
     try {
@@ -115,6 +142,9 @@ async function runRollupJob(sql: Sql, day: string, dayConvos: ConvoLite[]): Prom
           throw new Error("no transcript");
         }
         const transcript = segmentsToText(convo.transcript_segments);
+        // The client fills structured.title from its enrichment cache before
+        // posting, so `c.structured.title` carries the human name a bare TRACE
+        // conversation would otherwise lack.
         const title = convo.structured?.title || c.structured?.title || "Untitled Conversation";
         const date = convo.created_at || c.created_at;
         const analysis = await analyzeAdhd(transcript, title, date);
@@ -127,8 +157,15 @@ async function runRollupJob(sql: Sql, day: string, dayConvos: ConvoLite[]): Prom
           doneKeys: [],
         };
         analysesMap[c.id] = stored;
+        created[c.id] = stored;
       }
-      outputs.push({ title: stored.title, date: stored.date || c.created_at, analysis: stored.analysis, doneKeys: stored.doneKeys });
+      outputs.push({
+        title: stored.title,
+        date: stored.date || c.created_at,
+        analysis: stored.analysis,
+        doneKeys: Array.isArray(stored.doneKeys) ? stored.doneKeys : [],
+        letGoKeys: Array.isArray(stored.letGoKeys) ? stored.letGoKeys : [],
+      });
     } catch {
       failed++;
     }
@@ -138,7 +175,7 @@ async function runRollupJob(sql: Sql, day: string, dayConvos: ConvoLite[]): Prom
 
   // Persist whatever got analyzed even if the rollup step below fails, so a
   // retry (or another device) doesn't redo work that already succeeded.
-  await putNamespaceData(sql, ANALYSES_NS, analysesMap);
+  await mergeIntoNamespace(sql, ANALYSES_NS, created as unknown as RecordMap);
 
   if (outputs.length === 0) {
     await setRollupJob(day, {
@@ -157,13 +194,18 @@ async function runRollupJob(sql: Sql, day: string, dayConvos: ConvoLite[]): Prom
 
   const rollup = await generateRollup(day, outputs, previousRollup);
 
-  rollupsMap[day] = {
+  const now = new Date().toISOString();
+  const record: StoredRollup = {
     day,
-    timestamp: new Date().toISOString(),
+    timestamp: now,
+    generatedAt: now,
     conversationIds: dayConvos.map((c) => c.id),
     rollup,
   };
-  await putNamespaceData(sql, ROLLUPS_NS, rollupsMap);
+  // Merged, not replaced: the merge's done-field rule carries the day's
+  // ticked plan steps (planDoneKeys, on their own clock) onto this new
+  // record, and every other day's rollup is untouched.
+  await mergeIntoNamespace(sql, ROLLUPS_NS, { [day]: record } as unknown as RecordMap);
 
   await setRollupJob(day, { day, status: "done", total, done, failed, rollup, updatedAt: new Date().toISOString() });
 }

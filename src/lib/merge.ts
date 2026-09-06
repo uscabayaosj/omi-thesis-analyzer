@@ -114,39 +114,161 @@ function resolveDoneFields(
 }
 
 /**
- * Entries keyed by their conversation-id set and re-runnable, so a whole-list
- * replace is harmless — newest-list-wins by length is sufficient.
+ * Last-resort rule for an array namespace with no known record identity:
+ * newest-list-wins by length. Only reached for a namespace this module has no
+ * merge for — both array namespaces the app actually syncs have one below.
  */
 export function mergeByLength(local: ArrayRecord[], remote: ArrayRecord[]): ArrayRecord[] {
   return remote.length > local.length ? remote : local;
+}
+
+type CustomField = { timestamp?: string } | undefined;
+
+function customStamp(c: unknown): string {
+  return c && typeof c === "object" && typeof (c as CustomField)?.timestamp === "string"
+    ? ((c as CustomField)!.timestamp as string)
+    : "";
+}
+
+/**
+ * A custom (free-prompt) result is saved onto an existing analysis without
+ * restamping the analysis's own clock — that clock means "when this was
+ * analyzed" and drives the age badge. So the record-level rule cannot see it,
+ * and on a tie it would resolve to the copy *without* the custom result.
+ * Resolve the custom field on its own clock, the way done-state fields are.
+ */
+function overlayCustom(winner: ArrayRecord, local: unknown, remote: unknown): ArrayRecord {
+  const ls = customStamp(local);
+  const rs = customStamp(remote);
+  if (!ls && !rs) return winner;
+  const fresher = ls >= rs ? local : remote;
+  return { ...winner, custom: fresher };
 }
 
 /**
  * One entry per real conversationId whose `current.timestamp` genuinely can
  * differ between devices. A length comparison would silently drop a newer
  * local edit whenever the other side has more distinct conversations analyzed.
+ * The nested `current.custom` is resolved on its own clock (see overlayCustom).
  */
 export function mergeConversationList(local: ArrayRecord[], remote: ArrayRecord[]): ArrayRecord[] {
   const byId = new Map<string, ArrayRecord>();
+  const unkeyed: ArrayRecord[] = [];
   for (const r of remote) {
     const id = r?.conversationId;
     if (typeof id === "string") byId.set(id, r);
+    else unkeyed.push(r);
   }
   for (const l of local) {
     const id = l?.conversationId;
-    if (typeof id !== "string") continue;
+    if (typeof id !== "string") {
+      unkeyed.push(l);
+      continue;
+    }
     const existing = byId.get(id);
     if (!existing) {
       byId.set(id, l);
       continue;
     }
-    const lt = (l.current as { timestamp?: string } | undefined)?.timestamp ?? "";
-    const rt = (existing.current as { timestamp?: string } | undefined)?.timestamp ?? "";
-    if (lt > rt) byId.set(id, l);
+    const lc = l.current as Record<string, unknown> | undefined;
+    const rc = existing.current as Record<string, unknown> | undefined;
+    const lt = (lc?.timestamp as string | undefined) ?? "";
+    const rt = (rc?.timestamp as string | undefined) ?? "";
+    const winner = lt > rt ? l : existing;
+    const wc = winner.current as Record<string, unknown> | undefined;
+    const current = wc ? overlayCustom(wc, lc?.custom, rc?.custom) : wc;
+    byId.set(id, current === wc ? winner : { ...winner, current });
   }
-  return Array.from(byId.values());
+  // Malformed entries are unreadable but not ours to discard: a merge must
+  // never be the step that loses something.
+  return [...byId.values(), ...unkeyed];
+}
+
+function groupKeyOf(r: ArrayRecord): string | null {
+  const ids = r?.conversationIds;
+  if (!Array.isArray(ids)) return null;
+  const strs = ids.filter((x): x is string => typeof x === "string");
+  return strs.length ? [...strs].sort().join(",") : null;
+}
+
+/**
+ * One entry per group (the sorted set of conversation ids), newest
+ * `timestamp` wins, custom result on its own clock. Replaces the old
+ * longer-list-wins rule, which dropped a group added on one device whenever
+ * the other side happened to hold more groups.
+ */
+export function mergeGroupList(local: ArrayRecord[], remote: ArrayRecord[]): ArrayRecord[] {
+  const byKey = new Map<string, ArrayRecord>();
+  const unkeyed: ArrayRecord[] = [];
+  for (const r of remote) {
+    const k = groupKeyOf(r);
+    if (k) byKey.set(k, r);
+    else unkeyed.push(r);
+  }
+  for (const l of local) {
+    const k = groupKeyOf(l);
+    if (!k) {
+      unkeyed.push(l);
+      continue;
+    }
+    const existing = byKey.get(k);
+    if (!existing) {
+      byKey.set(k, l);
+      continue;
+    }
+    const lt = typeof l.timestamp === "string" ? l.timestamp : "";
+    const rt = typeof existing.timestamp === "string" ? existing.timestamp : "";
+    const winner = lt > rt ? l : existing;
+    byKey.set(k, overlayCustom(winner, l.custom, existing.custom));
+  }
+  return [...byKey.values(), ...unkeyed];
 }
 
 export function mergeArrayNamespace(ns: string, local: ArrayRecord[], remote: ArrayRecord[]): ArrayRecord[] {
-  return ns === "omi-thesis-analyses" ? mergeConversationList(local, remote) : mergeByLength(local, remote);
+  if (ns === "omi-thesis-analyses") return mergeConversationList(local, remote);
+  if (ns === "omi-thesis-group-analyses") return mergeGroupList(local, remote);
+  return mergeByLength(local, remote);
+}
+
+/** Unwrap the `{ list: [...] }` transport wrapper (or accept a bare array). */
+export function toList(v: unknown): ArrayRecord[] {
+  if (Array.isArray(v)) return v as ArrayRecord[];
+  if (v && typeof v === "object" && Array.isArray((v as { list?: unknown }).list)) {
+    return (v as { list: ArrayRecord[] }).list;
+  }
+  return [];
+}
+
+export function toMap(v: unknown): RecordMap {
+  return v && typeof v === "object" && !Array.isArray(v) ? (v as RecordMap) : {};
+}
+
+/** A deletion record — see people.ts's Tombstone; the same shape everywhere. */
+export function isTombstoneRecord(v: unknown): boolean {
+  return !!v && typeof v === "object" && (v as { deleted?: unknown }).deleted === true;
+}
+
+/**
+ * The server-side half of the contract: what `PUT /api/store` should store
+ * given what a client sent (`incoming`) and what the row already holds
+ * (`existing`). The client is treated as "local" and the row as "remote", so
+ * ties resolve to the stored copy exactly as they do on a client pull.
+ *
+ * Exists because the route used to replace the row wholesale. Every pull
+ * merged per record, but nothing protected the *server's* copy: a device with
+ * an empty or corrupt localStorage that wrote before its first pull landed
+ * (a new browser, cleared site data, a slow connection) pushed a one-record
+ * map and the server lost everything else. Under this rule a PUT can only add
+ * or update records; removing one takes an explicit tombstone.
+ *
+ * Array namespaces are stored wrapped as `{ list: [...] }` (see kv.ts); the
+ * result keeps that shape.
+ */
+export function mergeNamespaceValue(ns: string, isArray: boolean, incoming: unknown, existing: unknown): unknown {
+  if (isArray) {
+    const merged = mergeArrayNamespace(ns, toList(incoming), toList(existing));
+    return { list: merged };
+  }
+  if (existing == null) return toMap(incoming);
+  return mergeMaps(toMap(incoming), toMap(existing));
 }

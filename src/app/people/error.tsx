@@ -22,7 +22,7 @@ export default function PeopleError({
         <UsersIcon className="w-10 h-10 mx-auto mb-4 text-red-400" />
         <h1 className="font-bold text-white mb-2">People directory failed to load</h1>
         <p className="text-slate-400 mb-6 text-sm">
-          {error.message || "The people directory could not be loaded. Try again."}
+          The people directory could not be loaded. Try again.
         </p>
         <div className="flex gap-3 justify-center">
           <button

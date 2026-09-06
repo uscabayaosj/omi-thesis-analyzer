@@ -130,7 +130,9 @@ export default function UsagePage() {
 
       {summary && summary.configured && (
         <div className="space-y-6">
-          <div className="grid grid-cols-3 gap-3">
+          {/* One column on a phone: three tiles of "$0.0043" in 24px mono do
+              not fit 375px, and the middle tile was clipping its own number. */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <StatTile title="Today" summary={summary.today} />
             <StatTile title="This Week" summary={summary.thisWeek} />
             <StatTile title="This Month" summary={summary.thisMonth} />

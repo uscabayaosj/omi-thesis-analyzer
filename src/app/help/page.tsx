@@ -53,7 +53,8 @@ export default function HelpPage() {
         <Answer q="What are the two lenses?">
           <p>
             Every conversation can be read two ways, and they never mix. <strong className="text-slate-100">Thesis</strong> reads
-            a recording as fieldwork — five dimensions against the Pioneer Sovereignty research questions.
+            a recording as fieldwork — eight dimensions: the four research questions, the orienting conditions,
+            the rival hypothesis, refutation signals and forward thinking.
             <strong className="text-slate-100"> ADHD Aid</strong> reads the same recording as a to-do source: promises made,
             decisions worth keeping, people owed a reply, loops left open.
           </p>
@@ -149,6 +150,20 @@ export default function HelpPage() {
             A private server-side mirror then copies it so the same data is on your phone and your
             desktop. If that mirror is unreachable the app carries on unchanged — you just lose
             cross-device sync until it comes back.
+          </p>
+        </Answer>
+
+        <Answer q="How do I back up, and how do I get a backup back in?">
+          <p>
+            <strong className="text-slate-100">Backup</strong>, on the conversations page, downloads every analysis,
+            rollup, person and place as one JSON file — from the server mirror when it is reachable, otherwise from
+            this device. Keep the file somewhere that isn&apos;t this browser.
+          </p>
+          <p>
+            <strong className="text-slate-100">Restore</strong> reads such a file back in. It is a merge, not a
+            replacement: you see exactly how many records would be added or updated before anything is written,
+            newer wins on every record, and nothing on this device is replaced by an older copy. What it merges then
+            syncs to the server like any other change, so the other device picks it up too.
           </p>
         </Answer>
 

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { fetchJson } from "@/lib/fetch-json";
+import { dayOf } from "@/lib/format";
 import type { ConversationSearchResult, GroupSearchResult } from "@/lib/search";
 import { ArrowLeftIcon, SearchIcon } from "@/components/icons";
 import { LINK_BACK } from "@/lib/ui";
@@ -16,9 +17,12 @@ interface SearchResponse {
 const EMPTY: SearchResponse = { configured: true, conversationResults: [], groupResults: [] };
 const DEBOUNCE_MS = 300;
 
+// Local day, like every other screen: slicing the ISO string gave the UTC day,
+// which put an evening conversation under tomorrow's date in the results.
 function formatDate(date?: string): string {
   if (!date) return "";
-  return date.length >= 10 ? date.slice(0, 10) : date;
+  const d = dayOf(date);
+  return d === "unknown-date" ? "" : d;
 }
 
 export default function SearchPage() {

@@ -20,6 +20,8 @@ export function confidenceLabel(c: Confidence): string {
   }
 }
 
+export { formatDeadline, meaningful } from "./adhd-format";
+
 export interface AdhdCommitment {
   /** Deterministic hash of normalized who+what. Stable across re-runs so
    *  done-state (tracked by key) survives re-analysis. */

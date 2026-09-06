@@ -22,7 +22,7 @@ export default function PlaceError({
         <MapPinIcon className="w-10 h-10 mx-auto mb-4 text-red-400" />
         <h1 className="font-bold text-white mb-2">This place&rsquo;s page failed to load</h1>
         <p className="text-slate-400 mb-6 text-sm">
-          {error.message || "Something went wrong loading this place. Try again."}
+          Something went wrong loading this place. Try again.
         </p>
         <div className="flex gap-3 justify-center">
           <button

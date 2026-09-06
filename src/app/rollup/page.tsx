@@ -10,10 +10,12 @@ import type { DayConvoOutput } from "@/lib/rollup";
 import type { RollupJobState } from "@/lib/rollup-job";
 import {
   getAdhdAnalysis, getAdhdAnalyzedIds, saveAdhdAnalysis, getRollup, saveRollup, getPreviousRollup, getRollupDays, togglePlanStepDone, restoreRollup,
+  type StoredRollup,
 } from "@/lib/adhd-storage";
 import { getEnrichments, type StoredEnrichment } from "@/lib/enrich-storage";
 import { isHiddenJunk } from "@/lib/enrich-core";
-import { pullAndMerge } from "@/lib/sync";
+import { pullAndMerge, flushPush } from "@/lib/sync";
+import { conversationTitle } from "@/lib/titles";
 import { countOpen } from "@/lib/commitments";
 import { exportRollupToObsidian, downloadRollupMarkdown } from "@/lib/obsidian";
 import {
@@ -152,6 +154,11 @@ function RollupPageInner() {
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
+  // The rollup a server-side run is about to replace, held until the job
+  // finishes so the same ten-second undo the local path offers can be offered
+  // here — and production always takes the server path, so until now the undo
+  // existed only in local development.
+  const replacedRef = useRef<StoredRollup | null>(null);
 
   const togglePlanStep = useCallback((key: string) => {
     if (!selectedDay) return;
@@ -215,11 +222,23 @@ function RollupPageInner() {
     return () => clearInterval(t);
   }, [startedAt]);
 
+  // The bare list is the newest 200. `coveredFrom` is its oldest day (or
+  // "all" when the archive is shorter than that), so a day opened via ?day=
+  // that falls before it can fetch its month instead of reading as "source
+  // conversations unavailable".
+  const [coveredFrom, setCoveredFrom] = useState<string | "all" | null>(null);
+  const loadedMonths = useRef(new Set<string>());
+
   useEffect(() => {
     (async () => {
       try {
         const data = await fetchJson<ConvoLite[]>("/api/conversations");
-        setConvos(Array.isArray(data) ? data : []);
+        const list = Array.isArray(data) ? data : [];
+        setConvos((prev) => {
+          const seen = new Set(list.map((c) => c.id));
+          return [...list, ...prev.filter((c) => !seen.has(c.id))];
+        });
+        setCoveredFrom(list.length < 200 ? "all" : dayOf(list[list.length - 1].created_at));
       } catch (e) {
         setError(e instanceof Error ? e.message : "Could not load conversations");
       } finally {
@@ -227,6 +246,24 @@ function RollupPageInner() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (!selectedDay || coveredFrom === null || coveredFrom === "all") return;
+    const month = selectedDay.slice(0, 7);
+    if (month > coveredFrom.slice(0, 7) || loadedMonths.current.has(month)) return;
+    loadedMonths.current.add(month);
+    fetchJson<ConvoLite[]>(`/api/conversations?month=${month}`)
+      .then((data) => {
+        const list = Array.isArray(data) ? data : [];
+        setConvos((prev) => {
+          const seen = new Set(prev.map((c) => c.id));
+          return [...prev, ...list.filter((c) => !seen.has(c.id))];
+        });
+      })
+      .catch(() => {
+        loadedMonths.current.delete(month);
+      });
+  }, [selectedDay, coveredFrom]);
 
   // Group conversations by calendar day, newest day first.
   /* The day list used to be built purely from /api/conversations, so when Omi
@@ -345,12 +382,26 @@ function RollupPageInner() {
         if (cancelled || !job) return;
         setProgress({ done: job.done, total: job.total, failed: job.failed });
         if (job.status === "done") {
-          if (job.rollup) {
-            setRollup(job.rollup);
-            setPlanDone(new Set(getRollup(selectedDay)?.planDoneKeys ?? []));
-          }
+          if (job.rollup) setRollup(job.rollup);
           await pullAndMerge(true);
-          if (!cancelled) { setRunning(false); setStartedAt(null); setViaServer(false); }
+          if (cancelled) return;
+          // Re-read the stored record now that the pull has landed: the
+          // late-arrivals check and the day list derive from it, and holding
+          // the pre-pull object here left them describing the rollup that had
+          // just been replaced.
+          const fresh = getRollup(day);
+          setRollup(fresh?.rollup ?? job.rollup ?? null);
+          setPlanDone(new Set(fresh?.planDoneKeys ?? []));
+          const replaced = replacedRef.current;
+          replacedRef.current = null;
+          if (replaced) {
+            offerUndo("Previous rollup replaced.", () => {
+              restoreRollup(replaced);
+              setRollup(replaced.rollup);
+              setPlanDone(new Set(replaced.planDoneKeys ?? []));
+            });
+          }
+          setRunning(false); setStartedAt(null); setViaServer(false);
         } else if (job.status === "error") {
           setError(job.error || "Rollup failed.");
           if (!cancelled) { setRunning(false); setStartedAt(null); setViaServer(false); }
@@ -364,7 +415,7 @@ function RollupPageInner() {
     poll();
     const id = setInterval(poll, 2000);
     return () => { cancelled = true; clearInterval(id); };
-  }, [running, viaServer, selectedDay]);
+  }, [running, viaServer, selectedDay, offerUndo]);
 
   // Runs the whole batch in this tab: only used when no durable store is
   // configured server-side (so /api/rollup/job can't run anything past this
@@ -407,6 +458,7 @@ function RollupPageInner() {
           date: stored.date || c.created_at,
           analysis: stored.analysis,
           doneKeys: stored.doneKeys,
+          letGoKeys: stored.letGoKeys ?? [],
         });
       } catch (e) {
         // Stop is a decision, not a failure: keep every analysis already
@@ -474,28 +526,51 @@ function RollupPageInner() {
     setStartedAt(Date.now());
     setElapsed(0);
     setProgress({ done: 0, total: dayConvos.length, failed: 0 });
+    replacedRef.current = getRollup(day);
+
+    // The job reuses whatever analyses the server already holds. Analyses run
+    // on this device moments ago are still sitting in the 1.2 s push debounce,
+    // so push them first or the job pays to produce them a second time. A
+    // failed flush costs at most that duplicate call; the run still proceeds.
+    try {
+      await flushPush("omi-adhd-analyses");
+    } catch {
+      // see above
+    }
+
+    // Titles travel with the request: the job names each analysis from the
+    // conversation's own title, which a TRACE-captured recording lacks, so it
+    // saved "Untitled Conversation" wherever the enrichment pass had already
+    // found a real name on this device.
+    const named = dayConvos.map((c) => {
+      const title = conversationTitle(c, enrichments.get(c.id));
+      return c.structured?.title?.trim() ? c : { ...c, structured: { ...c.structured, title } };
+    });
 
     let res: Response;
     try {
       res = await fetch("/api/rollup/job", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ day, conversations: dayConvos }),
+        body: JSON.stringify({ day, conversations: named }),
       });
     } catch {
       setError("Network error — check your connection and try again.");
       setRunning(false); setStartedAt(null);
+      replacedRef.current = null;
       return;
     }
 
     if (res.status === 501) {
-      await generateLocally(dayConvos, day);
+      replacedRef.current = null; // the local path offers its own undo
+      await generateLocally(named, day);
       return;
     }
 
     if (!res.ok) {
       setError(`Rollup job failed to start (error ${res.status}).`);
       setRunning(false); setStartedAt(null);
+      replacedRef.current = null;
       return;
     }
 
@@ -509,7 +584,7 @@ function RollupPageInner() {
     }
     if (job) setProgress({ done: job.done, total: job.total, failed: job.failed });
     setViaServer(true); // hands control to the polling effect above
-  }, [generateLocally]);
+  }, [generateLocally, enrichments]);
 
   const doExport = useCallback(() => {
     if (!selectedDay) return;
@@ -770,7 +845,7 @@ function RollupPageInner() {
                               same discriminators here makes the coverage list
                               readable instead of decorative. */}
                           <span className="font-serif text-sm text-slate-300 truncate min-w-0">
-                            {c.structured?.title?.trim() || (
+                            {c.structured?.title?.trim() || enrichments.get(c.id)?.title?.trim() || (
                               <>
                                 <span className="font-mono text-slate-400">
                                   {formatTime(c.created_at)}

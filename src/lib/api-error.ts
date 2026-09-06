@@ -34,7 +34,11 @@ export function friendlyError(err: unknown): FriendlyError {
   if (raw.includes("API 401") || raw.includes("API 403")) {
     return { error: "AI service authentication failed. Check your API key.", status: 502 };
   }
-  if (raw.includes("429") || raw.toLowerCase().includes("rate")) {
+  // Word-bounded on purpose: a bare `includes("rate")` matched "generate",
+  // "accurate" and "separate", so an unrelated failure whose message contained
+  // any of those was reported as a rate limit — and, because this check ran
+  // before the timeout and JSON checks, it masked their more useful messages.
+  if (/\b429\b/.test(raw) || /rate[ _-]?limit/i.test(raw) || /too many requests/i.test(raw)) {
     return { error: "AI service is busy. Please wait a moment and try again.", status: 429 };
   }
   if (raw.includes("timed out") || raw.includes("timeout") || raw.includes("ETIMEDOUT") || raw.includes("aborted")) {

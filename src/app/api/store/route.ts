@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getStore, ensureSchema, withTimeout, SYNCED_NAMESPACES, isSyncedNamespace } from "@/lib/kv";
+import {
+  getStore, ensureSchema, withTimeout, getNamespaceData, putNamespaceData,
+  SYNCED_NAMESPACES, isSyncedNamespace, isArrayNamespace,
+} from "@/lib/kv";
+import { mergeNamespaceValue } from "@/lib/merge";
 
 /**
  * Durable mirror of the browser's client-side stores.
@@ -43,7 +47,19 @@ export async function GET() {
   }
 }
 
-// PUT /api/store → replace one namespace with the client's merged map.
+// PUT /api/store → merge the client's map into one namespace.
+//
+// This used to replace the row wholesale, trusting that the client had
+// already merged. Every pull does merge per record — but that only protects
+// the client's copy. A device whose localStorage was empty or corrupt (a new
+// browser, cleared site data) that wrote before its first pull landed pushed a
+// one-record map and the server lost everything else. The row is now merged
+// with the same rules the client uses (mergeNamespaceValue): a PUT can only
+// add or update records, and a removal has to arrive as a tombstone.
+//
+// The read-then-write is not transactional. Two devices pushing the same
+// namespace within the same moment can still lose one push's changes until
+// that device's next write; localStorage holds the write either way.
 export async function PUT(req: NextRequest) {
   const sql = getStore();
   if (!sql) return NextResponse.json({ configured: false });
@@ -56,14 +72,9 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Expected an object map." }, { status: 400 });
     }
     await ensureSchema(sql);
-    // The client sends an already-merged map, so last writer wins per
-    // namespace by design — the per-record reconciliation happens there.
-    await withTimeout(sql`
-      INSERT INTO trace_store (namespace, data, updated_at)
-      VALUES (${namespace}, ${JSON.stringify(map)}::jsonb, now())
-      ON CONFLICT (namespace)
-      DO UPDATE SET data = EXCLUDED.data, updated_at = now()
-    `);
+    const existing = await getNamespaceData(sql, namespace);
+    const merged = mergeNamespaceValue(namespace, isArrayNamespace(namespace), map, existing);
+    await putNamespaceData(sql, namespace, merged);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("store PUT failed:", err);
