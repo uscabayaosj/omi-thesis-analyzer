@@ -116,9 +116,17 @@ export function saveAdhdAnalysis(record: {
   const prev = map[record.conversationId];
 
   // Preserve done-state for commitments that still exist after re-analysis.
+  // A commitment's key is a hash of who+what, so a promise the model repeats
+  // verbatim keeps its tick, and one it rewords starts fresh. Let-go state is
+  // carried the same way: it used to be dropped outright, so a re-run quietly
+  // brought every retired promise back to life. The clocks travel with the
+  // keys, or the cross-device merge would see an unstamped side and overlay
+  // whatever the other device last recorded.
   const liveKeys = new Set(record.analysis.commitments.map((c) => c.key));
   const prevDoneKeys = Array.isArray(prev?.doneKeys) ? prev.doneKeys : [];
   const doneKeys = prevDoneKeys.filter((k) => liveKeys.has(k));
+  const prevLetGoKeys = Array.isArray(prev?.letGoKeys) ? prev.letGoKeys : [];
+  const letGoKeys = prevLetGoKeys.filter((k) => liveKeys.has(k));
 
   const stored: StoredAdhdAnalysis = {
     conversationId: record.conversationId,
@@ -127,6 +135,10 @@ export function saveAdhdAnalysis(record: {
     date: record.date,
     analysis: record.analysis,
     doneKeys,
+    ...(prev?.doneKeysUpdatedAt ? { doneKeysUpdatedAt: prev.doneKeysUpdatedAt } : {}),
+    ...(letGoKeys.length || prev?.letGoUpdatedAt
+      ? { letGoKeys, ...(prev?.letGoUpdatedAt ? { letGoUpdatedAt: prev.letGoUpdatedAt } : {}) }
+      : {}),
   };
   map[record.conversationId] = stored;
   writeMap(ANALYSES_KEY, map);

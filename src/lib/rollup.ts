@@ -7,6 +7,10 @@ export interface DayConvoOutput {
   date: string;
   analysis: AdhdAnalysis;
   doneKeys: string[];
+  /** Promises retired without being done. Optional for callers predating the
+   *  disposition; absent means none. Without it the rollup was told a let-go
+   *  promise was still OPEN and kept carrying it forward. */
+  letGoKeys?: string[];
 }
 
 /** The prose sections only — `plan_steps` is structured and parsed separately. */
@@ -115,16 +119,23 @@ Every field except "plan_steps" is a prose string (may contain newlines and simp
 - Return an empty array only when "tomorrow_plan" is genuinely "Nothing time-sensitive for tomorrow."
 - The two must agree: never put an item in one and not the other.`;
 
-function fmtCommitment(c: AdhdAnalysis["commitments"][number], doneSet: Set<string>): string {
+function fmtCommitment(
+  c: AdhdAnalysis["commitments"][number],
+  doneSet: Set<string>,
+  letGoSet: Set<string>
+): string {
   const dir = c.direction === "other_to_user" ? `${c.who} owes me` : `I owe ${c.who}`;
-  const status = doneSet.has(c.key) ? "DONE" : "OPEN";
+  // LET GO is a resolved disposition, not an open one: the user retired the
+  // promise on purpose, so the plan must neither carry it nor nag about it.
+  const status = doneSet.has(c.key) ? "DONE" : letGoSet.has(c.key) ? "LET GO (deliberately dropped — do not carry forward)" : "OPEN";
   return `    - [${status}][${c.confidence}] ${dir}: ${c.what} (deadline: ${c.deadline})`;
 }
 
 function fmtConvo(c: DayConvoOutput, i: number): string {
   const a = c.analysis;
   const doneSet = new Set(c.doneKeys);
-  const commitments = a.commitments.length ? a.commitments.map((commit) => fmtCommitment(commit, doneSet)).join("\n") : "    - none";
+  const letGoSet = new Set(c.letGoKeys ?? []);
+  const commitments = a.commitments.length ? a.commitments.map((commit) => fmtCommitment(commit, doneSet, letGoSet)).join("\n") : "    - none";
   const people = a.people.length ? a.people.map((p) => `    - ${p.name} (${p.relationship}); owed: ${p.owed}`).join("\n") : "    - none";
   const loops = a.open_loops.length ? a.open_loops.map((l) => `    - ${l}`).join("\n") : "    - none";
   const ahead = a.ahead.length ? a.ahead.map((x) => `    - ${x.event} (${x.date}); prep: ${x.prep}; start: ${x.start_when}`).join("\n") : "    - none";
