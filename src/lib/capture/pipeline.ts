@@ -104,7 +104,7 @@ export async function ingestChunk(input: { chunkId: string; deviceId: string; by
   return { duplicate: false, durationMs: chunk.durationMs, voicedMs, sessionId: open?.id ?? null, toClose };
 }
 
-async function assembleSessionAudio(
+export async function assembleSessionAudio(
   sql: Sql,
   s: SessionState
 ): Promise<{ assembled: ReturnType<typeof assembleVoiced>; chunkIds: string[]; paths: Map<string, string> }> {
