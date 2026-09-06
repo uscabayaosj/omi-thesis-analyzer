@@ -10,6 +10,7 @@ import {
 } from "@/lib/adhd-storage";
 import { pullAndMerge } from "@/lib/sync";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { useUndoOffer } from "@/components/UndoProvider";
 import type { WeeklyRollup } from "@/lib/weekly-rollup";
 import {
   ArrowLeftIcon, CalendarIcon, FileTextIcon, TrendingUpIcon, WarningIcon,
@@ -80,6 +81,7 @@ function WeekPageInner() {
   // the server's view and filling in after mount keeps the two in agreement.
   const [mounted, setMounted] = useState(false);
   const [showRegenConfirm, setShowRegenConfirm] = useState(false);
+  const { offerUndo } = useUndoOffer();
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration-safe mount flag: it exists to hold the first client render to the server's output before any localStorage-derived value is read
@@ -114,6 +116,9 @@ function WeekPageInner() {
     if (dayRollups.length === 0) return;
     setGenerating(true);
     setError(null);
+    // Weekly rollups keep no version history; the daily rollup already offers
+    // ten seconds to take a regeneration back, and this one did not.
+    const replaced = stored;
     try {
       const data = await fetchJson<{ rollup: WeeklyRollup }>("/api/rollup/weekly", {
         method: "POST",
@@ -125,6 +130,13 @@ function WeekPageInner() {
       });
       const saved = saveWeeklyRollup({ weekStart, dayCount: dayRollups.length, rollup: data.rollup });
       setStored(saved);
+      if (replaced) {
+        offerUndo("Previous weekly rollup replaced.", () => {
+          // Re-saved rather than replayed, so the restore carries a fresh
+          // merge clock and wins against the regenerated copy on the server.
+          setStored(saveWeeklyRollup({ weekStart, dayCount: replaced.dayCount, rollup: replaced.rollup }));
+        });
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Weekly rollup failed.");
     } finally {

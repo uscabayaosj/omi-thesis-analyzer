@@ -964,8 +964,8 @@ export default function PersonDetailPage() {
           tone="danger"
           body={
             <>
-              This permanently deletes <strong className="text-slate-200">{person.name}</strong> and all
-              their facts and meetings. This can&rsquo;t be undone.
+              This deletes <strong className="text-slate-200">{person.name}</strong> with all their facts,
+              meetings and relationships. You&rsquo;ll have ten seconds to undo.
             </>
           }
           confirmLabel="Delete"

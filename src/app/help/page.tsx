@@ -53,7 +53,8 @@ export default function HelpPage() {
         <Answer q="What are the two lenses?">
           <p>
             Every conversation can be read two ways, and they never mix. <strong className="text-slate-100">Thesis</strong> reads
-            a recording as fieldwork — five dimensions against the Pioneer Sovereignty research questions.
+            a recording as fieldwork — eight dimensions: the four research questions, the orienting conditions,
+            the rival hypothesis, refutation signals and forward thinking.
             <strong className="text-slate-100"> ADHD Aid</strong> reads the same recording as a to-do source: promises made,
             decisions worth keeping, people owed a reply, loops left open.
           </p>

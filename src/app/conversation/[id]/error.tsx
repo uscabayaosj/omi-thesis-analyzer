@@ -22,7 +22,7 @@ export default function ConversationError({
         <MessageIcon className="w-10 h-10 mx-auto mb-4 text-red-400" />
         <h1 className="font-bold text-white mb-2">Failed to load conversation</h1>
         <p className="text-slate-400 mb-6 text-sm">
-          {error.message || "The conversation could not be loaded. It may have been deleted or the API is unavailable."}
+          The conversation could not be loaded. It may have been deleted or the API is unavailable.
         </p>
         <div className="flex gap-3 justify-center">
           <button
