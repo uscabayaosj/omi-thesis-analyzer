@@ -24,6 +24,12 @@ final class PendantConnection: NSObject, CBCentralManagerDelegate, CBPeripheralD
     private var central: CBCentralManager!
     private var peripheral: CBPeripheral?
     private var scanHandler: ((CBPeripheral) -> Void)?
+    /// The firmware pushes 0x2A19 every 5 s while connected, but only if the
+    /// notify subscription actually took. If iOS reports it didn't, fall back
+    /// to reading on a timer so the number can't freeze at its connect-time value.
+    private var batteryCharacteristic: CBCharacteristic?
+    private var batteryPoll: Timer?
+    private static let batteryPollInterval: TimeInterval = 30
 
     func start() {
         guard central == nil else { reconnectIfPaired(); return }
@@ -93,6 +99,8 @@ final class PendantConnection: NSObject, CBCentralManagerDelegate, CBPeripheralD
     }
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
+        stopBatteryPolling()
+        batteryCharacteristic = nil
         onState?("Disconnected — reconnecting")
         onDisconnect?()
         central.connect(peripheral)
@@ -113,11 +121,34 @@ final class PendantConnection: NSObject, CBCentralManagerDelegate, CBPeripheralD
             case Self.audioCodec: peripheral.readValue(for: c)
             case Self.audioData: peripheral.setNotifyValue(true, for: c)
             case Self.batteryLevel:
+                batteryCharacteristic = c
                 peripheral.readValue(for: c)
                 peripheral.setNotifyValue(true, for: c)
             default: break
             }
         }
+    }
+
+    func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
+        guard characteristic.uuid == Self.batteryLevel else { return }
+        if error == nil && characteristic.isNotifying {
+            stopBatteryPolling()
+        } else {
+            startBatteryPolling()
+        }
+    }
+
+    private func startBatteryPolling() {
+        guard batteryPoll == nil else { return }
+        batteryPoll = Timer.scheduledTimer(withTimeInterval: Self.batteryPollInterval, repeats: true) { [weak self] _ in
+            guard let self, let p = self.peripheral, let c = self.batteryCharacteristic, p.state == .connected else { return }
+            p.readValue(for: c)
+        }
+    }
+
+    private func stopBatteryPolling() {
+        batteryPoll?.invalidate()
+        batteryPoll = nil
     }
 
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {

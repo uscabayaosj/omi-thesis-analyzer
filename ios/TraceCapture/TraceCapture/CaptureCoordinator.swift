@@ -9,6 +9,8 @@ final class CaptureCoordinator {
 
     var connection = "Starting…"
     var battery: Int?
+    /// When `battery` last came off the radio; nil with no reading.
+    var batteryUpdatedAt: Date?
     var pending = 0
     var lastUpload: Date?
     var lastError: String?
@@ -28,7 +30,12 @@ final class CaptureCoordinator {
         let uploads = UploadQueue.shared
 
         pendant.onState = { [weak self] s in DispatchQueue.main.async { self?.connection = s } }
-        pendant.onBattery = { [weak self] b in DispatchQueue.main.async { self?.battery = b } }
+        pendant.onBattery = { [weak self] b in
+            DispatchQueue.main.async {
+                self?.battery = b
+                self?.batteryUpdatedAt = Date()
+            }
+        }
         pendant.onCodec = { [weak self] c in self?.writer.codec = c }
         pendant.onFrame = { [weak self] frame in
             guard let self, !self.muted else { return }
@@ -37,6 +44,12 @@ final class CaptureCoordinator {
         }
         pendant.onDisconnect = { [weak self] in
             guard let self else { return }
+            // A disconnected pendant has no battery to show; the old number
+            // would otherwise sit on screen as if it were current.
+            DispatchQueue.main.async {
+                self.battery = nil
+                self.batteryUpdatedAt = nil
+            }
             if let file = self.writer.flush() { uploads.enqueue(file: file) }
             self.requestSweep()
         }

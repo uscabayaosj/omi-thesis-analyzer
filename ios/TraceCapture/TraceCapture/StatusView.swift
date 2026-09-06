@@ -91,9 +91,14 @@ struct StatusView: View {
                     .foregroundStyle(Theme.paper)
                 Spacer()
                 if let b = coordinator.battery {
-                    Label("\(b)%", systemImage: batterySymbol(b))
-                        .font(.system(.subheadline, design: .monospaced))
-                        .foregroundStyle(b <= 15 ? Theme.clay : Theme.graphite)
+                    TimelineView(.periodic(from: .now, by: 15)) { context in
+                        let age = context.date.timeIntervalSince(coordinator.batteryUpdatedAt ?? context.date)
+                        let stale = age > Self.batteryStaleAfter
+                        Label(stale ? "\(b)% · \(Int(age / 60)) min ago" : "\(b)%", systemImage: batterySymbol(b))
+                            .font(.system(.subheadline, design: .monospaced))
+                            .foregroundStyle(b <= 15 ? Theme.clay : Theme.graphite)
+                            .opacity(stale ? 0.6 : 1)
+                    }
                 }
             }
             Text(heroDetail)
@@ -104,6 +109,10 @@ struct StatusView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.panel, in: RoundedRectangle(cornerRadius: 12))
     }
+
+    /// The pendant reports every 5 s; a reading older than this means the
+    /// stream has stopped, and the number is shown as history, not status.
+    private static let batteryStaleAfter: TimeInterval = 60
 
     private func batterySymbol(_ level: Int) -> String {
         switch level {
