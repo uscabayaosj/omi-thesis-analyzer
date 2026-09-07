@@ -301,13 +301,15 @@ optimization, not a correctness requirement.
   embeddings: two clear groups, a below-threshold pair staying separate,
   determinism under input reordering, stable `group_id` across two runs where
   the second adds a member.
-- `test/capture-identify.test.mts` — extended to assert that a matched cluster
-  writes no row, an unmatched one writes its embedding, and an empty gallery
-  still short-circuits before the model (the bail is now load-bearing for cost,
-  so it gets a test that fails if someone removes it).
+`identifySpeakers`, the route handlers, and the localStorage mutators get no
+unit tests: this repo's suite is pure-function only (no localStorage stub, no
+HTTP harness, no `sql`/model mocking anywhere in `test/`), and adding that
+machinery is out of scope here. They are covered by `npm run build`'s
+type-check plus the manual verification listed per phase in the plan.
 
-Routes are covered by their pure helpers; no HTTP-level tests exist in this
-repo and this work does not add the harness for them.
+The design pushes the decidable logic — quote selection, clip capping,
+clustering — into pure functions precisely so that this constraint costs
+coverage of glue code only.
 
 ## Rollout
 
