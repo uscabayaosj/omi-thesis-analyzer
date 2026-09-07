@@ -51,7 +51,7 @@ function fallbackTitle(createdAt: string): string {
  *  link or heading: its own title if it has one, else a time-derived stand-in.
  *  Pulled out of `buildVoiceEvidence` so a second caller (the group-members
  *  link list) can't drift from this by restating the `??`/`trim()` logic. */
-export function conversationTitle(conversation: Conversation): string {
+export function voiceConversationTitle(conversation: Conversation): string {
   return conversation.structured?.title?.trim() || fallbackTitle(conversation.created_at);
 }
 
@@ -84,7 +84,7 @@ export function buildVoiceEvidence(conversation: Conversation, speakerId: number
   }, 0);
 
   return {
-    title: conversationTitle(conversation),
+    title: voiceConversationTitle(conversation),
     quotes,
     othersPresent: others,
     lineCount: mine.length,

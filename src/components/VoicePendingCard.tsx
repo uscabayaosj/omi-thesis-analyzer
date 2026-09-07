@@ -7,7 +7,7 @@ import { BUTTON_PRIMARY, optionLabel } from "@/lib/ui";
 import { getAnalysisAge } from "@/lib/storage";
 import {
   buildVoiceEvidence,
-  conversationTitle,
+  voiceConversationTitle,
   loadConversationCached,
   type VoiceEvidence,
 } from "@/lib/voice-evidence";
@@ -181,7 +181,7 @@ function OtherGroupMembers({ members }: { members: PendingSuggestion[] }) {
     others.forEach((m) => {
       loadConversationCached(m.conversationId)
         .then((c) => {
-          if (live) setTitles((cur) => ({ ...cur, [m.conversationId]: conversationTitle(c) }));
+          if (live) setTitles((cur) => ({ ...cur, [m.conversationId]: voiceConversationTitle(c) }));
         })
         .catch(() => {
           // Silent by design — the age-label fallback already makes the link
