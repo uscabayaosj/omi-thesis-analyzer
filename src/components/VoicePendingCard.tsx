@@ -1,8 +1,78 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { type PendingSuggestion, type Person } from "@/lib/people";
 import { BUTTON_PRIMARY, optionLabel } from "@/lib/ui";
 import { getAnalysisAge } from "@/lib/storage";
+import { buildVoiceEvidence, loadConversationCached, type VoiceEvidence } from "@/lib/voice-evidence";
+
+function formatSpeech(seconds: number): string {
+  if (seconds < 60) return `${Math.round(seconds)}s of speech`;
+  return `~${Math.round(seconds / 60)} min of speech`;
+}
+
+/**
+ * The reason this card is answerable at all. Everything here comes from the
+ * conversation the suggestion already points at — what this voice said, who
+ * else was recognized in the room, and a way into the full transcript.
+ *
+ * Failure is silent by design: a card without evidence is exactly the card
+ * that shipped before, and the picker below it still works. An error banner
+ * for a missing enhancement would only be noise stacked on top of a question
+ * the user can still answer.
+ */
+function VoiceEvidenceBlock({ conversationId, speakerId }: { conversationId: string; speakerId: number }) {
+  const [evidence, setEvidence] = useState<VoiceEvidence | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    loadConversationCached(conversationId)
+      .then((c) => live && setEvidence(buildVoiceEvidence(c, speakerId)))
+      .catch(() => live && setFailed(true));
+    return () => {
+      live = false;
+    };
+  }, [conversationId, speakerId]);
+
+  if (failed) return null;
+
+  // Reserves the block's height so the picker does not jump under a thumb
+  // already reaching for it.
+  if (!evidence) return <div className="mb-3 h-24 rounded-lg bg-slate-800/40 animate-pulse" aria-hidden="true" />;
+
+  return (
+    <div className="mb-3 min-w-0">
+      <Link
+        href={`/conversation/${conversationId}`}
+        className="text-sm text-cyan-400 hover:underline break-words"
+      >
+        {evidence.title}
+      </Link>
+      <p className="text-slate-400 text-xs mt-0.5">
+        {evidence.lineCount} {evidence.lineCount === 1 ? "line" : "lines"}
+        {evidence.speechSeconds > 0 && ` · ${formatSpeech(evidence.speechSeconds)}`}
+      </p>
+
+      {evidence.quotes.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {evidence.quotes.map((q, i) => (
+            <li key={i} className="text-sm text-slate-300 border-l-2 border-slate-700 pl-3 break-words">
+              “{q}”
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <p className="text-slate-400 text-xs mt-2 break-words">
+        {evidence.othersPresent.length > 0
+          ? `Also here: ${evidence.othersPresent.join(", ")}`
+          : "No one else was recognized in this conversation."}
+      </p>
+    </div>
+  );
+}
 
 export default function VoicePendingCard({
   suggestion: s,
@@ -31,6 +101,8 @@ export default function VoicePendingCard({
         <div className="text-white font-medium">Unrecognized voice</div>
         <div className="text-slate-400 text-xs">{getAnalysisAge(s.date).label}</div>
       </div>
+
+      <VoiceEvidenceBlock conversationId={s.conversationId} speakerId={s.speakerId ?? 0} />
 
       {showError && (
         <p className="text-red-400 text-xs mb-2 break-words" role="alert">
