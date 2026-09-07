@@ -257,23 +257,22 @@ async function handle(req: NextRequest) {
     // still needs work, and the two can never disagree about what "owing"
     // means.
     //
-    // Termination: call C the number of distinct conversations in `wanted`
-    // and `limit` the clamped batch size (1-5) for this call. Every call that
+    // Termination: call C the number of distinct conversations in `wanted` and
+    // `limit` the clamped batch size (1-5) for this call. Every call that
     // finds anything owing processes a non-empty batch, and every owing pair
     // it touches either settles this call (an embedding is written, or a
     // structural null at the cap) or has its `attempts` strictly incremented
     // by a catch branch (assembly or per-speaker embed). Since a conversation
-    // stays in the owing set until
-    // every one of its speakers has settled, and batches are drawn oldest
-    // first from that set, the oldest `limit` owing conversations are
-    // reselected on every subsequent call until they settle — which, even in
-    // the worst case where every speaker in them fails deterministically on
-    // every attempt, takes at most MAX_EMBED_ATTEMPTS calls (attempts climbs
-    // 1, 2, ... to the cap, at which point isOwing goes false). So the owing
-    // set is retired `limit` conversations at a time, each batch taking at
-    // most MAX_EMBED_ATTEMPTS calls, for a worst-case total of
-    // ceil(C / limit) * MAX_EMBED_ATTEMPTS calls before `remaining` is 0 and
-    // the client's loop exits.
+    // stays in the owing set until every one of its speakers has settled, and
+    // batches are drawn oldest first from that set, the oldest `limit` owing
+    // conversations are reselected on every subsequent call until they
+    // settle — which, even in the worst case where every speaker in them fails
+    // deterministically on every attempt, takes at most MAX_EMBED_ATTEMPTS
+    // calls (attempts climbs 1, 2, ... to the cap, at which point isOwing goes
+    // false). So the owing set is retired `limit` conversations at a time,
+    // each batch taking at most MAX_EMBED_ATTEMPTS calls, for a worst-case
+    // total of ceil(C / limit) * MAX_EMBED_ATTEMPTS calls before `remaining`
+    // is 0 and the client's loop exits.
     const stillOwing = new Set([...wanted.values()].filter(isOwing).map((v) => v.conversationId));
 
     return NextResponse.json({

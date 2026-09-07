@@ -54,6 +54,7 @@ function VoiceEvidenceBlock({ conversationId, speakerId }: { conversationId: str
       if (playing) {
         audio.pause();
       } else {
+        setClipError(null);
         audio.play().catch(handlePlayFailure);
       }
       return;

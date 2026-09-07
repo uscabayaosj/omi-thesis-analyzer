@@ -811,7 +811,7 @@ export default function PeoplePage() {
                 </button>
               </div>
             )}
-            {ungroupedVoices.length > 1 && (
+            {(groupingBusy || ungroupedVoices.length > 1) && (
               <div className="card p-4 mb-3 flex flex-wrap items-center justify-between gap-3">
                 <p className="text-sm text-slate-200">
                   <strong className="font-semibold">{ungroupedVoices.length}</strong> unrecognized voices.
