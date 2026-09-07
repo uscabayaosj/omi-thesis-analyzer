@@ -90,6 +90,20 @@ async function ensureCaptureSchema(sql: Sql): Promise<void> {
       // transcription time (spec: 2026-09-05-speaker-identification-design.md).
       // Added after first deploy, hence ALTER rather than a column in the CREATE.
       sql`ALTER TABLE conversations ADD COLUMN IF NOT EXISTS unmatched_speakers JSONB`,
+      // Speaker embeddings for clusters that matched nobody, kept so the review
+      // queue can tell that N cards are one recurring person rather than N people
+      // (spec: 2026-09-07-unrecognized-voice-review-design.md). Not stored on the
+      // PendingSuggestion: 512 floats per card is ~9KB of JSON in a localStorage
+      // namespace that already carries photos and a quota guard.
+      sql`
+        CREATE TABLE IF NOT EXISTS voice_clusters (
+          conversation_id TEXT NOT NULL,
+          speaker_id      INT  NOT NULL,
+          embedding       JSONB,
+          group_id        TEXT,
+          created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+          PRIMARY KEY (conversation_id, speaker_id)
+        )`,
     ]),
     20_000
   );
@@ -292,6 +306,54 @@ export async function deleteConversations(sql: Sql, ids: string[]): Promise<numb
     sql`DELETE FROM conversations WHERE id = ANY(${ids}) RETURNING id`
   )) as { id: string }[];
   return rows.length;
+}
+
+// ── voice clusters ──
+
+export interface VoiceClusterRow {
+  conversationId: string;
+  speakerId: number;
+  /** null = unembeddable (session gone, or an Omi import with no audio). */
+  embedding: number[] | null;
+  groupId: string | null;
+}
+
+export async function getVoiceClusters(sql: Sql, conversationIds: string[]): Promise<VoiceClusterRow[]> {
+  if (conversationIds.length === 0) return [];
+  const rows = (await withTimeout(sql`
+    SELECT conversation_id, speaker_id, embedding, group_id
+    FROM voice_clusters WHERE conversation_id = ANY(${conversationIds})`)) as {
+    conversation_id: string;
+    speaker_id: number;
+    embedding: number[] | null;
+    group_id: string | null;
+  }[];
+  return rows.map((r) => ({
+    conversationId: r.conversation_id,
+    speakerId: r.speaker_id,
+    embedding: r.embedding,
+    groupId: r.group_id,
+  }));
+}
+
+export async function upsertVoiceCluster(sql: Sql, r: VoiceClusterRow): Promise<void> {
+  await withTimeout(sql`
+    INSERT INTO voice_clusters (conversation_id, speaker_id, embedding, group_id)
+    VALUES (${r.conversationId}, ${r.speakerId},
+            ${r.embedding === null ? null : JSON.stringify(r.embedding)}::jsonb, ${r.groupId})
+    ON CONFLICT (conversation_id, speaker_id) DO UPDATE SET
+      embedding = EXCLUDED.embedding, group_id = EXCLUDED.group_id`);
+}
+
+export async function setVoiceClusterGroups(
+  sql: Sql,
+  groups: { conversationId: string; speakerId: number; groupId: string }[]
+): Promise<void> {
+  for (const g of groups) {
+    await withTimeout(sql`
+      UPDATE voice_clusters SET group_id = ${g.groupId}
+      WHERE conversation_id = ${g.conversationId} AND speaker_id = ${g.speakerId}`);
+  }
 }
 
 // ── status page ──
