@@ -90,6 +90,25 @@ async function ensureCaptureSchema(sql: Sql): Promise<void> {
       // transcription time (spec: 2026-09-05-speaker-identification-design.md).
       // Added after first deploy, hence ALTER rather than a column in the CREATE.
       sql`ALTER TABLE conversations ADD COLUMN IF NOT EXISTS unmatched_speakers JSONB`,
+      // Speaker embeddings for clusters that matched nobody, kept so the review
+      // queue can tell that N cards are one recurring person rather than N people
+      // (spec: 2026-09-07-unrecognized-voice-review-design.md). Not stored on the
+      // PendingSuggestion: 512 floats per card is ~9KB of JSON in a localStorage
+      // namespace that already carries photos and a quota guard.
+      sql`
+        CREATE TABLE IF NOT EXISTS voice_clusters (
+          conversation_id TEXT NOT NULL,
+          speaker_id      INT  NOT NULL,
+          embedding       JSONB,
+          group_id        TEXT,
+          created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+          PRIMARY KEY (conversation_id, speaker_id)
+        )`,
+      // Retry counter for a null-embedding row, so a deterministic embed
+      // failure (malformed PCM, a segment that always throws) settles after a
+      // bounded number of attempts instead of being retried forever. Added
+      // after first deploy, hence ALTER rather than a column in the CREATE.
+      sql`ALTER TABLE voice_clusters ADD COLUMN IF NOT EXISTS attempts INT NOT NULL DEFAULT 0`,
     ]),
     20_000
   );
@@ -108,6 +127,14 @@ export async function ensureCaptureSchemaOnce(sql: Sql): Promise<void> {
 
 const iso = (ms: number) => new Date(ms).toISOString();
 const toMs = (v: unknown) => new Date(v as string).getTime();
+// A TIMESTAMPTZ column comes back from the Neon driver as a `Date` (its
+// pg-types parsers run over every result), never the string its column type
+// might suggest. Callers of getConversationCreatedAt sort these as ISO
+// strings, so this normalizes both shapes it could actually see instead of
+// asserting one with `as` — an `as string` cast here previously lied about
+// the type and let two `.localeCompare` call sites crash on a real `Date`.
+const isoOrEmpty = (v: unknown): string =>
+  v instanceof Date ? v.toISOString() : typeof v === "string" ? v : "";
 
 // ── chunks ──
 
@@ -283,6 +310,18 @@ export async function getConversationRow(sql: Sql, id: string): Promise<Conversa
   return rows[0] ?? null;
 }
 
+/** Just the timestamp, for callers that only need it to order or batch
+ *  conversations — `getConversationRow` selects the full row, `transcript_segments`
+ *  (the heaviest column in the schema) included, which is wasteful when all
+ *  that's wanted is `created_at` for a set of ids. */
+export async function getConversationCreatedAt(sql: Sql, ids: string[]): Promise<Map<string, string>> {
+  if (ids.length === 0) return new Map();
+  const rows = (await withTimeout(
+    sql`SELECT id, created_at FROM conversations WHERE id = ANY(${ids})`
+  )) as { id: string; created_at: unknown }[];
+  return new Map(rows.map((r) => [r.id, isoOrEmpty(r.created_at)]));
+}
+
 /** Permanent: `conversations` is TRACE's own store, not a cache of anything
  *  else, so there is no re-fetch to fall back on. Returns how many rows
  *  actually existed to delete, which may be less than `ids.length`. */
@@ -292,6 +331,59 @@ export async function deleteConversations(sql: Sql, ids: string[]): Promise<numb
     sql`DELETE FROM conversations WHERE id = ANY(${ids}) RETURNING id`
   )) as { id: string }[];
   return rows.length;
+}
+
+// ── voice clusters ──
+
+export interface VoiceClusterRow {
+  conversationId: string;
+  speakerId: number;
+  /** null = unembeddable (session gone, or an Omi import with no audio). */
+  embedding: number[] | null;
+  groupId: string | null;
+  /** Retries spent on a null-embedding row; optional so callers that never
+   *  retry (pipeline.ts's first-pass insert) can omit it and get 0. */
+  attempts?: number;
+}
+
+export async function getVoiceClusters(sql: Sql, conversationIds: string[]): Promise<VoiceClusterRow[]> {
+  if (conversationIds.length === 0) return [];
+  const rows = (await withTimeout(sql`
+    SELECT conversation_id, speaker_id, embedding, group_id, attempts
+    FROM voice_clusters WHERE conversation_id = ANY(${conversationIds})`)) as {
+    conversation_id: string;
+    speaker_id: number;
+    embedding: number[] | null;
+    group_id: string | null;
+    attempts: number;
+  }[];
+  return rows.map((r) => ({
+    conversationId: r.conversation_id,
+    speakerId: r.speaker_id,
+    embedding: r.embedding,
+    groupId: r.group_id,
+    attempts: r.attempts,
+  }));
+}
+
+export async function upsertVoiceCluster(sql: Sql, r: VoiceClusterRow): Promise<void> {
+  await withTimeout(sql`
+    INSERT INTO voice_clusters (conversation_id, speaker_id, embedding, group_id, attempts)
+    VALUES (${r.conversationId}, ${r.speakerId},
+            ${r.embedding === null ? null : JSON.stringify(r.embedding)}::jsonb, ${r.groupId}, ${r.attempts ?? 0})
+    ON CONFLICT (conversation_id, speaker_id) DO UPDATE SET
+      embedding = EXCLUDED.embedding, group_id = EXCLUDED.group_id, attempts = EXCLUDED.attempts`);
+}
+
+export async function setVoiceClusterGroups(
+  sql: Sql,
+  groups: { conversationId: string; speakerId: number; groupId: string }[]
+): Promise<void> {
+  for (const g of groups) {
+    await withTimeout(sql`
+      UPDATE voice_clusters SET group_id = ${g.groupId}
+      WHERE conversation_id = ${g.conversationId} AND speaker_id = ${g.speakerId}`);
+  }
 }
 
 // ── status page ──

@@ -34,14 +34,18 @@ function envNumber(name: string, fallback: number, valid: (v: number) => boolean
 
 const vadThreshold = () => envNumber("CAPTURE_VAD_DBFS", VAD_DEFAULTS.thresholdDbfs);
 // Cosine similarity: only (0, 1] is a meaningful "same speaker" cutoff.
-const voiceMatchThreshold = () => envNumber("CAPTURE_VOICE_MATCH_THRESHOLD", 0.8, (v) => v > 0 && v <= 1);
+export const voiceMatchThreshold = () => envNumber("CAPTURE_VOICE_MATCH_THRESHOLD", 0.8, (v) => v > 0 && v <= 1);
+// Grouping is deliberately stricter than matching: a false match mislabels one
+// conversation, a false group makes the user answer for two people at once.
+export const voiceGroupThreshold = () =>
+  envNumber("CAPTURE_VOICE_GROUP_THRESHOLD", 0.85, (v) => v > 0 && v <= 1);
 const minSpeakerMs = () => envNumber("CAPTURE_MIN_SPEAKER_MS", 3000, (v) => v >= 0);
 
 function blobPathFor(startedAtMs: number, chunkId: string): string {
   return `capture/${new Date(startedAtMs).toISOString().slice(0, 10)}/${chunkId}.trch`;
 }
 
-async function readBlob(path: string): Promise<Uint8Array> {
+export async function readBlob(path: string): Promise<Uint8Array> {
   const res = await get(path, { access: "private" });
   if (!res || res.statusCode !== 200) throw new Error(`blob read failed: ${path}`);
   return new Uint8Array(await new Response(res.stream).arrayBuffer());
@@ -130,7 +134,7 @@ export async function assembleSessionAudio(
   return { assembled: assembleVoiced(pieces), chunkIds, paths };
 }
 
-function extractPeopleWithVoicePrints(raw: unknown): { id: string; name: string; voicePrint?: number[] }[] {
+export function extractPeopleWithVoicePrints(raw: unknown): { id: string; name: string; voicePrint?: number[] }[] {
   if (!raw || typeof raw !== "object") return [];
   const out: { id: string; name: string; voicePrint?: number[] }[] = [];
   for (const [id, v] of Object.entries(raw as Record<string, unknown>)) {
@@ -158,9 +162,9 @@ async function identifySpeakers(
   segments: TranscriptSegment[],
   assembled: ReturnType<typeof assembleVoiced>,
   conversationStartMs: number
-): Promise<{ segments: TranscriptSegment[]; unmatchedSpeakers: number[] }> {
+): Promise<{ segments: TranscriptSegment[]; unmatchedSpeakers: number[]; unmatchedEmbeddings: Map<number, number[]> }> {
   const clusters = groupBySpeaker(segments).filter((c) => c.totalMs >= minSpeakerMs());
-  if (clusters.length === 0) return { segments, unmatchedSpeakers: [] };
+  if (clusters.length === 0) return { segments, unmatchedSpeakers: [], unmatchedEmbeddings: new Map() };
 
   const people = extractPeopleWithVoicePrints(await getNamespaceData(sql, "omi-people"));
   const gallery = people
@@ -170,13 +174,17 @@ async function identifySpeakers(
 
   // Nobody is enrolled yet, so every cluster is unmatched by definition. Bail
   // before the model load and one inference per cluster — compute that cannot
-  // change the answer.
+  // change the answer. Deliberately kept even though it means these clusters
+  // reach voice_clusters only via the backfill: it fires only until the first
+  // voice is named, so the gap it leaves is a bounded, one-time backlog rather
+  // than a standing cost on every session (see the spec's Decisions table).
   if (gallery.length === 0) {
-    return { segments, unmatchedSpeakers: clusters.map((c) => c.speakerId) };
+    return { segments, unmatchedSpeakers: clusters.map((c) => c.speakerId), unmatchedEmbeddings: new Map() };
   }
 
   const matchBySpeakerId = new Map<number, { personId: string; name: string }>();
   const unmatchedSpeakers: number[] = [];
+  const unmatchedEmbeddings = new Map<number, number[]>();
 
   for (const cluster of clusters) {
     try {
@@ -188,6 +196,7 @@ async function identifySpeakers(
         matchBySpeakerId.set(cluster.speakerId, { personId: person.id, name: person.name });
       } else {
         unmatchedSpeakers.push(cluster.speakerId);
+        unmatchedEmbeddings.set(cluster.speakerId, embedding);
       }
     } catch (e) {
       console.error(`speaker identification failed for cluster ${cluster.speakerId}:`, e);
@@ -198,16 +207,26 @@ async function identifySpeakers(
     const m = matchBySpeakerId.get(seg.speaker_id);
     return m ? { ...seg, speaker_name: m.name, speaker_person_id: m.personId } : seg;
   });
-  return { segments: out, unmatchedSpeakers };
+  return { segments: out, unmatchedSpeakers, unmatchedEmbeddings };
 }
 
-async function transcribeSession(sql: Sql, s: SessionState): Promise<ConversationRow> {
+async function transcribeSession(
+  sql: Sql,
+  s: SessionState
+): Promise<{ row: ConversationRow; unmatchedEmbeddings: Map<number, number[]> }> {
   const { assembled, chunkIds, paths } = await assembleSessionAudio(sql, s);
   const utterances = await transcribeWav(encodeWav(assembled.pcm));
   const segments = utterancesToSegments(utterances, assembled.map, s.startedAtMs);
-  const { segments: identified, unmatchedSpeakers } = await identifySpeakers(sql, segments, assembled, s.startedAtMs);
-  return {
-    id: randomUUID(),
+  const { segments: identified, unmatchedSpeakers, unmatchedEmbeddings } = await identifySpeakers(
+    sql,
+    segments,
+    assembled,
+    s.startedAtMs
+  );
+  const id = randomUUID();
+
+  const row: ConversationRow = {
+    id,
     source: "trace",
     created_at: new Date(s.startedAtMs).toISOString(),
     started_at: new Date(s.startedAtMs).toISOString(),
@@ -220,6 +239,7 @@ async function transcribeSession(sql: Sql, s: SessionState): Promise<Conversatio
     audio_refs: chunkIds.map((id) => paths.get(id)).filter((p): p is string => !!p),
     unmatched_speakers: unmatchedSpeakers.length ? unmatchedSpeakers : null,
   };
+  return { row, unmatchedEmbeddings };
 }
 
 /** Never throws — a failure is recorded on the session for the sweep to retry. */
@@ -234,8 +254,24 @@ export async function closeSession(sessionId: string): Promise<void> {
       return;
     }
     await store.setSessionStatus(sql, s.id, "transcribing", { bumpAttempts: true });
-    const row = await transcribeSession(sql, s);
+    const { row, unmatchedEmbeddings } = await transcribeSession(sql, s);
     await store.upsertConversations(sql, [row]);
+
+    // Only now does row.id exist as a conversation. Write the unmatched
+    // clusters here, after the insert, not inside transcribeSession: a retry
+    // re-runs transcribeSession and mints a fresh id, so any cluster row
+    // written against the old id — one that never made it into
+    // upsertConversations — would be orphaned forever, with no foreign key
+    // and no cleanup path to reclaim it. Best-effort per row: a failed
+    // cluster write costs a backfill later, never the session.
+    for (const [speakerId, embedding] of unmatchedEmbeddings) {
+      try {
+        await store.upsertVoiceCluster(sql, { conversationId: row.id, speakerId, embedding, groupId: null });
+      } catch (e) {
+        console.error(`voice cluster write failed for speaker ${speakerId}:`, e);
+      }
+    }
+
     await store.setSessionStatus(sql, s.id, "done", { conversationId: row.id, endedAtMs: s.lastSpeechAtMs });
   } catch (err) {
     console.error(`closeSession ${sessionId} failed:`, err);
