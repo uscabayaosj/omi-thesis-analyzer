@@ -1145,7 +1145,19 @@ In the per-cluster loop, record the embedding on the unmatched branch — it is 
 
 Declare `const unmatchedEmbeddings = new Map<number, number[]>();` beside `unmatchedSpeakers`, and add it to the final return.
 
-- [ ] **Step 2: Persist them in `transcribeSession`**
+- [ ] **Step 2: Persist them once the conversation row has landed**
+
+> **Amended during execution (approved by the project owner).** As first
+> written, this step had `transcribeSession` write the rows itself. But its
+> caller `closeSession` inserts the conversation row *afterwards*, and if that
+> insert throws, the session is retried and `transcribeSession` mints a new
+> id — orphaning the first attempt's rows forever, with no foreign key and no
+> cleanup path. So `transcribeSession` instead returns
+> `{ row, unmatchedEmbeddings }`, and `closeSession` writes the rows after
+> `upsertConversations` succeeds, keeping the per-row try/catch below. The
+> code sketch that follows describes the original ordering; the shipped code
+> (commit `4f3c4eb`) has the write in `closeSession`.
+
 
 `identifySpeakers` does not know the conversation id — it is minted in the returned row — so the write happens in `transcribeSession`, which has both. Replace the `const { segments: identified, unmatchedSpeakers } = await identifySpeakers(...)` line and the return with:
 
