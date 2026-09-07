@@ -135,6 +135,7 @@ function VoiceEvidenceBlock({ conversationId, speakerId }: { conversationId: str
 
 export default function VoicePendingCard({
   suggestion: s,
+  members,
   people,
   showError,
   errorMessage,
@@ -145,6 +146,7 @@ export default function VoicePendingCard({
   onIgnore,
 }: {
   suggestion: PendingSuggestion;
+  members: PendingSuggestion[];
   people: Person[];
   showError: boolean;
   errorMessage?: string | null;
@@ -157,11 +159,19 @@ export default function VoicePendingCard({
   return (
     <div className="card p-4">
       <div className="mb-2">
-        <div className="text-white font-medium">Unrecognized voice</div>
+        <div className="text-white font-medium">
+          {members.length > 1 ? `This voice · ${members.length} conversations` : "Unrecognized voice"}
+        </div>
         <div className="text-slate-400 text-xs">{getAnalysisAge(s.date).label}</div>
       </div>
 
       <VoiceEvidenceBlock conversationId={s.conversationId} speakerId={s.speakerId ?? 0} />
+
+      {members.length > 1 && (
+        <p className="text-slate-400 text-xs mb-3 break-words">
+          Naming this voice resolves all {members.length} cards.
+        </p>
+      )}
 
       {showError && (
         <p className="text-red-400 text-xs mb-2 break-words" role="alert">

@@ -435,8 +435,44 @@ export default function PeoplePage() {
     }
   };
 
-  const doIgnoreVoice = (s: PendingSuggestion) => {
-    removePending(s.id);
+  /** Enrolls once, from the most recent member. Enrolling from all N would mean
+   *  N audio assemblies for one tap; picking the *longest* sample instead would
+   *  mean fetching every member's transcript just to measure it, which is work
+   *  on a path that must stay free. Most-recent is known for nothing, is the
+   *  sample the user is most likely to have just heard, and averageEmbeddings
+   *  strengthens the print on every later conversation anyway.
+   *
+   *  `getPending` sorts newest-first and the buckets preserve that order, so
+   *  members[0] is the most recent. Nothing is removed unless the enrollment
+   *  actually succeeded. */
+  const acceptVoiceGroupInto = async (members: PendingSuggestion[], personId: string) => {
+    const lead = members[0];
+    const ok = await acceptVoiceInto(lead, personId);
+    if (!ok) return;
+    for (const m of members) if (m.id !== lead.id) removePending(m.id);
+    refresh();
+  };
+
+  const acceptVoiceGroupAsNew = async (members: PendingSuggestion[], name: string) => {
+    const lead = members[0];
+    const before = new Set(getPending().map((p) => p.id));
+    await acceptVoiceAsNew(lead, name);
+    // acceptVoiceAsNew removes its own suggestion only on success; if it is gone
+    // the enrollment landed and the rest of the group is the same voice.
+    if (getPending().some((p) => p.id === lead.id)) return;
+    for (const m of members) if (before.has(m.id) && m.id !== lead.id) removePending(m.id);
+    refresh();
+  };
+
+  const ignoreVoiceGroup = (members: PendingSuggestion[]) => {
+    for (const m of members) removePending(m.id);
+    offerUndo(
+      members.length === 1 ? "Voice ignored." : `${members.length} cards ignored.`,
+      () => {
+        for (const m of members) restorePending(m);
+        refresh();
+      }
+    );
     refresh();
   };
 
@@ -489,6 +525,36 @@ export default function PeoplePage() {
   };
 
   const ungroupedVoices = pending.filter((s) => s.kind === "voice" && !s.voiceGroupId);
+
+  /** One card per voice, not per conversation. An ungrouped card is its own
+   *  bucket, so this is a no-op until grouping has run. The representative is
+   *  the most recent member, so the evidence shown is the freshest sample. */
+  const voiceGroups = useMemo(() => {
+    const buckets = new Map<string, PendingSuggestion[]>();
+    for (const s of pending) {
+      if (s.kind !== "voice") continue;
+      const key = s.voiceGroupId ?? s.id;
+      buckets.set(key, [...(buckets.get(key) ?? []), s]);
+    }
+    return buckets;
+  }, [pending]);
+
+  const reviewRows = useMemo(() => {
+    const seen = new Set<string>();
+    const rows: { key: string; suggestion: PendingSuggestion; members: PendingSuggestion[] }[] = [];
+    for (const s of pending) {
+      if (s.kind !== "voice") {
+        rows.push({ key: s.id, suggestion: s, members: [s] });
+        continue;
+      }
+      const key = s.voiceGroupId ?? s.id;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const members = voiceGroups.get(key) ?? [s];
+      rows.push({ key, suggestion: members[0], members });
+    }
+    return rows;
+  }, [pending, voiceGroups]);
 
   /** Walks the backfill route until it reports nothing left. Deliberately manual:
    *  one audio assembly per conversation plus one inference per speaker is the
@@ -687,23 +753,24 @@ export default function PeoplePage() {
               <p role="status" className="text-sm text-slate-300 mb-3">{batchResult}</p>
             )}
             <div className="space-y-3">
-              {pending.map((s) =>
+              {reviewRows.map(({ key, suggestion: s, members }) =>
                 s.kind === "voice" ? (
                   <VoicePendingCard
-                    key={s.id}
+                    key={key}
                     suggestion={s}
+                    members={members}
                     people={people}
                     showError={acceptErrorId === s.id}
                     errorMessage={acceptErrorId === s.id ? acceptErrorMsg : null}
                     newName={voiceNameDraft[s.id] ?? ""}
                     onNewNameChange={(v) => setVoiceNameDraft((cur) => ({ ...cur, [s.id]: v }))}
-                    onAcceptExisting={(id) => acceptVoiceInto(s, id)}
-                    onAcceptNew={(name) => acceptVoiceAsNew(s, name)}
-                    onIgnore={() => doIgnoreVoice(s)}
+                    onAcceptExisting={(id) => acceptVoiceGroupInto(members, id)}
+                    onAcceptNew={(name) => acceptVoiceGroupAsNew(members, name)}
+                    onIgnore={() => ignoreVoiceGroup(members)}
                   />
                 ) : (
                   <PendingCard
-                    key={s.id}
+                    key={key}
                     suggestion={s}
                     people={people}
                     showError={acceptErrorId === s.id}
