@@ -47,7 +47,11 @@ export async function embedAudio(pcm: Float32Array): Promise<number[]> {
   const { processor, model } = await modelPromise;
   // Bounded here rather than at each call site: the limit is a property of the
   // model, not of any one caller, and every caller had gotten it wrong. See
-  // capPcmForEmbedding for why an unbounded input is not survivable.
+  // capPcmForEmbedding for why an unbounded input is not survivable. Callers
+  // now cap their SEGMENTS to EMBED_MAX_MS before decoding any audio at all
+  // (clip.ts's capSpeakerSegments), so this is a backstop rather than the
+  // primary bound — defence in depth, kept unconditionally regardless of
+  // whether the caller upstream remembered to cap.
   const inputs = await processor(capPcmForEmbedding(pcm));
   const { embeddings } = await model(inputs);
   return Array.from(embeddings.data as Float32Array);

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStore, getNamespaceData, putNamespaceData } from "@/lib/kv";
 import { ensureCaptureSchemaOnce, getSessionByConversationId, getConversationRow } from "@/lib/capture/store";
-import { assembleSessionAudio } from "@/lib/capture/pipeline";
-import { groupBySpeaker, extractSpeakerPcm, int16ToFloat32, averageEmbeddings } from "@/lib/capture/identify";
+import { assembleTargetedAudio } from "@/lib/capture/pipeline";
+import { groupBySpeaker, segmentsToAbsRanges, int16ToFloat32, averageEmbeddings } from "@/lib/capture/identify";
 import { embedAudio } from "@/lib/capture/embed";
+import { capSpeakerSegments, EMBED_MAX_MS } from "@/lib/capture/clip";
 import { friendlyError } from "@/lib/api-error";
 
 export const maxDuration = 300;
@@ -93,8 +94,14 @@ async function handleEnroll(req: NextRequest) {
       return NextResponse.json({ error: `person ${body.personId} not found` }, { status: 404 });
     }
 
-    const { assembled } = await assembleSessionAudio(sql, session);
-    const pcm = extractSpeakerPcm(assembled, session.startedAtMs, cluster);
+    // Cap to the embedding budget (EMBED_MAX_MS, derived from
+    // EMBED_MAX_SAMPLES) BEFORE decoding anything — the segments going in,
+    // not the samples coming out — then decode only the chunks that capped
+    // audio actually touches. See assembleTargetedAudio's doc comment
+    // (pipeline.ts) for why this is not byte-identical to slicing the old
+    // full session assembly when a segment spans a chunk boundary.
+    const ranges = segmentsToAbsRanges(session.startedAtMs, capSpeakerSegments(cluster.segments, EMBED_MAX_MS));
+    const { pcm } = await assembleTargetedAudio(sql, session, ranges);
     const embedding = await embedAudio(int16ToFloat32(pcm));
 
     const peopleRaw = (await getNamespaceData(sql, "omi-people")) as Record<string, unknown> | null;

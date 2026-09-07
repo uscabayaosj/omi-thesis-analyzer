@@ -1,5 +1,12 @@
 import type { TranscriptSegment } from "./types.ts";
-import { assembleVoiced, absToOutMs, SAMPLE_RATE, type Assembled, type VoicedPiece } from "./assemble.ts";
+import {
+  assembleVoiced,
+  absToOutMs,
+  SAMPLE_RATE,
+  type Assembled,
+  type VoicedPiece,
+  type WantedRange,
+} from "./assemble.ts";
 
 /**
  * Pure speaker-matching logic: no PCM decoding, no ML model, no network —
@@ -110,4 +117,21 @@ export function extractSpeakerPcm(
     };
   });
   return assembleVoiced(pieces, 200).pcm;
+}
+
+/** Turns a speaker cluster's segment timestamps (seconds, relative to the
+ *  conversation start) into absolute wall-clock ranges — the shape the
+ *  targeted-assembly path wants (see WantedRange / stitchWantedAudio in
+ *  assemble.ts, and assembleTargetedAudio in pipeline.ts). Same arithmetic
+ *  extractSpeakerPcm above uses to locate a segment in real time; split out
+ *  because the targeted path has no assembled buffer to slice — it decodes
+ *  only the chunks these ranges point into. */
+export function segmentsToAbsRanges(
+  conversationStartMs: number,
+  segments: { start: number; end: number }[]
+): WantedRange[] {
+  return segments.map((seg) => ({
+    startMs: conversationStartMs + seg.start * 1000,
+    endMs: conversationStartMs + seg.end * 1000,
+  }));
 }

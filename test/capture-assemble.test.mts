@@ -1,6 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { assembleVoiced, outToAbsMs, absToOutMs, encodeWav } from "../src/lib/capture/assemble.ts";
+import {
+  assembleVoiced,
+  outToAbsMs,
+  absToOutMs,
+  encodeWav,
+  spansOverlappingRanges,
+  stitchWantedAudio,
+  type DecodedChunkPcm,
+} from "../src/lib/capture/assemble.ts";
+import type { AbsSpan } from "../src/lib/capture/types.ts";
 
 const s = (ms: number) => Math.round((ms / 1000) * 16000);
 const piece = (absStartMs: number, ms: number, fill: number) => ({
@@ -51,4 +60,133 @@ test("absToOutMs is the inverse of outToAbsMs", () => {
   assert.equal(absToOutMs(map, 7_000), 500); // in the real-time gap → snaps to end of piece 1
   assert.equal(absToOutMs(map, 10_100), 1_000);
   assert.equal(absToOutMs(map, 20_000), 1_900); // past the end → end of last piece
+});
+
+// ── targeted assembly (spansOverlappingRanges / stitchWantedAudio) ──
+//
+// Pure logic behind the targeted-assembly path (assembleTargetedAudio /
+// decodeChunksForRanges in pipeline.ts), used by speaker-audio, enroll-voice
+// and cluster-voices to decode only the chunks a wanted speaker actually
+// touches instead of a whole session. Everything here works in absolute
+// wall-clock ms, deliberately never OffsetMapEntry coordinates — see the
+// "Targeted assembly" comment above stitchWantedAudio's definition for why
+// reusing those against a decoded subset would silently misalign.
+
+const chunk = (startedAtMs: number, durationMs: number, fill: number): DecodedChunkPcm => ({
+  startedAtMs,
+  pcm: new Int16Array(s(durationMs)).fill(fill),
+});
+
+test("spansOverlappingRanges keeps only spans that overlap a wanted range", () => {
+  const spans: AbsSpan[] = [
+    { chunkId: "c1", startMs: 1_000, endMs: 2_000 },
+    { chunkId: "c2", startMs: 5_000, endMs: 6_000 },
+    { chunkId: "c3", startMs: 9_000, endMs: 9_500 }, // touches no range below
+  ];
+  const ranges = [
+    { startMs: 1_500, endMs: 1_800 },
+    { startMs: 5_900, endMs: 6_200 },
+  ];
+  assert.deepEqual(spansOverlappingRanges(spans, ranges), [spans[0], spans[1]]);
+});
+
+test("spansOverlappingRanges returns nothing for a range with no overlapping span", () => {
+  const spans: AbsSpan[] = [{ chunkId: "c1", startMs: 1_000, endMs: 2_000 }];
+  assert.deepEqual(spansOverlappingRanges(spans, [{ startMs: 100_000, endMs: 100_100 }]), []);
+});
+
+test("spansOverlappingRanges returns nothing for an empty range list", () => {
+  const spans: AbsSpan[] = [{ chunkId: "c1", startMs: 1_000, endMs: 2_000 }];
+  assert.deepEqual(spansOverlappingRanges(spans, []), []);
+});
+
+test("stitchWantedAudio: a range fully inside one chunk", () => {
+  const spans: AbsSpan[] = [{ chunkId: "c1", startMs: 0, endMs: 2_000 }];
+  const decoded = new Map([["c1", chunk(0, 2_000, 3)]]);
+  const out = stitchWantedAudio(decoded, spans, [{ startMs: 500, endMs: 1_000 }]);
+  assert.equal(out.length, s(500));
+  assert.ok(out.every((v) => v === 3));
+});
+
+test("stitchWantedAudio: a range spanning two chunks joins the real audio with no filler", () => {
+  const spans: AbsSpan[] = [
+    { chunkId: "c1", startMs: 0, endMs: 1_000 },
+    { chunkId: "c2", startMs: 1_000, endMs: 2_000 },
+  ];
+  const decoded = new Map([
+    ["c1", chunk(0, 1_000, 7)],
+    ["c2", chunk(1_000, 1_000, 9)],
+  ]);
+  // Straddles the 1_000ms boundary: 200ms from c1, 300ms from c2.
+  const out = stitchWantedAudio(decoded, spans, [{ startMs: 800, endMs: 1_300 }]);
+  assert.equal(out.length, s(200) + s(300));
+  assert.ok(out.subarray(0, s(200)).every((v) => v === 7), "c1's tail, unpadded");
+  assert.ok(out.subarray(s(200)).every((v) => v === 9), "c2's head, joined directly — no synthetic gap");
+});
+
+test("stitchWantedAudio: a range with no overlapping span contributes nothing (not silence)", () => {
+  const spans: AbsSpan[] = [{ chunkId: "c1", startMs: 0, endMs: 1_000 }];
+  const decoded = new Map([["c1", chunk(0, 1_000, 5)]]);
+  const out = stitchWantedAudio(decoded, spans, [
+    { startMs: 5_000, endMs: 5_200 }, // no span here
+    { startMs: 100, endMs: 300 },
+  ]);
+  // Only the second range produced audio; no gap is spent on the empty one.
+  assert.equal(out.length, s(200));
+  assert.ok(out.every((v) => v === 5));
+});
+
+test("stitchWantedAudio: ranges out of order are stitched in time order", () => {
+  const spans: AbsSpan[] = [
+    { chunkId: "later", startMs: 5_000, endMs: 5_200 },
+    { chunkId: "earlier", startMs: 0, endMs: 200 },
+  ];
+  const decoded = new Map([
+    ["later", chunk(5_000, 200, 4)],
+    ["earlier", chunk(0, 200, 2)],
+  ]);
+  // Passed later-range-first, on purpose.
+  const out = stitchWantedAudio(
+    decoded,
+    spans,
+    [
+      { startMs: 5_000, endMs: 5_200 },
+      { startMs: 0, endMs: 200 },
+    ],
+    400
+  );
+  assert.equal(out.length, s(200) + s(400) + s(200));
+  assert.ok(out.subarray(0, s(200)).every((v) => v === 2), "earlier range comes first");
+  assert.ok(out.subarray(s(200), s(200) + s(400)).every((v) => v === 0), "gap is silence");
+  assert.ok(out.subarray(s(200) + s(400)).every((v) => v === 4), "later range comes last");
+});
+
+test("stitchWantedAudio clamps to a chunk whose decoded PCM is shorter than its span", () => {
+  const spans: AbsSpan[] = [{ chunkId: "c1", startMs: 0, endMs: 2_000 }]; // span claims 2s...
+  const decoded = new Map([["c1", chunk(0, 1_000, 6)]]); // ...but only 1s actually decoded
+  const out = stitchWantedAudio(decoded, spans, [{ startMs: 0, endMs: 2_000 }]);
+  assert.equal(out.length, s(1_000), "clamped to what was actually decoded, not the span's claimed end");
+  assert.ok(out.every((v) => v === 6));
+});
+
+test("stitchWantedAudio returns an empty buffer for an empty range list", () => {
+  const spans: AbsSpan[] = [{ chunkId: "c1", startMs: 0, endMs: 1_000 }];
+  const decoded = new Map([["c1", chunk(0, 1_000, 1)]]);
+  assert.equal(stitchWantedAudio(decoded, spans, []).length, 0);
+});
+
+test("stitchWantedAudio defaults to a 200ms gap between separate ranges", () => {
+  const spans: AbsSpan[] = [
+    { chunkId: "a", startMs: 0, endMs: 100 },
+    { chunkId: "b", startMs: 1_000, endMs: 1_100 },
+  ];
+  const decoded = new Map([
+    ["a", chunk(0, 100, 1)],
+    ["b", chunk(1_000, 100, 1)],
+  ]);
+  const out = stitchWantedAudio(decoded, spans, [
+    { startMs: 0, endMs: 100 },
+    { startMs: 1_000, endMs: 1_100 },
+  ]);
+  assert.equal(out.length, s(100) + s(200) + s(100));
 });

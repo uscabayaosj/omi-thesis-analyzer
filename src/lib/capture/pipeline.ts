@@ -5,7 +5,15 @@ import { parseChunk } from "./container";
 import { decodeChunk, decodeFrames } from "./decode";
 import { detectSpeech, levelStats, VAD_DEFAULTS } from "./vad";
 import { placeSpan, isStale, disposition, SESSION_GAP_MS } from "./sessions";
-import { assembleVoiced, encodeWav, type VoicedPiece } from "./assemble";
+import {
+  assembleVoiced,
+  encodeWav,
+  spansOverlappingRanges,
+  stitchWantedAudio,
+  type VoicedPiece,
+  type WantedRange,
+  type DecodedChunkPcm,
+} from "./assemble";
 import { transcribeWav, utterancesToSegments } from "./transcribe";
 import { groupBySpeaker, bestMatch, extractSpeakerPcm, int16ToFloat32 } from "./identify";
 import { embedAudio } from "./embed";
@@ -132,6 +140,70 @@ export async function assembleSessionAudio(
     pieces.push({ span: sp, pcm: d.pcm.subarray(Math.max(0, from), Math.min(d.pcm.length, to)) });
   }
   return { assembled: assembleVoiced(pieces), chunkIds, paths };
+}
+
+/**
+ * Targeted counterpart to assembleSessionAudio, for callers that want only a
+ * few seconds of ONE speaker — speaker-audio's preview clip, enroll-voice,
+ * and cluster-voices' backfill — rather than the whole session Deepgram
+ * needs. assembleSessionAudio decodes every chunk the session ever touched;
+ * measured in production that was ~110s per conversation and enough peak
+ * memory to SIGKILL (exit 137) a batch of two, to extract at most 30s of one
+ * voice. This decodes only the chunks whose spans overlap `ranges`.
+ *
+ * IO split into two steps, both exported: decodeChunksForRanges pays for the
+ * Blob reads + Opus decode once for a whole SET of ranges (so a caller that
+ * needs several speakers out of the SAME conversation — cluster-voices — can
+ * decode the union once and reuse it, exactly like the old per-conversation
+ * assembleSessionAudio reuse, just scoped to what's wanted instead of the
+ * whole session); stitchWantedAudio (assemble.ts, pure) then slices each
+ * caller's own ranges back out of that shared decode. assembleTargetedAudio
+ * below composes both for the common single-caller case.
+ *
+ * Works entirely in absolute wall-clock ms — see the WantedRange /
+ * spansOverlappingRanges / stitchWantedAudio doc comments in assemble.ts for
+ * why: reusing assembleVoiced's accumulated OffsetMapEntry coordinates
+ * against a decoded SUBSET of a session's pieces would silently misalign,
+ * since every offset in that map depends on which other pieces were
+ * assembled alongside it. transcribeSession and identifySpeakers must keep
+ * calling assembleSessionAudio and its OffsetMapEntry map unchanged — this
+ * function is additive, not a replacement, and nothing here should ever be
+ * wired into that path.
+ */
+export async function decodeChunksForRanges(
+  sql: Sql,
+  spans: AbsSpan[],
+  ranges: WantedRange[]
+): Promise<{ decoded: Map<string, DecodedChunkPcm>; chunkIds: string[] }> {
+  const chunkIds = Array.from(new Set(spansOverlappingRanges(spans, ranges).map((sp) => sp.chunkId)));
+  const paths = await store.getChunkBlobPaths(sql, chunkIds);
+  const decoded = new Map<string, DecodedChunkPcm>();
+  for (const id of chunkIds) {
+    const path = paths.get(id);
+    if (!path) continue;
+    const chunk = parseChunk(await readBlob(path));
+    decoded.set(id, { startedAtMs: chunk.startedAtMs, pcm: decodeFrames(chunk.frames, chunk.codec) });
+  }
+  return { decoded, chunkIds };
+}
+
+export interface TargetedAudioResult {
+  pcm: Int16Array;
+  chunkIds: string[];
+}
+
+/** decodeChunksForRanges + stitchWantedAudio pre-composed, for a caller that
+ *  only needs one set of ranges out of one session (speaker-audio,
+ *  enroll-voice). See decodeChunksForRanges's doc comment for the full
+ *  design and the constraint that this must never replace
+ *  assembleSessionAudio on the transcription path. */
+export async function assembleTargetedAudio(
+  sql: Sql,
+  session: SessionState,
+  ranges: WantedRange[]
+): Promise<TargetedAudioResult> {
+  const { decoded, chunkIds } = await decodeChunksForRanges(sql, session.spans, ranges);
+  return { pcm: stitchWantedAudio(decoded, session.spans, ranges), chunkIds };
 }
 
 export function extractPeopleWithVoicePrints(raw: unknown): { id: string; name: string; voicePrint?: number[] }[] {
