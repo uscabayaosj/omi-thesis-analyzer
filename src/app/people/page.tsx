@@ -15,6 +15,7 @@ import {
   ignoreName,
   removePending,
   restorePending,
+  setVoiceGroups,
   unignoreName,
   type Meeting,
   type PendingSuggestion,
@@ -146,6 +147,8 @@ export default function PeoplePage() {
   const [acceptErrorMsg, setAcceptErrorMsg] = useState<string | null>(null);
   const [voiceNameDraft, setVoiceNameDraft] = useState<Record<string, string>>({});
   const [batchResult, setBatchResult] = useState<string | null>(null);
+  const [groupingBusy, setGroupingBusy] = useState(false);
+  const [groupingNote, setGroupingNote] = useState<string | null>(null);
   const { offerUndo } = useUndoOffer();
   // Collapsed by default so the directory, search, and view toggle aren't
   // buried under the full review queue on first paint — the count banner keeps
@@ -485,6 +488,52 @@ export default function PeoplePage() {
     refresh();
   };
 
+  const ungroupedVoices = pending.filter((s) => s.kind === "voice" && !s.voiceGroupId);
+
+  /** Walks the backfill route until it reports nothing left. Deliberately manual:
+   *  one audio assembly per conversation plus one inference per speaker is the
+   *  most expensive thing in this app, and it must never start on its own. */
+  const runVoiceGrouping = async () => {
+    const voices = pending
+      .filter((s) => s.kind === "voice" && typeof s.speakerId === "number")
+      .map((s) => ({ conversationId: s.conversationId, speakerId: s.speakerId!, id: s.id }));
+    if (voices.length === 0) return;
+
+    setGroupingBusy(true);
+    setGroupingNote("Grouping voices…");
+    const byKey = new Map(voices.map((v) => [`${v.conversationId}:${v.speakerId}`, v.id]));
+    let total = 0;
+
+    try {
+      for (;;) {
+        const res = await fetchJson<{ processed: number; remaining: number; groups: Record<string, string> }>(
+          "/api/capture/cluster-voices",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ voices: voices.map(({ conversationId, speakerId }) => ({ conversationId, speakerId })) }),
+          }
+        );
+
+        setVoiceGroups(
+          Object.entries(res.groups)
+            .map(([key, groupId]) => ({ id: byKey.get(key), groupId }))
+            .filter((e): e is { id: string; groupId: string } => !!e.id)
+        );
+        refresh();
+
+        total += res.processed;
+        if (res.remaining === 0) break;
+        setGroupingNote(`Grouping voices — ${total} of ${total + res.remaining} conversations…`);
+      }
+      setGroupingNote("Voices grouped.");
+    } catch (e) {
+      setGroupingNote(e instanceof Error ? e.message : "Couldn’t finish grouping — try again.");
+    } finally {
+      setGroupingBusy(false);
+    }
+  };
+
   // ── add person ──
 
   const creatingRef = useRef(false);
@@ -619,6 +668,20 @@ export default function PeoplePage() {
                   Add all {confidentMatches.length}
                 </button>
               </div>
+            )}
+            {ungroupedVoices.length > 1 && (
+              <div className="card p-4 mb-3 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-slate-200">
+                  <strong className="font-semibold">{ungroupedVoices.length}</strong> unrecognized voices.
+                  Group them and the same person across conversations becomes one card.
+                </p>
+                <button onClick={runVoiceGrouping} disabled={groupingBusy} className={`${BUTTON_PRIMARY} py-2 px-4 disabled:opacity-50`}>
+                  {groupingBusy ? "Grouping…" : "Group similar voices"}
+                </button>
+              </div>
+            )}
+            {groupingNote && (
+              <p role="status" className="text-sm text-slate-300 mb-3">{groupingNote}</p>
             )}
             {batchResult && (
               <p role="status" className="text-sm text-slate-300 mb-3">{batchResult}</p>
