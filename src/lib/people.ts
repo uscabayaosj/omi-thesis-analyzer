@@ -59,6 +59,10 @@ export interface PendingSuggestion {
   candidateIds?: string[];
   /** Set only for kind: "voice" — the diarized speaker_id this card is about. */
   speakerId?: number;
+  /** Set only for kind: "voice", and only once grouping has run. Cards sharing
+   *  a value are the same voice and are reviewed as one. Absent means
+   *  ungrouped — which is every record predating this field. */
+  voiceGroupId?: string;
   timestamp: string;
 }
 
@@ -399,6 +403,23 @@ export function removePending(id: string): void {
   if (!(id in map)) return;
   map[id] = { deleted: true, timestamp: new Date().toISOString() } satisfies Tombstone;
   writeMap(PENDING_NS, map);
+}
+
+/** One write for the whole batch. Grouping assigns a value to every voice card
+ *  at once, and this namespace re-serializes wholesale on every write and
+ *  schedules a push — 44 individual writes would be 44 of both. */
+export function setVoiceGroups(entries: { id: string; groupId: string }[]): void {
+  if (entries.length === 0) return;
+  const map = pruneTombstones(readMap<PendingSuggestion | Tombstone>(PENDING_NS));
+  let changed = false;
+  for (const { id, groupId } of entries) {
+    const cur = map[id];
+    if (!isPendingRecord(cur)) continue;
+    if (cur.voiceGroupId === groupId) continue;
+    map[id] = { ...cur, voiceGroupId: groupId, timestamp: new Date().toISOString() };
+    changed = true;
+  }
+  if (changed) writeMap(PENDING_NS, map);
 }
 
 /**
