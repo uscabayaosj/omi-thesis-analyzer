@@ -224,9 +224,37 @@ async function handle(req: NextRequest) {
       })
     );
 
+    // `remaining` is a post-processing count, not the pre-processing
+    // `byCreated.length - batch.length` gap: that snapshot is 0 whenever the
+    // whole owing set fit in one batch (always true of the last call, often
+    // true of the first), which would hide a pair that just landed below the
+    // attempts cap in the catch branch and is still genuinely owing. `known`
+    // was kept current by every write above, so re-filtering `wanted` with
+    // the same `isOwing` predicate that chose the batch reports what actually
+    // still needs work, and the two can never disagree about what "owing"
+    // means.
+    //
+    // Termination: call C the number of distinct conversations in `wanted`
+    // and `limit` the clamped batch size (1-5) for this call. Every call that
+    // finds anything owing processes a non-empty batch, and every owing pair
+    // it touches either settles this call (an embedding is written, or a
+    // structural null at the cap) or has its `attempts` strictly incremented
+    // by the catch branch. Since a conversation stays in the owing set until
+    // every one of its speakers has settled, and batches are drawn oldest
+    // first from that set, the oldest `limit` owing conversations are
+    // reselected on every subsequent call until they settle — which, even in
+    // the worst case where every speaker in them fails deterministically on
+    // every attempt, takes at most MAX_EMBED_ATTEMPTS calls (attempts climbs
+    // 1, 2, ... to the cap, at which point isOwing goes false). So the owing
+    // set is retired `limit` conversations at a time, each batch taking at
+    // most MAX_EMBED_ATTEMPTS calls, for a worst-case total of
+    // ceil(C / limit) * MAX_EMBED_ATTEMPTS calls before `remaining` is 0 and
+    // the client's loop exits.
+    const stillOwing = new Set([...wanted.values()].filter(isOwing).map((v) => v.conversationId));
+
     return NextResponse.json({
       processed: batch.length,
-      remaining: Math.max(0, byCreated.length - batch.length),
+      remaining: stillOwing.size,
       groups,
     });
   } catch (err) {
