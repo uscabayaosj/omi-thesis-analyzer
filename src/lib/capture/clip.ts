@@ -30,18 +30,34 @@ export function capSpeakerSegments<T extends { start: number; end: number }>(
 /**
  * How much of a speaker's audio the embedding model is allowed to see.
  *
- * WavLM's feature extractor downsamples 16kHz audio by 320x and its
- * self-attention is quadratic in the resulting frames, so the cost of one
- * embedding grows with the SQUARE of how long that speaker talked. Feeding it
- * a whole cluster is what SIGKILLed enroll-voice and cluster-voices in
- * production (exit 137): twenty minutes of speech is ~19.2M samples, ~60k
- * frames, and an attention matrix wanting ~14GB on its own. No instance size
- * survives an unbounded input — it has to be bounded here.
+ * WavLM downsamples 16kHz by 320x (50 frames/s) and its self-attention is
+ * quadratic in the resulting frames, so one embedding's cost grows with the
+ * SQUARE of how long that speaker talked. The scores tensor is
+ * (1, heads=12, T, T) float32 = 48*T^2 bytes, and WavLM's gated relative
+ * position bias is itself (12, T, T), computed at layer 0 and carried
+ * resident through all 12 layers — so two T-by-T tensors are live at once.
  *
- * 30s is generous for the job. Speaker-verification embeddings saturate after
- * a few seconds of voiced audio, and this input is already voiced-only
- * (assembleVoiced strips the silence between segments), so 30s is 30s of
- * actual speech. At that length the attention matrix is ~9MB.
+ *     30s  ->  T=1,500   ~108 MB      <- this cap
+ *     60s  ->  T=3,000   ~432 MB
+ *     2min ->  T=6,000   ~1.73 GB     <- past the 2 GB instance
+ *    20min ->  T=60,000  ~173 GB
+ *
+ * Feeding it a whole cluster is what SIGKILLed enroll-voice and
+ * cluster-voices in production (exit 137). Against a 2 GB instance, after the
+ * ~400 MB fp32 model, ~150 MB of Node/ORT baseline and the assembled audio,
+ * the kill boundary lands around T=3,200-4,000 — roughly 65-80 SECONDS of one
+ * speaker. That is an ordinary speaker in an ordinary conversation, not an
+ * outlier, which is why this failed every time rather than occasionally.
+ *
+ * DO NOT RAISE THIS ABOVE ~60s WITHOUT RAISING THE INSTANCE MEMORY FIRST.
+ * The numbers above are the whole tensor; reasoning per-head understates them
+ * by 12x, which is exactly the mistake that shipped this incident.
+ *
+ * 30s is generous for the job regardless: verification embeddings are near
+ * asymptotic by 30s and degrade mainly below ~5s, and this input is
+ * voiced-only, so the window is close to 30s of real speech (assembleVoiced
+ * does splice 200ms between segments, so a backchannel-heavy speaker loses a
+ * little of it).
  */
 export const EMBED_MAX_SAMPLES = 30 * SAMPLE_RATE;
 
