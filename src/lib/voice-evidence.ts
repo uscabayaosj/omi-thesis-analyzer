@@ -1,6 +1,7 @@
 "use client";
 
 import type { Conversation, TranscriptSegment } from "./conversation-types";
+import { fetchJson } from "./fetch-json.ts";
 
 /** Everything the review card needs to let a person answer "who is this?",
  *  derived entirely from the conversation the suggestion already points at.
@@ -82,4 +83,25 @@ export function buildVoiceEvidence(conversation: Conversation, speakerId: number
     speechSeconds,
     canPlay: conversation.source === "trace",
   };
+}
+
+/** One in-flight request per conversation, shared by every card that needs it.
+ *  A 44-card queue can span far fewer conversations, and grouping makes several
+ *  cards share one outright. The route is `immutable, max-age=86400` for a
+ *  finished conversation, so a resolved entry is kept for the page's lifetime;
+ *  a rejected one is evicted so the next card can retry. */
+const conversationCache = new Map<string, Promise<Conversation>>();
+
+export function loadConversationCached(id: string): Promise<Conversation> {
+  const hit = conversationCache.get(id);
+  if (hit) return hit;
+  const p = fetchJson<Conversation>(`/api/conversations/${id}`);
+  p.catch(() => conversationCache.delete(id));
+  conversationCache.set(id, p);
+  return p;
+}
+
+/** Test-only. Nothing in the app clears this — a page load is the reset. */
+export function resetConversationCache(): void {
+  conversationCache.clear();
 }
