@@ -15,7 +15,7 @@
 - **No LLM call anywhere in this work.** Every fact on the card comes from data already stored.
 - **No expensive work on page load.** No audio assembly, decode, or embedding may run without an explicit user tap. No preloading of clips.
 - **Degrade, never block.** A failed evidence fetch, a missing clip, or an unavailable store leaves the card's picker/Add/Ignore fully working.
-- **Tests are pure-function only.** This repo has no localStorage stub, no HTTP harness, and no `sql`/model mocking in `test/`. Do not add that machinery. Route handlers, `identifySpeakers`, and localStorage mutators are verified by `npm run build` plus the manual checks listed per phase.
+- **Tests are pure-function only.** This repo has no localStorage stub, no route-invocation harness, and no `sql`/model mocking in `test/`. Do not add that machinery. Route handlers, `identifySpeakers`, and localStorage mutators are verified by `npm run build` plus the manual checks listed per phase. A local `globalThis.fetch` stub inside one test file is *not* that machinery and is explicitly permitted (Task 2 uses one).
 - **Local dev has no store.** `getStore()` refuses `DATABASE_URL` outside prod builds, so every new route returns 503 in dev and every control that depends on one must not render.
 - **Existing card behaviour is frozen.** Accept/Add/Ignore semantics, error copy, and the 44px minimum tap targets stay exactly as they are.
 - **Threshold env vars:** `CAPTURE_VOICE_MATCH_THRESHOLD` default `0.8` (existing), `CAPTURE_VOICE_GROUP_THRESHOLD` default `0.85` (new).
@@ -147,10 +147,27 @@ test("uses the structured title when there is one", () => {
   assert.equal(buildVoiceEvidence(conv(), 2).title, "Field visit");
 });
 
-test("falls back to a readable date when there is no title", () => {
-  const e = buildVoiceEvidence(conv({ structured: undefined }), 2);
-  assert.notEqual(e.title, "");
-  assert.notEqual(e.title, "Field visit");
+test("falls back to a title derived from the conversation's timestamp", () => {
+  const morning = buildVoiceEvidence(
+    conv({ structured: undefined, created_at: "2026-09-07T06:40:00.000Z" }),
+    2
+  );
+  const evening = buildVoiceEvidence(
+    conv({ structured: undefined, created_at: "2026-09-10T19:05:00.000Z" }),
+    2
+  );
+  assert.notEqual(morning.title, "");
+  assert.notEqual(morning.title, "Field visit");
+  // The real assertion: the fallback is a function of created_at, not a
+  // constant. Locale-independent, so it holds wherever this suite runs.
+  assert.notEqual(morning.title, evening.title);
+});
+
+test("an unparseable timestamp still yields a usable title", () => {
+  assert.equal(
+    buildVoiceEvidence(conv({ structured: undefined, created_at: "not a date" }), 2).title,
+    "Untitled conversation"
+  );
 });
 
 test("canPlay is true only for TRACE-captured conversations", () => {
@@ -267,7 +284,7 @@ export function buildVoiceEvidence(conversation: Conversation, speakerId: number
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `node --test test/voice-evidence.test.mts`
-Expected: PASS, 11 tests.
+Expected: PASS, 12 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -1838,7 +1855,6 @@ const acceptVoiceGroupInto = async (members: PendingSuggestion[], personId: stri
   const ok = await acceptVoiceInto(lead, personId);
   if (!ok) return;
   for (const m of members) if (m.id !== lead.id) removePending(m.id);
-  await sweepMatchedVoices();
   refresh();
 };
 
@@ -1850,7 +1866,6 @@ const acceptVoiceGroupAsNew = async (members: PendingSuggestion[], name: string)
   // the enrollment landed and the rest of the group is the same voice.
   if (getPending().some((p) => p.id === lead.id)) return;
   for (const m of members) if (before.has(m.id) && m.id !== lead.id) removePending(m.id);
-  await sweepMatchedVoices();
   refresh();
 };
 
@@ -1867,7 +1882,9 @@ const ignoreVoiceGroup = (members: PendingSuggestion[]) => {
 };
 ```
 
-`sweepMatchedVoices` is added in Task 15; until then, define it as `const sweepMatchedVoices = async () => {};` so this task builds and is reviewable on its own.
+Task 15 adds the post-enrollment sibling sweep and wires it into both handlers.
+Do **not** add a placeholder for it here — this task must contain no dead code,
+and it is complete and reviewable without one.
 
 - [ ] **Step 3: Render the group in the card**
 
@@ -2008,9 +2025,9 @@ export async function POST(req: NextRequest) {
 }
 ```
 
-- [ ] **Step 2: Replace the client stub**
+- [ ] **Step 2: Add the sweep and call it from both group handlers**
 
-In `src/app/people/page.tsx`, replace `const sweepMatchedVoices = async () => {};` with:
+In `src/app/people/page.tsx`, add this beside the voice handlers from Task 14:
 
 ```ts
 /** Cards that are now recognizable because of the enrollment that just landed.
@@ -2055,6 +2072,28 @@ const sweepMatchedVoices = async () => {
   refresh();
 };
 ```
+
+Then add the call to both group-accept handlers, immediately before their
+closing `refresh()`:
+
+```ts
+  for (const m of members) if (m.id !== lead.id) removePending(m.id);
+  await sweepMatchedVoices();
+  refresh();
+};
+```
+
+in `acceptVoiceGroupInto`, and:
+
+```ts
+  for (const m of members) if (before.has(m.id) && m.id !== lead.id) removePending(m.id);
+  await sweepMatchedVoices();
+  refresh();
+};
+```
+
+in `acceptVoiceGroupAsNew`. `ignoreVoiceGroup` does not sweep — ignoring a
+voice enrolls nothing, so no other card's status can have changed.
 
 - [ ] **Step 3: Verify**
 
