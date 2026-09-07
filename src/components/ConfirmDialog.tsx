@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useId, useRef, useState } from "react";
 import { useModalFocus } from "@/lib/use-modal-focus";
 import { WarningIcon } from "@/components/icons";
 
@@ -63,16 +63,27 @@ export default function ConfirmDialog({
   const panelRef = useRef<HTMLDivElement>(null);
   const [closing, setClosing] = useState(false);
   const styles = TONE[tone];
+  // Two dialogs can be mounted in the same tree (a batch run confirming over a
+  // regenerate), so the ids have to be per-instance rather than constants.
+  const reactId = useId();
+  const titleId = `confirm-title-${reactId}`;
+  const bodyId = `confirm-body-${reactId}`;
 
   // Defer the caller's handler until the exit transition has played. Guarded
   // so a second trigger mid-exit (double-tap, Escape after clicking) is a no-op
-  // rather than firing the action twice.
+  // rather than firing the action twice — via a ref, not the `closing` state
+  // itself: React's Strict Mode double-invokes a setState updater in
+  // development to catch impure ones, and the guard used to live inside that
+  // updater, so the `setTimeout(action, 100)` side effect ran twice for every
+  // single click (both invocations saw the same pre-update `already`). A ref
+  // mutates immediately and is shared between both invocations, so the second
+  // one already sees it flipped.
+  const closingRef = useRef(false);
   const requestClose = useCallback((action: () => void) => {
-    setClosing((already) => {
-      if (already) return already;
-      setTimeout(action, 100);
-      return true;
-    });
+    if (closingRef.current) return;
+    closingRef.current = true;
+    setClosing(true);
+    setTimeout(action, 100);
   }, []);
 
   // Focus contract lives in a shared hook so this dialog and the shortcut
@@ -85,7 +96,12 @@ export default function ConfirmDialog({
       className={`overlay-backdrop fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 ${closing ? "overlay-closing" : ""}`}
       role="dialog"
       aria-modal="true"
-      aria-label={title}
+      // Pointing at the real heading and the real body, rather than duplicating
+      // the title string into aria-label: a screen reader then announces the
+      // explanation of the consequence along with the name of the action, which
+      // for an irreversible one is the half that matters.
+      aria-labelledby={titleId}
+      aria-describedby={bodyId}
       onClick={(e) => {
         if (e.target === e.currentTarget) requestClose(onCancel);
       }}
@@ -94,11 +110,17 @@ export default function ConfirmDialog({
         ref={panelRef}
         className={`overlay-panel card p-6 max-w-md w-full ${styles.border} ${closing ? "overlay-closing" : ""}`}
       >
-        <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
+        <h3 id={titleId} className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
           <WarningIcon className={`w-5 h-5 flex-shrink-0 ${styles.icon}`} />
           {title}
         </h3>
-        <div className="text-sm text-slate-400 mb-4">{body}</div>
+        {/* slate-300, not slate-400. This body carries the entire explanation
+            of an action that usually cannot be undone — on the regenerate
+            dialog it is the only place the user is told that rollups keep no
+            version history — and it was set in the app's quietest text colour,
+            one step below the title it explains. The thing you must read to
+            decide should not be the faintest thing in the dialog. */}
+        <div id={bodyId} className="text-sm text-slate-300 mb-4">{body}</div>
         <div className="flex gap-3 justify-end">
           <button
             ref={cancelRef}

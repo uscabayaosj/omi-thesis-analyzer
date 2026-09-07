@@ -54,7 +54,13 @@ export default function RootLayout({
   return (
     <html lang="en" className={`dark ${sourceSerif.variable}`}>
       <head />
-      <body className="bg-slate-950 text-slate-100 antialiased min-h-screen">
+      {/* No background utility here. globals.css sets the body background
+          unlayered (the lamplight gradient + paper grain over --background),
+          and unlayered author styles beat every Tailwind layer regardless of
+          specificity — so `bg-slate-950` never applied. Leaving it in claimed
+          the field was #14100d when it has always rendered #161311, which is
+          the kind of dead declaration the next editor trusts. */}
+      <body className="text-slate-100 antialiased min-h-screen">
         {/* Bypass block (WCAG 2.4.1). Every route repeats a back link, an
             eyebrow, a title, a subtitle and a nav row before its content, and
             a keyboard user had to tab through all of it on every navigation. */}

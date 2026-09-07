@@ -30,8 +30,11 @@ function Block({
   );
 }
 
-function Empty() {
-  return <p className="text-slate-400">None.</p>;
+/** "A", "A and B", "A, B and C" — for naming the categories that came up empty
+ *  in one line instead of one card each. */
+function listSentence(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? "";
+  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
 /** A labelled line that is omitted when the model said "None" — six "None"
@@ -97,13 +100,35 @@ export function AdhdResults({
     );
   }
 
+  /* The all-empty case collapses to one sentence above. The *partly* empty case
+     used to render a full card — icon, serif heading, wash — around the single
+     word "None." for every core category that had nothing, so a conversation
+     with two populated categories still shipped four of them. Six blocks always
+     rendering made an ordinary result (this conversation simply wasn't about
+     four of the six things) read as four gaps in the analysis, and pushed the
+     two blocks that did have content further apart. The reflection pass already
+     solved this for itself; the core blocks now follow the same rule, and the
+     empty ones are named once at the end rather than shown six times. */
+  const CORE_EMPTY = [
+    analysis.do_today.length === 0 && "Do today",
+    analysis.commitments.length === 0 && "Promises",
+    analysis.remember.length === 0 && "Worth remembering",
+    analysis.people.length === 0 && "People",
+    analysis.open_loops.length === 0 && "Unfinished threads",
+    analysis.ahead.length === 0 && "Coming up",
+  ].filter((v): v is string => typeof v === "string");
+
   // Mirrors each block's own render guard, so the strip never offers an
-  // anchor that isn't on the page. The reflection blocks are individually
-  // conditional — an absent observation is the good outcome, not a gap.
+  // anchor that isn't on the page. Every block is individually conditional now
+  // — an absent category is the good outcome, not a gap.
   const r = analysis.reflection;
   const navSections = [
-    "Do today", "Promises", "Worth remembering", "People",
-    "Unfinished threads", "Coming up",
+    ...(analysis.do_today.length ? ["Do today"] : []),
+    ...(analysis.commitments.length ? ["Promises"] : []),
+    ...(analysis.remember.length ? ["Worth remembering"] : []),
+    ...(analysis.people.length ? ["People"] : []),
+    ...(analysis.open_loops.length ? ["Unfinished threads"] : []),
+    ...(analysis.ahead.length ? ["Coming up"] : []),
     ...(r?.social_balance?.length ? ["How the conversation went"] : []),
     ...(r?.emotional_check?.length ? ["Feelings check"] : []),
     ...(r?.capacity_check?.length ? ["Promised too much?"] : []),
@@ -118,8 +143,8 @@ export function AdhdResults({
         <p className="text-sm text-slate-200">{analysis.summary}</p>
       </div>
 
+      {analysis.do_today.length > 0 && (
       <Block icon={ZapIcon} title="Do today">
-        {analysis.do_today.length ? (
           <ul className="space-y-2">
             {analysis.do_today.map((item, i) => (
               <li key={i} className="flex gap-2">
@@ -128,11 +153,11 @@ export function AdhdResults({
               </li>
             ))}
           </ul>
-        ) : <Empty />}
       </Block>
+      )}
 
+      {analysis.commitments.length > 0 && (
       <Block icon={ClipboardIcon} title="Promises">
-        {analysis.commitments.length ? (
           <ul className="space-y-3">
             {analysis.commitments.map((c) => {
               const isDone = done.has(c.key);
@@ -198,19 +223,19 @@ export function AdhdResults({
               );
             })}
           </ul>
-        ) : <Empty />}
       </Block>
+      )}
 
+      {analysis.remember.length > 0 && (
       <Block icon={CogIcon} title="Worth remembering">
-        {analysis.remember.length ? (
           <ul className="list-disc pl-5 space-y-1.5 marker:text-slate-500">
             {analysis.remember.map((item, i) => <li key={i}><Inline text={item} /></li>)}
           </ul>
-        ) : <Empty />}
       </Block>
+      )}
 
+      {analysis.people.length > 0 && (
       <Block icon={UsersIcon} title="People">
-        {analysis.people.length ? (
           <div className="space-y-3">
             {analysis.people.map((p, i) => (
               <div key={i} className="rounded-lg bg-slate-900/60 p-3">
@@ -224,19 +249,19 @@ export function AdhdResults({
               </div>
             ))}
           </div>
-        ) : <Empty />}
       </Block>
+      )}
 
+      {analysis.open_loops.length > 0 && (
       <Block icon={RefreshIcon} title="Unfinished threads">
-        {analysis.open_loops.length ? (
           <ul className="list-disc pl-5 space-y-1.5 marker:text-slate-500">
             {analysis.open_loops.map((item, i) => <li key={i}><Inline text={item} /></li>)}
           </ul>
-        ) : <Empty />}
       </Block>
+      )}
 
+      {analysis.ahead.length > 0 && (
       <Block icon={CalendarIcon} title="Coming up">
-        {analysis.ahead.length ? (
           <div className="space-y-3">
             {analysis.ahead.map((x, i) => (
               <div key={i} className="rounded-lg bg-slate-900/60 p-3">
@@ -249,8 +274,8 @@ export function AdhdResults({
               </div>
             ))}
           </div>
-        ) : <Empty />}
       </Block>
+      )}
 
       {/* Reflection pass — meta-cognition and interpersonal dynamics, rendered
           only for analyses that carry it (older stored analyses predate it,
@@ -288,6 +313,16 @@ export function AdhdResults({
           </ul>
         </Block>
       ) : null}
+
+      {/* Named, not shown. The rule this app runs on is that nothing tracked
+          disappears without being accounted for — so the categories that came
+          up empty are still stated, just once and quietly, instead of six
+          cards deep. */}
+      {CORE_EMPTY.length > 0 && (
+        <p className="text-sm text-slate-400 px-1">
+          Nothing under {listSentence(CORE_EMPTY)}.
+        </p>
+      )}
     </div>
   );
 }

@@ -535,6 +535,14 @@ function GroupAnalysisContent() {
               <CompassIcon className="w-7 h-7 mx-auto mb-2 text-cyan-400" />
               <p className="font-semibold text-white">Run Group Analysis</p>
               <p className="text-slate-400 font-serif italic text-sm mt-1">Find patterns across {ids.length} conversations</p>
+              {/* The last spend point in the app that said nothing about what
+                  it would cost. /rollup and the per-conversation runs both
+                  state it; this one didn't, and it is the run whose size varies
+                  most. One call, not one per conversation: the route builds a
+                  single prompt from all the transcripts at once. */}
+              <p className="text-slate-400 font-mono text-xs mt-2">
+                1 API call over {ids.length} transcripts · usually under a minute
+              </p>
             </div>
           )}
         </button>

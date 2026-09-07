@@ -42,11 +42,12 @@ import {
   ExternalLinkIcon,
   LoaderIcon,
 } from "@/components/icons";
-import { BUTTON_PRIMARY, BUTTON_GHOST, BUTTON_SECONDARY } from "@/lib/ui";
+import { BUTTON_PRIMARY, BUTTON_GHOST, BUTTON_SECONDARY, PILL_SWITCH_ON, PILL_SWITCH_OFF_TRACK } from "@/lib/ui";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { pullAndMerge } from "@/lib/sync";
 import { useRovingRadioGroup } from "@/lib/roving";
 import { usePersistedPreference } from "@/lib/use-persisted-preference";
+import { useDocumentTitle } from "@/lib/use-document-title";
 import { conversationTitle } from "@/lib/titles";
 import { runExtraction, suggestFromAdhdPeople, suggestUnmatchedVoices } from "@/lib/people-pipeline";
 import dynamic from "next/dynamic";
@@ -242,6 +243,19 @@ export default function ConversationPage() {
   const [enrichment] = useState(() => getEnrichments().get(id));
   const enrichedTitle = enrichment?.title;
   const enrichedOverview = enrichment?.overview;
+
+  /* The one expression for "what this conversation is called", shared by the
+     h1 and the tab title. Every conversation used to share the static
+     "Conversation · TRACE", so a long history was a run of indistinguishable
+     back-stack entries. The route's metadata can't do better on its own — the
+     title lives in localStorage and the enrichment cache, which the server
+     never sees, and a server fetch per navigation to label a tab is the wrong
+     trade for an offline-first tool. useDocumentTitle owns it client-side; see
+     that hook for why a plain effect wasn't enough. */
+  const pageTitle = conversation
+    ? conversation.structured?.title || enrichedTitle || "Untitled"
+    : null;
+  useDocumentTitle(pageTitle ? `${pageTitle} · TRACE` : null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [storedAnalysis, setStoredAnalysis] = useState<StoredAnalysis | null>(null);
   const [versions, setVersions] = useState<AnalysisVersion[]>([]);
@@ -875,9 +889,18 @@ export default function ConversationPage() {
             <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
               {conversation.structured?.category || "Entry"}
             </p>
-            <h1 className="font-bold text-white mb-2">
-              <span aria-hidden="true">{conversation.structured?.emoji || "💬"}</span>{" "}
-              {conversation.structured?.title || enrichedTitle || "Untitled"}
+            {/* The emoji comes straight from Omi and is an uncontrolled
+                multi-hue glyph at the top of a nine-colour palette that bans a
+                second accent by name — the one saturated thing on the page,
+                sitting exactly where the eye lands first. Kept, because it is
+                genuinely useful for recognising a conversation at a glance, but
+                demoted to a marginal mark: smaller than the title, set on the
+                baseline beside it rather than leading it at full display size. */}
+            <h1 className="font-bold text-white mb-2 flex items-baseline gap-2.5">
+              <span aria-hidden="true" className="text-base flex-shrink-0 opacity-80">
+                {conversation.structured?.emoji || "💬"}
+              </span>
+              <span className="min-w-0">{pageTitle}</span>
             </h1>
             {(conversation.structured?.overview || enrichedOverview) && (
               <p className="text-slate-400 font-serif italic text-[0.95rem]">
@@ -922,7 +945,13 @@ export default function ConversationPage() {
                     )}
                   </p>
                 )}
-                <MeetingMap markers={mapMarkers} />
+                {/* Shorter here than on the map-first pages. This section is
+                    context for the conversation, not the subject of it — at the
+                    full h-64 the map was the largest thing between the title and
+                    the analysis on a phone, which put "where" above "what to do
+                    about it". h-40 is still enough to place the pin in its
+                    surroundings. */}
+                <MeetingMap markers={mapMarkers} heightClass="h-40 sm:h-56" />
               </>
             ) : (
               !editingLocation && (
@@ -966,12 +995,12 @@ export default function ConversationPage() {
                   setLensPref(l);
                 }}
                 {...rovingLens(l)}
+                // SWITCH pill on a segmented track (see lib/ui.ts). Real pairs,
+                // both verified: slate-950/cyan-400 (7.87:1) and
+                // slate-300/slate-900 (11.35:1) — the unselected pill has no
+                // fill and sits on the toggle's own track.
                 className={`px-4 py-2 min-h-[44px] rounded-md text-sm transition-colors ${
-                  // False positive below: the scanner pairs the unselected branch's text-slate-300
-                  // with the selected branch's bg-cyan-400, but the two are mutually exclusive.
-                  // Real pairs, both verified: slate-950/cyan-400 (7.87:1) and slate-300/slate-900
-                  // (11.35:1) — the unselected pill has no fill and sits on the toggle's own track.
-                  lens === l ? "bg-cyan-400 text-slate-950" : "text-slate-300 hover:text-white" // impeccable-disable-line gray-on-color
+                  lens === l ? PILL_SWITCH_ON : PILL_SWITCH_OFF_TRACK
                 }`}
               >
                 {l === "thesis" ? "Thesis" : l === "adhd" ? "ADHD Aid" : "Both"}

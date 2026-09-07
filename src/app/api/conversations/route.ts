@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Conversation } from "@/lib/conversation-types";
 import { getStore } from "@/lib/kv";
-import { ensureCaptureSchemaOnce, listConversationsLite, listConversationsLiteBetween } from "@/lib/capture/store";
+import {
+  ensureCaptureSchemaOnce, listConversationsLite, listConversationsLiteBetween, deleteConversations,
+} from "@/lib/capture/store";
 import { friendlyError } from "@/lib/api-error";
 import { fixturesEnabled, fixtureConversations } from "@/lib/dev-fixtures";
+
+// A malformed or absent-minded client could otherwise send an unbounded array
+// in one request; this is a sanity clamp, not a real usage limit (a bulk clear
+// from the UI is at most one day's or one search's worth of ignored rows).
+const MAX_DELETE_IDS = 500;
 
 const iso = (v: unknown): string | undefined =>
   v instanceof Date ? v.toISOString() : typeof v === "string" ? v : undefined;
@@ -73,6 +80,40 @@ export async function GET(req: NextRequest) {
     });
   } catch (err) {
     console.error("conversations fetch failed:", err);
+    const { error, status } = friendlyError(err);
+    return NextResponse.json({ error }, { status });
+  }
+}
+
+/**
+ * Bulk permanent delete, e.g. the home page's "Clear all ignored". No undo
+ * here — the client defers this call until its own undo window has closed
+ * (see page.tsx), so by the time this runs the user has already had their
+ * chance to back out.
+ */
+export async function DELETE(req: NextRequest) {
+  try {
+    const body = await req.json().catch(() => null);
+    const ids = Array.isArray(body?.ids) ? body.ids.filter((v: unknown): v is string => typeof v === "string") : [];
+    if (ids.length === 0) {
+      return NextResponse.json({ error: "Expected a non-empty ids array." }, { status: 400 });
+    }
+    if (ids.length > MAX_DELETE_IDS) {
+      return NextResponse.json({ error: `Expected at most ${MAX_DELETE_IDS} ids.` }, { status: 400 });
+    }
+
+    const sql = getStore();
+    if (!sql) {
+      // Not provisioned (or dev-fixtures only, which aren't real rows) —
+      // nothing durable to delete, so report success on zero rows rather
+      // than erroring for a feature the user may simply not have turned on.
+      return NextResponse.json({ deleted: 0 });
+    }
+    await ensureCaptureSchemaOnce(sql);
+    const deleted = await deleteConversations(sql, ids);
+    return NextResponse.json({ deleted });
+  } catch (err) {
+    console.error("conversations delete failed:", err);
     const { error, status } = friendlyError(err);
     return NextResponse.json({ error }, { status });
   }
