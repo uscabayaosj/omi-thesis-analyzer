@@ -1,4 +1,5 @@
 import { AutoModel, AutoProcessor, env } from "@huggingface/transformers";
+import { capPcmForEmbedding } from "./clip";
 
 /**
  * Loads the WavLM speaker-verification model once per Function instance and
@@ -44,7 +45,10 @@ async function load() {
 export async function embedAudio(pcm: Float32Array): Promise<number[]> {
   if (!modelPromise) modelPromise = load();
   const { processor, model } = await modelPromise;
-  const inputs = await processor(pcm);
+  // Bounded here rather than at each call site: the limit is a property of the
+  // model, not of any one caller, and every caller had gotten it wrong. See
+  // capPcmForEmbedding for why an unbounded input is not survivable.
+  const inputs = await processor(capPcmForEmbedding(pcm));
   const { embeddings } = await model(inputs);
   return Array.from(embeddings.data as Float32Array);
 }
