@@ -83,7 +83,9 @@ test("quotes the speaker's longest lines, in the order they were spoken", () => 
   assert.equal(e.quotes.length, 3);
   assert.ok(e.quotes[0].startsWith("So we moved the herd"));
   assert.ok(e.quotes[1].startsWith("Better than the year before"));
-  assert.equal(e.quotes[2], "yeah");
+  // "mm-hm" (5 chars) beats "yeah" (4), and is spoken last of the three —
+  // so this pins both the longest-first selection and the chronological output.
+  assert.equal(e.quotes[2], "mm-hm");
 });
 
 test("counts only the target speaker's lines and speech time", () => {
