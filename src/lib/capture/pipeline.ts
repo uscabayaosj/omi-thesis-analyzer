@@ -41,7 +41,7 @@ function blobPathFor(startedAtMs: number, chunkId: string): string {
   return `capture/${new Date(startedAtMs).toISOString().slice(0, 10)}/${chunkId}.trch`;
 }
 
-async function readBlob(path: string): Promise<Uint8Array> {
+export async function readBlob(path: string): Promise<Uint8Array> {
   const res = await get(path, { access: "private" });
   if (!res || res.statusCode !== 200) throw new Error(`blob read failed: ${path}`);
   return new Uint8Array(await new Response(res.stream).arrayBuffer());
