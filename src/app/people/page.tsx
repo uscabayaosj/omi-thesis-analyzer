@@ -450,6 +450,7 @@ export default function PeoplePage() {
     const ok = await acceptVoiceInto(lead, personId);
     if (!ok) return;
     for (const m of members) if (m.id !== lead.id) removePending(m.id);
+    await sweepMatchedVoices();
     refresh();
   };
 
@@ -461,6 +462,7 @@ export default function PeoplePage() {
     // the enrollment landed and the rest of the group is the same voice.
     if (getPending().some((p) => p.id === lead.id)) return;
     for (const m of members) if (before.has(m.id) && m.id !== lead.id) removePending(m.id);
+    await sweepMatchedVoices();
     refresh();
   };
 
@@ -473,6 +475,48 @@ export default function PeoplePage() {
         refresh();
       }
     );
+    refresh();
+  };
+
+  /** Cards that are now recognizable because of the enrollment that just landed.
+   *  Removed with an undo, matching how acceptAllConfident handles bulk
+   *  resolution — a sweep that silently clears cards the user never saw resolved
+   *  needs a way back. A failure here is silent: the cards simply stay, which is
+   *  the state the app was already in. */
+  const sweepMatchedVoices = async () => {
+    const voices = getPending()
+      .filter((s) => s.kind === "voice" && typeof s.speakerId === "number")
+      .map((s) => ({ conversationId: s.conversationId, speakerId: s.speakerId!, id: s.id, record: s }));
+    if (voices.length === 0) return;
+
+    let matched: { conversationId: string; speakerId: number }[] = [];
+    try {
+      const res = await fetchJson<{ matched: { conversationId: string; speakerId: number }[] }>(
+        "/api/capture/rematch-voices",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ voices: voices.map(({ conversationId, speakerId }) => ({ conversationId, speakerId })) }),
+        }
+      );
+      matched = res.matched;
+    } catch {
+      return;
+    }
+
+    const keys = new Set(matched.map((m) => `${m.conversationId}:${m.speakerId}`));
+    const cleared = voices.filter((v) => keys.has(`${v.conversationId}:${v.speakerId}`));
+    if (cleared.length === 0) return;
+
+    for (const c of cleared) removePending(c.id);
+    setBatchResult(
+      `Also cleared ${cleared.length} ${cleared.length === 1 ? "card" : "cards"} that were the same voice.`
+    );
+    offerUndo(`Cleared ${cleared.length} matching ${cleared.length === 1 ? "card" : "cards"}.`, () => {
+      for (const c of cleared) restorePending(c.record);
+      setBatchResult(null);
+      refresh();
+    });
     refresh();
   };
 
