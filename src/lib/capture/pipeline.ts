@@ -206,7 +206,10 @@ async function identifySpeakers(
   return { segments: out, unmatchedSpeakers, unmatchedEmbeddings };
 }
 
-async function transcribeSession(sql: Sql, s: SessionState): Promise<ConversationRow> {
+async function transcribeSession(
+  sql: Sql,
+  s: SessionState
+): Promise<{ row: ConversationRow; unmatchedEmbeddings: Map<number, number[]> }> {
   const { assembled, chunkIds, paths } = await assembleSessionAudio(sql, s);
   const utterances = await transcribeWav(encodeWav(assembled.pcm));
   const segments = utterancesToSegments(utterances, assembled.map, s.startedAtMs);
@@ -218,17 +221,7 @@ async function transcribeSession(sql: Sql, s: SessionState): Promise<Conversatio
   );
   const id = randomUUID();
 
-  // Best-effort: a failed cluster write costs a backfill later, never the
-  // transcript. Nothing downstream reads these during this call.
-  for (const [speakerId, embedding] of unmatchedEmbeddings) {
-    try {
-      await store.upsertVoiceCluster(sql, { conversationId: id, speakerId, embedding, groupId: null });
-    } catch (e) {
-      console.error(`voice cluster write failed for speaker ${speakerId}:`, e);
-    }
-  }
-
-  return {
+  const row: ConversationRow = {
     id,
     source: "trace",
     created_at: new Date(s.startedAtMs).toISOString(),
@@ -242,6 +235,7 @@ async function transcribeSession(sql: Sql, s: SessionState): Promise<Conversatio
     audio_refs: chunkIds.map((id) => paths.get(id)).filter((p): p is string => !!p),
     unmatched_speakers: unmatchedSpeakers.length ? unmatchedSpeakers : null,
   };
+  return { row, unmatchedEmbeddings };
 }
 
 /** Never throws — a failure is recorded on the session for the sweep to retry. */
@@ -256,8 +250,24 @@ export async function closeSession(sessionId: string): Promise<void> {
       return;
     }
     await store.setSessionStatus(sql, s.id, "transcribing", { bumpAttempts: true });
-    const row = await transcribeSession(sql, s);
+    const { row, unmatchedEmbeddings } = await transcribeSession(sql, s);
     await store.upsertConversations(sql, [row]);
+
+    // Only now does row.id exist as a conversation. Write the unmatched
+    // clusters here, after the insert, not inside transcribeSession: a retry
+    // re-runs transcribeSession and mints a fresh id, so any cluster row
+    // written against the old id — one that never made it into
+    // upsertConversations — would be orphaned forever, with no foreign key
+    // and no cleanup path to reclaim it. Best-effort per row: a failed
+    // cluster write costs a backfill later, never the session.
+    for (const [speakerId, embedding] of unmatchedEmbeddings) {
+      try {
+        await store.upsertVoiceCluster(sql, { conversationId: row.id, speakerId, embedding, groupId: null });
+      } catch (e) {
+        console.error(`voice cluster write failed for speaker ${speakerId}:`, e);
+      }
+    }
+
     await store.setSessionStatus(sql, s.id, "done", { conversationId: row.id, endedAtMs: s.lastSpeechAtMs });
   } catch (err) {
     console.error(`closeSession ${sessionId} failed:`, err);
