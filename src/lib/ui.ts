@@ -82,3 +82,8 @@ export const PILL_SWITCH_OFF_TRACK = "text-slate-300 hover:text-white";
 // REFINE, selected / unselected.
 export const PILL_REFINE_ON = "border border-cyan-500/50 bg-cyan-950/40 text-cyan-200";
 export const PILL_REFINE_OFF = "bg-slate-800 text-slate-300 hover:text-white";
+
+/** Native option text can't wrap or ellipsize, so clip it before it renders. */
+export function optionLabel(name: string): string {
+  return name.length > 48 ? `${name.slice(0, 47)}…` : name;
+}
