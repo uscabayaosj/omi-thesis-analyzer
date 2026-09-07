@@ -13,17 +13,18 @@ import { fetchJson } from "@/lib/fetch-json";
 import { formatDateTime, dayOf, todayString } from "@/lib/format";
 import {
   TraceMark, SquareIcon, XIcon, CheckIcon, SparklesIcon, WarningIcon, MicIcon,
-  FolderIcon, RefreshIcon, ClipboardIcon, CalendarIcon, ChevronRightIcon, SearchIcon, MapPinIcon, HelpIcon,
+  FolderIcon, RefreshIcon, ClipboardIcon, CalendarIcon, ChevronRightIcon, SearchIcon, MapPinIcon,
   UsersIcon, TrendingUpIcon, DownloadIcon, UploadIcon,
 } from "@/components/icons";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { useUndoOffer } from "@/components/UndoProvider";
 import { CaptureBanner } from "@/components/CaptureBanner";
 import { pullAndMerge } from "@/lib/sync";
 import { useRovingRadioGroup } from "@/lib/roving";
 import { exportAllData } from "@/lib/export";
 import { readBackupFile, applyRestore, type RestorePlan } from "@/lib/restore";
 import { conversationTitle } from "@/lib/titles";
-import { BUTTON_GHOST, BUTTON_SECONDARY } from "@/lib/ui";
+import { BUTTON_GHOST, BUTTON_SECONDARY, BUTTON_PRIMARY, PILL_SWITCH_ON, PILL_SWITCH_OFF } from "@/lib/ui";
 
 const FILTER_VALUES = ["all", "analyzed", "unanalyzed"] as const;
 
@@ -49,14 +50,17 @@ function unionById(fresh: Conversation[], prev: Conversation[]): Conversation[] 
 // these are parallel choices acting on the same selection, not a primary/
 // secondary pair, so both get the identical class string rather than one
 // claiming the app's solid-fill cyan "one primary action" treatment.
-// Three tiers, not two: flat slate with no selection; a cyan-tinted
+// Three tiers, not two: flat slate when the button can't act; a cyan-tinted
 // "ready" wash (reusing the same wash ConversationRow uses for a selected
-// item) as soon as *any* conversation is selected, on both buttons at once
-// — even though Group Thesis's own minimum is 2, not 1, that's a business
-// rule enforced inside startGroupAnalysis's own guard clause, not something
-// the resting button color should announce; and a solid-fill "full cyan"
-// flash on :active, so the moment of an actual tap still reads distinctly
-// from just having a selection ready.
+// item) once it can; and a solid-fill "full cyan" flash on :active, so the
+// moment of an actual tap still reads distinctly from just having a
+// selection ready.
+// The "ready" tier keys off each button's *own* minimum, not merely "something
+// is selected". An earlier version lit both buttons as soon as one row was
+// picked and let Group Thesis (minimum 2) no-op on click — so it looked
+// pressable and then did nothing at all. The count in the label
+// ("Group Thesis (1)") says why it isn't ready; the disabled state says that
+// it isn't.
 // disabled:bg-slate-700, not slate-800: this toolbar is itself a .card
 // (Ink Panel, #262019 === bg-slate-800), so slate-800 here would repeat the
 // exact "invisible against its own container" bug the Secondary Button rule
@@ -398,6 +402,7 @@ interface BatchFailure {
 function HomeInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { offerUndo } = useUndoOffer();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   /* Coverage of the archive. The newest-N list covers from its oldest row
      forward; a month fetched on demand covers itself. Anything the user
@@ -455,6 +460,17 @@ function HomeInner() {
   const [restoreNotice, setRestoreNotice] = useState<string | null>(null);
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
+  /* "Clear all ignored": a permanent delete (conversations is TRACE's own
+     store, not a cache — there is no re-fetch to fall back on), so the actual
+     DELETE is deferred until the undo window closes rather than fired
+     immediately like every other offerUndo use on this page. `pendingDeletes`
+     hides the rows from every derived list the instant the user confirms;
+     `clearTimersRef` lets a same-window Undo cancel the one commit that
+     matches its own batch without disturbing any other batch in flight. */
+  const [pendingClearIgnored, setPendingClearIgnored] = useState<{ ids: string[] } | null>(null);
+  const [clearIgnoredError, setClearIgnoredError] = useState<string | null>(null);
+  const [pendingDeletes, setPendingDeletes] = useState<Set<string>>(new Set());
+  const clearTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const [filter, setFilter] = useState<"all" | "analyzed" | "unanalyzed">("all");
   const [stale, setStale] = useState(false);
   const rovingFilter = useRovingRadioGroup(FILTER_VALUES, filter, setFilter);
@@ -690,16 +706,25 @@ function HomeInner() {
     [conversations, enrichments, gists]
   );
 
+  // A conversation mid-way through a "Clear all ignored" delete (confirmed,
+  // undo window still open) must vanish from every list immediately, not
+  // just the Ignored disclosure it was cleared from — otherwise it would
+  // still show up under Search, or in another day's grouping bug report.
+  const activeConversations = useMemo(
+    () => (pendingDeletes.size === 0 ? conversations : conversations.filter((c) => !pendingDeletes.has(c.id))),
+    [conversations, pendingDeletes]
+  );
+
   // Group once per conversation-list change, not per render — feeds both the
   // calendar's "has entries" dots and the selected day's list.
   const conversationsByDay = useMemo(() => {
     const map = new Map<string, Conversation[]>();
-    for (const c of conversations) {
+    for (const c of activeConversations) {
       const d = dayOf(c.created_at);
       (map.get(d) ?? map.set(d, []).get(d)!).push(c);
     }
     return map;
-  }, [conversations]);
+  }, [activeConversations]);
 
   const daysWithEntries = useMemo(() => new Set(conversationsByDay.keys()), [conversationsByDay]);
 
@@ -724,7 +749,7 @@ function HomeInner() {
   const searchResults = useMemo(() => {
     if (!isSearching) return [];
     const q = searchQuery.trim().toLowerCase();
-    return conversations.filter((c) => {
+    return activeConversations.filter((c) => {
       const e = enrichments.get(c.id);
       const title = c.structured?.title?.toLowerCase() ?? "";
       const overview = c.structured?.overview?.toLowerCase() ?? "";
@@ -732,7 +757,7 @@ function HomeInner() {
       const eOverview = e?.overview?.toLowerCase() ?? "";
       return title.includes(q) || overview.includes(q) || eTitle.includes(q) || eOverview.includes(q);
     });
-  }, [conversations, searchQuery, isSearching, enrichments]);
+  }, [activeConversations, searchQuery, isSearching, enrichments]);
 
   const dayConversations = conversationsByDay.get(selectedDate) ?? [];
   const visibleConversations = isSearching ? searchResults : dayConversations;
@@ -764,6 +789,10 @@ function HomeInner() {
   // many "Ignored" rows appear.
   const shown = filtered.filter((c) => !isHiddenJunk(c.id));
   const ignored = visibleConversations.filter((c) => enrichments.get(c.id)?.junk);
+  // The bulk-clear target: only rows actually hidden right now, not every
+  // junk verdict ever recorded — a conversation the user has Kept already
+  // opted back in and must not be swept up by "Clear all ignored".
+  const clearableIgnored = ignored.filter((c) => isHiddenJunk(c.id));
 
   // Date-group search results only when they actually span more than one day —
   // a single-day search doesn't need a redundant heading repeating what the
@@ -1007,6 +1036,68 @@ function HomeInner() {
     );
   };
 
+  // Cancel every still-pending delete on unmount so a commit never fires
+  // (and calls setState) against an unmounted page.
+  useEffect(() => {
+    const timers = clearTimersRef.current;
+    return () => {
+      for (const t of timers.values()) clearTimeout(t);
+      timers.clear();
+    };
+  }, []);
+
+  // Runs after the undo window has closed with no undo — the point of no
+  // return. Splices the rows out of `conversations` itself (not just
+  // `pendingDeletes`) so they stay gone even if a later fetch merges in a
+  // stale copy of the list fetched before this delete landed.
+  const commitClearIgnored = useCallback(async (ids: string[], batchId: string) => {
+    clearTimersRef.current.delete(batchId);
+    try {
+      const res = await fetch("/api/conversations", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setConversations((prev) => prev.filter((c) => !ids.includes(c.id)));
+    } catch (e) {
+      console.error("clear ignored failed:", e);
+      setClearIgnoredError("Couldn’t delete — the change didn’t go through. They’re back in the Ignored list.");
+      setPendingDeletes((prev) => {
+        const next = new Set(prev);
+        for (const id of ids) next.delete(id);
+        return next;
+      });
+    }
+  }, []);
+
+  const confirmClearIgnored = () => {
+    const ids = pendingClearIgnored?.ids ?? [];
+    setPendingClearIgnored(null);
+    if (ids.length === 0) return;
+    setClearIgnoredError(null);
+    setPendingDeletes((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) next.add(id);
+      return next;
+    });
+    const batchId = `${Date.now()}-${Math.random()}`;
+    // A little past the undo bar's own 10s window (UndoProvider), so the bar
+    // never disappears a beat before Undo would actually still have worked.
+    const timer = setTimeout(() => commitClearIgnored(ids, batchId), 10_500);
+    clearTimersRef.current.set(batchId, timer);
+    offerUndo(`Cleared ${ids.length} ignored ${ids.length === 1 ? "conversation" : "conversations"}.`, () => {
+      const t = clearTimersRef.current.get(batchId);
+      if (t) clearTimeout(t);
+      clearTimersRef.current.delete(batchId);
+      setPendingDeletes((prev) => {
+        const next = new Set(prev);
+        for (const id of ids) next.delete(id);
+        return next;
+      });
+    });
+  };
+
   return (
     <main id="main" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-8">
       <header className="mb-6">
@@ -1029,78 +1120,50 @@ function HomeInner() {
           Personal &amp; research assistant — your recorded conversations as thesis evidence and a daily plan
         </p>
 
-        {/* Header controls, split by job so nothing overflows on a phone:
-            destinations (places to go) wrap freely on their own nav row, while
-            the two utilities (Backup, Refresh) sit beside the sync status they
-            act on. The old single non-wrapping row put ~600px of flex-shrink-0
-            controls into a 343px viewport — Search, Backup, and Refresh were
-            simply off-screen on mobile. Rendered as a labeled contents rule
-            (small caps "Contents" + hairline) rather than plain ghost pills,
-            so it reads as a journal's table of contents, not app-shell nav. */}
-        <nav aria-label="Sections" className="mt-5 -mx-3">
+        {/* Contents — the journal's table of contents rather than app-shell nav.
+            This used to list all seven destinations at equal weight, which had
+            two costs. Under the One Ink Rule exactly one thing per screen may
+            carry copper, and nothing above the fold was spending it: the home
+            page offered fourteen controls and marked none of them as the move.
+            And with seven links plus the toolbar, the first conversation card
+            landed around y≈700 on an 812px phone — the screen whose whole job
+            is "show me my conversations" gave them the last 15% of the fold.
+
+            Now it carries only the three destinations that are part of a day's
+            work, with Daily Rollup — the screen the ADHD lens exists to reach —
+            taking the copper. The other four (How this works, Search analyses,
+            Usage, Capture) moved to the footer nav at the end of the page; none
+            of them is something you go to *before* looking at today. */}
+        <nav aria-label="Sections" className="mt-5">
           {/* 11px, not 10px: the Micro step (10px) is reserved for a single
               glyph inside a circular badge. This is a running head and belongs
               on the Eyebrow step like every other one in the app. */}
-          <p className="mb-1.5 px-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
+          <p className="mb-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
             Contents
           </p>
-          <div className="flex flex-wrap items-center gap-x-1 gap-y-0">
+          <div className="flex flex-wrap items-center gap-2">
             {/* Carries the day you are browsing. `href="/rollup"` dropped it,
                 so jumping to the rollup from 25 Aug landed on a day picker and
                 you had to find the date again. */}
             <Link
               href={selectedDate ? `/rollup?day=${selectedDate}` : "/rollup"}
-              className={BUTTON_GHOST}
+              className={`${BUTTON_PRIMARY} inline-flex items-center gap-1.5 px-4 py-2`}
             >
               <CalendarIcon className="w-4 h-4 flex-shrink-0" />
               Daily Rollup
             </Link>
-            <Link
-              href="/commitments"
-              className={BUTTON_GHOST}
-            >
+            <Link href="/commitments" className={`${BUTTON_SECONDARY} flex-shrink-0`}>
               <ClipboardIcon className="w-4 h-4 flex-shrink-0" />
               Open promises
             </Link>
-            <Link
-              href="/help"
-              className={BUTTON_GHOST}
-            >
-              <HelpIcon className="w-4 h-4 flex-shrink-0" />
-              How this works
-            </Link>
-            <Link
-              href="/people"
-              className={BUTTON_GHOST}
-            >
+            <Link href="/people" className={`${BUTTON_SECONDARY} flex-shrink-0`}>
               <UsersIcon className="w-4 h-4 flex-shrink-0" />
               People
-            </Link>
-            <Link
-              href="/usage"
-              className={BUTTON_GHOST}
-            >
-              <TrendingUpIcon className="w-4 h-4 flex-shrink-0" />
-              Usage
-            </Link>
-            <Link
-              href="/capture"
-              className={BUTTON_GHOST}
-            >
-              <MicIcon className="w-4 h-4 flex-shrink-0" />
-              Capture
-            </Link>
-            <Link
-              href="/search"
-              className={BUTTON_GHOST}
-            >
-              <SearchIcon className="w-4 h-4 flex-shrink-0" />
-              Search Analyses
             </Link>
           </div>
         </nav>
 
-        {/* Sync status + its two utilities — quiet meta row, read once per visit */}
+        {/* Sync status + Refresh — quiet meta row, read once per visit */}
         <div className="flex flex-wrap items-center justify-between gap-2 mt-1 pb-3 border-b border-slate-800">
           <span
             className={`text-sm min-w-0 truncate ${stale ? "text-amber-400" : "text-slate-400"}`}
@@ -1116,39 +1179,14 @@ function HomeInner() {
               ? `Synced ${getAnalysisAge(lastSynced).label}`
               : "Not synced yet"}
           </span>
+          {/* Backup and Restore used to sit here too, as a third and fourth
+              identical ghost button. Refresh re-reads a list; Restore merges a
+              backup into live data. Giving the two the same weight, adjacent,
+              with the destructive one in the middle, is the kind of neighbouring
+              that gets mis-tapped — and neither is something you reach for while
+              actually using the app. They now live in the footer's Data
+              disclosure, one deliberate open away. */}
           <div className="flex items-center gap-1 flex-shrink-0">
-            <button
-              onClick={handleExport}
-              disabled={exporting}
-              aria-label="Download a backup of all stored analyses"
-              className={BUTTON_GHOST}
-            >
-              <DownloadIcon className="w-4 h-4 flex-shrink-0" />
-              {exporting ? "Backing up…" : "Backup"}
-            </button>
-            <button
-              onClick={() => restoreInputRef.current?.click()}
-              disabled={restoring}
-              aria-label="Restore analyses from a backup file"
-              className={BUTTON_GHOST}
-            >
-              <UploadIcon className="w-4 h-4 flex-shrink-0" />
-              {restoring ? "Reading…" : "Restore"}
-            </button>
-            <input
-              ref={restoreInputRef}
-              type="file"
-              accept=".json,application/json"
-              className="sr-only"
-              tabIndex={-1}
-              aria-hidden="true"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void handleRestoreFile(file);
-                // Reset so choosing the same file again re-fires onChange.
-                e.target.value = "";
-              }}
-            />
             <button
               onClick={() => loadConversations("refresh")}
               disabled={loading || refreshing}
@@ -1160,30 +1198,6 @@ function HomeInner() {
             </button>
           </div>
         </div>
-
-        {exportError && (
-          <p className="text-sm text-red-400 mt-2" role="alert">
-            {exportError}
-          </p>
-        )}
-
-        {exportNotice && (
-          <p className="text-sm text-slate-400 mt-2">
-            {exportNotice}
-          </p>
-        )}
-
-        {restoreError && (
-          <p className="text-sm text-red-400 mt-2" role="alert">
-            {restoreError}
-          </p>
-        )}
-
-        {restoreNotice && (
-          <p className="text-sm text-slate-400 mt-2" role="status">
-            {restoreNotice}
-          </p>
-        )}
 
         {/* What the pendant is capturing right now — otherwise the three-minute
             wait before a conversation appears reads as "nothing is happening". */}
@@ -1293,12 +1307,11 @@ function HomeInner() {
                     onClick={() => setFilter(f)}
                     {...rovingFilter(f)}
                     aria-label={`Show ${f} conversations`}
+                    // SWITCH pill (see lib/ui.ts): slate-950 on cyan-400 =
+                    // 7.87:1; slate-300 on slate-800 = 8.35:1. Branches are
+                    // mutually exclusive.
                     className={`px-4 py-2 min-h-[44px] rounded-full text-sm transition-colors ${
-                      filter === f
-                        // slate-950 on cyan-400 = 7.87:1; slate-300 on
-                        // slate-800 = 8.35:1. Branches are mutually exclusive.
-                        ? "bg-cyan-400 text-slate-950" // impeccable-disable-line gray-on-color
-                        : "bg-slate-800 text-slate-300 hover:text-white"
+                      filter === f ? PILL_SWITCH_ON : PILL_SWITCH_OFF
                     }`}
                   >
                     {f === "all" ? "All" : f === "analyzed" ? "Analyzed" : "Unanalyzed"}
@@ -1525,6 +1538,22 @@ function HomeInner() {
         />
       )}
 
+      {pendingClearIgnored && (
+        <ConfirmDialog
+          title={`Permanently delete ${pendingClearIgnored.ids.length} ignored ${pendingClearIgnored.ids.length === 1 ? "recording" : "recordings"}?`}
+          body={
+            <>
+              This removes them from TRACE for good — there is no backup copy to restore from, only the next few
+              seconds to undo. Anything you&apos;ve Kept is left alone.
+            </>
+          }
+          confirmLabel="Delete"
+          tone="danger"
+          onConfirm={confirmClearIgnored}
+          onCancel={() => setPendingClearIgnored(null)}
+        />
+      )}
+
       {loading && (
         <div className="space-y-4" aria-label="Loading conversations" role="status">
           {[1, 2, 3].map((i) => <div key={i} className="skeleton h-24 w-full" />)}
@@ -1660,6 +1689,19 @@ function HomeInner() {
             <ChevronRightIcon className="w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] group-open:rotate-90" />
             Ignored ({ignored.length}) — noise recordings, kept out of the way
           </summary>
+          {clearableIgnored.length > 0 && (
+            <div className="pl-5 pt-1">
+              <button
+                onClick={() => setPendingClearIgnored({ ids: clearableIgnored.map((c) => c.id) })}
+                className="text-xs text-red-400 hover:text-red-300 hover:underline min-h-[44px] px-0"
+              >
+                Clear all ignored ({clearableIgnored.length})
+              </button>
+            </div>
+          )}
+          {clearIgnoredError && (
+            <p className="pl-5 text-xs text-red-400" role="alert">{clearIgnoredError}</p>
+          )}
           <ul className="pl-5 pt-1 space-y-2">
             {ignored.map((convo) => {
               const e = enrichments.get(convo.id);
@@ -1668,7 +1710,14 @@ function HomeInner() {
                 <li key={convo.id} className="flex items-center justify-between gap-3 text-sm">
                   <Link href={`/conversation/${convo.id}`} className="min-w-0 text-slate-300 hover:text-white transition-colors">
                     <span className="block truncate">{name}</span>
-                    <span className="block text-xs text-slate-500 truncate">
+                    {/* slate-400, not slate-500. The Two Greys Rule allows
+                        exactly one grey to carry text: slate-500 (#7a6b58)
+                        measured 3.59:1 here against Night Pasture, under the
+                        4.5:1 floor, and this was the only place in the app
+                        still using it for text rather than for a marker or an
+                        icon fill. slate-400 is 6.73:1. Quieter is size and
+                        weight, never a darker grey. */}
+                    <span className="block text-xs text-slate-400 truncate">
                       {e?.junkReason || "Marked as noise"}
                       {e ? ` · ${e.wordCount} ${e.wordCount === 1 ? "word" : "words"}` : ""}
                     </span>
@@ -1689,6 +1738,88 @@ function HomeInner() {
           </ul>
         </details>
       )}
+
+      {/* Footer — the destinations and utilities that are *about* the tool
+          rather than part of using it. These were all in the header's Contents
+          row, where they competed with today's conversations for the first
+          fold; nothing here is something you reach for before looking at the
+          day, so the end of the page is where they belong. */}
+      <nav aria-label="More" className="mt-10 pt-4 border-t border-slate-800 -mx-3">
+        <div className="flex flex-wrap items-center gap-x-1 gap-y-0">
+          {/* No "How this works" here: the global footer (app-version.tsx)
+              already carries it on every screen, which is strictly better than
+              a home-only copy. Two links to the manual within one screen-height
+              of each other is worse than one. */}
+          <Link href="/search" className={BUTTON_GHOST}>
+            <SearchIcon className="w-4 h-4 flex-shrink-0" />
+            Search analyses
+          </Link>
+          <Link href="/usage" className={BUTTON_GHOST}>
+            <TrendingUpIcon className="w-4 h-4 flex-shrink-0" />
+            Usage
+          </Link>
+          <Link href="/capture" className={BUTTON_GHOST}>
+            <MicIcon className="w-4 h-4 flex-shrink-0" />
+            Capture
+          </Link>
+        </div>
+      </nav>
+
+      {/* Backup and Restore. Behind a disclosure because Restore merges a
+          backup into live data and used to sit in the header beside Refresh at
+          identical weight — one deliberate open is the cheapest way to stop the
+          two being neighbours. */}
+      <details className="mt-3 group">
+        <summary className="cursor-pointer list-none text-sm text-slate-400 hover:text-slate-300 transition-colors min-h-[44px] flex items-center gap-1.5">
+          <ChevronRightIcon className="w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] group-open:rotate-90" />
+          Back up or restore
+        </summary>
+        <div className="pl-5 pt-1 pb-2 space-y-3">
+          <p className="text-sm text-slate-300">
+            Backup downloads every analysis, rollup, person and place as one JSON file. Restore reads
+            one back in as a merge — you see what would change before anything is written, and newer
+            always wins.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              aria-label="Download a backup of all stored analyses"
+              className={BUTTON_SECONDARY}
+            >
+              <DownloadIcon className="w-4 h-4 flex-shrink-0" />
+              {exporting ? "Backing up…" : "Backup"}
+            </button>
+            <button
+              onClick={() => restoreInputRef.current?.click()}
+              disabled={restoring}
+              aria-label="Restore analyses from a backup file"
+              className={BUTTON_SECONDARY}
+            >
+              <UploadIcon className="w-4 h-4 flex-shrink-0" />
+              {restoring ? "Reading…" : "Restore"}
+            </button>
+            <input
+              ref={restoreInputRef}
+              type="file"
+              accept=".json,application/json"
+              className="sr-only"
+              tabIndex={-1}
+              aria-hidden="true"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleRestoreFile(file);
+                // Reset so choosing the same file again re-fires onChange.
+                e.target.value = "";
+              }}
+            />
+          </div>
+          {exportError && <p className="text-sm text-red-400" role="alert">{exportError}</p>}
+          {exportNotice && <p className="text-sm text-slate-400">{exportNotice}</p>}
+          {restoreError && <p className="text-sm text-red-400" role="alert">{restoreError}</p>}
+          {restoreNotice && <p className="text-sm text-slate-400" role="status">{restoreNotice}</p>}
+        </div>
+      </details>
 
       {/* Onboarding: About this framework — a quiet footnote at the end of the page */}
       <details className="mt-3 group">

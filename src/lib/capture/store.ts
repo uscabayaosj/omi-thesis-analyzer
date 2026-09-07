@@ -283,6 +283,17 @@ export async function getConversationRow(sql: Sql, id: string): Promise<Conversa
   return rows[0] ?? null;
 }
 
+/** Permanent: `conversations` is TRACE's own store, not a cache of anything
+ *  else, so there is no re-fetch to fall back on. Returns how many rows
+ *  actually existed to delete, which may be less than `ids.length`. */
+export async function deleteConversations(sql: Sql, ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  const rows = (await withTimeout(
+    sql`DELETE FROM conversations WHERE id = ANY(${ids}) RETURNING id`
+  )) as { id: string }[];
+  return rows.length;
+}
+
 // ── status page ──
 
 export interface CaptureStatus {

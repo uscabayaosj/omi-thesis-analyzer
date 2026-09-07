@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { Map as LeafletMap } from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { TILE_URL, TILE_ATTRIBUTION } from "@/lib/map-tiles";
 
 function esc(s: string): string {
   return s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -47,9 +48,14 @@ interface MeetingMapProps {
   places?: PlaceMarker[];
   onNameLocation?: (lat: number, lng: number, rawName?: string) => void;
   className?: string;
+  /** Height utilities for the map box. A separate prop rather than something a
+   *  caller folds into `className`, because two height classes on one element
+   *  don't resolve by the order they're written — Tailwind emits them in its own
+   *  order and the larger one silently wins. One height, decided here. */
+  heightClass?: string;
 }
 
-export default function MeetingMap({ markers, places, onNameLocation, className }: MeetingMapProps) {
+export default function MeetingMap({ markers, places, onNameLocation, className, heightClass = "h-64" }: MeetingMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<LeafletMap | null>(null);
 
@@ -65,10 +71,7 @@ export default function MeetingMap({ markers, places, onNameLocation, className 
       }
       const map = L.map(containerRef.current, { scrollWheelZoom: false });
       mapRef.current = map;
-      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 19,
-      }).addTo(map);
+      L.tileLayer(TILE_URL, { attribution: TILE_ATTRIBUTION, maxZoom: 19 }).addTo(map);
       const icon = L.divIcon({
         className: "",
         html: `<div style="width:14px;height:14px;border-radius:9999px;background:${PIN.meeting};border:2px solid ${PIN.stroke}"></div>`,
@@ -134,7 +137,7 @@ export default function MeetingMap({ markers, places, onNameLocation, className 
   return (
     <div
       ref={containerRef}
-      className={`rounded-xl overflow-hidden border border-slate-800 h-64 ${className ?? ""}`}
+      className={`rounded-xl overflow-hidden border border-slate-800 ${heightClass} ${className ?? ""}`}
       role="region"
       aria-label="Map of meeting locations"
     />

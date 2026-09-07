@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Map as LeafletMap, Marker as LeafletMarker } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { SearchIcon, LoaderIcon } from "@/components/icons";
+import { TILE_URL, TILE_ATTRIBUTION } from "@/lib/map-tiles";
 
 interface LatLng {
   lat: number;
@@ -69,10 +70,7 @@ export default function LocationPicker({ value, onChange, initialCenter, onResol
       }
       const map = L.map(containerRef.current, { scrollWheelZoom: false });
       mapRef.current = map;
-      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 19,
-      }).addTo(map);
+      L.tileLayer(TILE_URL, { attribution: TILE_ATTRIBUTION, maxZoom: 19 }).addTo(map);
 
       const icon = L.divIcon({ className: "", html: pinHtml(), iconSize: [16, 16], iconAnchor: [8, 8] });
 

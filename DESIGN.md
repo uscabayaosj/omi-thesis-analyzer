@@ -76,18 +76,27 @@ spacing:
 components:
   button-primary:
     backgroundColor: "{colors.copper-brand}"
-    textColor: "#020617"
+    textColor: "#14100d"
     rounded: "{rounded.md}"
     padding: "8px 20px"
   button-primary-hover:
-    backgroundColor: "#67e8f9"
+    backgroundColor: "#e6b988"
   button-secondary:
     backgroundColor: "{colors.ink-panel}"
-    textColor: "{colors.paper}"
+    textColor: "{colors.lamp-paper}"
     rounded: "{rounded.md}"
     padding: "8px 16px"
   button-secondary-hover:
     backgroundColor: "{colors.ink-panel-raised}"
+  pill-switch-on:
+    backgroundColor: "{colors.copper-brand-light}"
+    textColor: "#14100d"
+    rounded: "{rounded.full}"
+  pill-refine-on:
+    backgroundColor: "rgba(42, 25, 13, 0.4)"
+    borderColor: "rgba(185, 109, 51, 0.5)"
+    textColor: "#f0d3ae"
+    rounded: "{rounded.full}"
   card:
     backgroundColor: "{colors.ink-panel}"
     rounded: "{rounded.lg}"
@@ -144,7 +153,9 @@ The palette is a narrow, deliberately dark stack: one background, one panel colo
 
 ## Typography
 
-**Display/Body Font:** System sans (`ui-sans-serif, system-ui, -apple-system`) — no custom webfont is loaded; the system stack keeps the app feeling native and instant on a phone-installed PWA.
+**Display Font:** Source Serif 4, loaded through `next/font/google` in `src/app/layout.tsx` and exposed as `--font-serif` (`'Source Serif 4', Georgia, 'Times New Roman', serif`). It is the *only* webfont in the app, and it carries the journal voice: every `h1`/`h2`/`h3` and the italic Subtitle gloss. `next/font` self-hosts it and inlines the `@font-face`, so there is no render-blocking request to a third party.
+
+**Body Font:** System sans (`ui-sans-serif, system-ui, -apple-system`) — deliberately not the serif. Body copy is dense generated text read at arm's length, and the system stack keeps it native and instant on a phone-installed PWA.
 **Label/Mono Font:** System mono (`ui-monospace, SFMono-Regular`) — used narrowly for small structured metadata (a commitment's "who → who" direction, a transcript timestamp), never for prose.
 
 **Character:** Plain and legible over expressive. The type system does one job — make dense structured output (five thesis dimensions, six ADHD categories) scannable at a glance — and gets out of the way otherwise.
@@ -196,7 +207,7 @@ Every interactive component shares one behavior contract: `background` and `tran
 - **Shape:** 8px radius (`rounded-lg`), 44px minimum height always.
 - **Primary:** Copper Brand background, `slate-950` label (never white — see Colors), `font-medium`, used for the one primary action per screen (Run Custom Analysis, Generate Rollup). Lives as `BUTTON_PRIMARY` in `src/lib/ui.ts` so the brand colour has exactly one definition; call sites append only padding and layout.
 - **Secondary:** one tonal step lighter than whatever surface it sits on, lightening one further step on hover — used for every non-primary action (Cancel, Refresh, Deselect All). On the page field this is Ink Panel background (`bg-slate-800`) → Ink Panel Raised on hover; **inside a `.card`, that step must shift down to `bg-slate-700` → `bg-slate-600`**, since a card's own background already *is* Ink Panel — a secondary button using `bg-slate-800` there is invisible at rest (confirmed bug, fixed across the toolbar, both confirm dialogs, and both quick-prompt-preset blocks: same-color-as-container, no shape until hovered). The rule is relative to the immediate surface, never a fixed class.
-- **Parity Action:** for two or more independent, co-equal actions sharing one control (e.g. the selection toolbar's Group Thesis / Run ADHD — different actions, not a preference order), no button claims solid-fill copper at rest, since only one action per screen is allowed that mark under the One Ink Rule. All of them share one class and three tiers instead: flat slate with nothing selected; a copper-tinted **ready** wash (`border-cyan-500/50 bg-cyan-950/40 text-cyan-200`, `hover:` one step up) — the same wash `ConversationRow` uses for a selected item, not a new pattern — as soon as *anything* is selected, even if a given button's own minimum (Group Thesis needs 2, not 1) isn't met yet; and a solid-fill **full copper** flash on `:active`, so an actual tap still reads as a distinct, heavier moment than just having a selection ready. A button whose own minimum isn't met yet stays visually "ready" and tappable rather than disabled — its click handler no-ops instead (`if (selected.size < 2) return;`) — since the resting color's job is "there's a selection to act on," not "this specific action's exact threshold is satisfied"; the live count in the label (`Group Thesis (1)`) carries that nuance instead. Disabled state (nothing selected, or a batch already running) is `bg-slate-700` here, not `bg-slate-800` — this toolbar is itself a `.card` (Ink Panel), so the Secondary Button "shift one step inside a card" rule applies just as much to this variant.
+- **Parity Action:** for two or more independent, co-equal actions sharing one control (e.g. the selection toolbar's Group Thesis / Run ADHD — different actions, not a preference order), no button claims solid-fill copper at rest, since only one action per screen is allowed that mark under the One Ink Rule. All of them share one class and three tiers instead: flat slate with nothing selected; a copper-tinted **ready** wash (`border-cyan-500/50 bg-cyan-950/40 text-cyan-200`, `hover:` one step up) — the same wash `ConversationRow` uses for a selected item, not a new pattern — as soon as *anything* is selected, even if a given button's own minimum (Group Thesis needs 2, not 1) isn't met yet; and a solid-fill **full copper** flash on `:active`, so an actual tap still reads as a distinct, heavier moment than just having a selection ready. A button whose own minimum isn't met yet **is disabled** (`disabled={selected.size < 2 || batchRunning}`), not left tappable with a no-op handler. That was the earlier rule here, and it was wrong in practice: with one conversation selected, Group Thesis carried the copper "ready" wash, invited a tap, and then did nothing at all — a control that looks pressable and silently refuses is worse than one that plainly says "not yet." The live count in the label (`Group Thesis (1)`) still carries the nuance of *why*. Disabled state (nothing selected, or a batch already running) is `bg-slate-700` here, not `bg-slate-800` — this toolbar is itself a `.card` (Ink Panel), so the Secondary Button "shift one step inside a card" rule applies just as much to this variant.
 - **Ghost/ text-link:** No background, `text-cyan-400` (remapped to light copper), underline on hover — used for low-emphasis actions inline in text ("Show all").
 - **Disabled:** Background drops to a flat slate; Primary/Parity Action buttons swap to a flat color directly, Secondary/Ghost buttons reduce opacity instead — either way, no hover/press feedback. Which flat slate depends on the immediate surface (page field vs. inside a `.card`) — see the Secondary Button rule.
 
@@ -216,8 +227,15 @@ Every interactive component shares one behavior contract: `background` and `tran
 - **Focus:** Border shifts to the relevant accent color (amber for the custom-analysis textarea), plus the global 2px accent focus ring — no glow/shadow effect.
 
 ### Navigation
-- Filter pills (All / Analyzed / Unanalyzed) use solid-fill selection: the active pill gets a full Copper Brand background and a slate-950 label, inactive pills stay Ink Panel with graphite text. This is the one place the system uses fill (not tint) for state, reserved for true single-select navigation.
-- Primary in-page navigation (Daily Rollup, Refresh) sits as icon + label ghost buttons in the header, never a persistent nav bar or tab strip — the app has no chrome beyond what a given screen needs.
+
+**Single-select pills — two roles, one ink.** Every "pick exactly one of these" control in the app is one of two treatments, both defined once in `src/lib/ui.ts` (`PILL_SWITCH_*`, `PILL_REFINE_*`). Which one a control gets is decided by what changes when you press it, not by where it sits:
+
+- **Switch** (`PILL_SWITCH_ON` — solid Copper Brand fill, slate-950 label): the choice replaces *what you are looking at*. The home filter pills (All / Analyzed / Unanalyzed), the Thesis / ADHD Aid / Both lens toggle, `/people`'s Grid / Connections / Map / Places views, and the calendar's selected day. This is the system's only use of fill (not tint) for state, and it is reserved for exactly this. Unselected pills sit on Ink Panel on the page field (`PILL_SWITCH_OFF`), or carry no fill at all inside a segmented track that is already Ink Panel (`PILL_SWITCH_OFF_TRACK`) — the Secondary Button surface rule, applied to pills.
+- **Refine** (`PILL_REFINE_ON` — copper tint wash, `border-cyan-500/50 bg-cyan-950/40 text-cyan-200`): the choice narrows or moves within a list that is already on screen, and the page keeps its identity. `/commitments`' age and direction filters, `SectionNav`'s section chips. A tint reads as an adjustment; a fill would over-claim. This is the same wash `ConversationRow` uses for a selected row and the Parity Action's "ready" tier — not a new pattern.
+
+Both keep the One Ink Rule: copper is still the only colour that means "active," and neither role introduces a second hue. A grey-on-grey selected state is not a third option — `/people`'s view switcher used `bg-slate-700` on a `bg-slate-800` track, roughly a 1.1:1 step, and it was the faintest selected state in the app on its most modal screen.
+
+- Primary in-page navigation (Daily Rollup, Refresh) sits as icon + label buttons in the header, never a persistent nav bar or tab strip — the app has no chrome beyond what a given screen needs. On the conversations list, Daily Rollup is the one control that carries `BUTTON_PRIMARY`: the One Ink Rule allows exactly one copper mark per screen, and the home screen previously spent it on nothing while offering fourteen equal-weight controls above the fold. Destinations that are *about* the tool rather than part of a day's work (How this works, Search analyses, Usage, Capture, Backup / Restore) belong in the page footer, not the header.
 
 ### Lens Badge (signature component)
 A stacked pair of small rounded-full pills ("Thesis" / "ADHD") shown beside every conversation list item, each independently lit (emerald fill + border) or dim (flat slate) depending on whether that lens has run. Reads as plain words, not a coded glyph — a first-time reader doesn't need a tooltip to know what's been processed. This is the system's one custom-invented primitive — a status readout that lets the researcher scan a whole list at a glance.
@@ -226,6 +244,14 @@ A stacked pair of small rounded-full pills ("Thesis" / "ADHD") shown beside ever
 The primary day-browsing entry point on the conversations list. A 7-column Monday-first grid inside a `.card`. The selected day reuses the filter pills' solid-fill pattern (Copper Brand background, slate-950 label) — the same "true single-select navigation" rule, not a new one. Today gets a copper ring (`border-cyan-500/60`) independent of selection, so it stays identifiable even when browsing a different day. Days with conversations get a small graphite dot; days without get none — no shadow, no elevation, just the dot and the two copper treatments. Future dates render dimmed (Graphite, one step below the `text-slate-300` of past days) but stay clickable rather than disabled — simplicity over guarding an edge case that just resolves to an empty state. They are dimmed, not faded out: because they remain real controls, they hold the same AA-legible Graphite as any other muted text.
 
 Collapsed to a one-line summary row by default (icon + selected day's label, chevron affordance) — the full grid would otherwise be the first thing painted on mobile, pushing that day's actual conversations below the fold. Tapping the row expands the grid; picking a day (or "Today") collapses it back automatically, so the grid never lingers once its job is done. The one exception: while group-select mode is active, picking a day does *not* collapse the grid, since batch-selecting across several days means jumping between them repeatedly — closing on every pick would fight that workflow. The month label doubles as a native `<input type="month">` (invisibly overlaid) for jumping distant months without a hand-built year picker.
+
+### Map (Leaflet)
+
+Used by `MeetingMap` (conversation, `/people` map view, `/people/place/[id]`) and `LocationPicker`. The basemap is **CARTO `dark_all`**, defined once in `src/lib/map-tiles.ts` and imported by both — never a per-component tile URL.
+
+This matters more than it looks. The map is the only third-party surface in the app, and its tiles are ~90% of the component's pixels: on stock light OpenStreetMap tiles the map was a rectangle of daylight inside a system whose first constraint is "no light mode," and on the conversation page it put the brightest, largest object on the screen directly above the analysis — value contrast outranking "Do today." Themed pins, popups and attribution do not compensate for a light basemap; the tiles themselves have to be dark.
+
+Height is a `heightClass` prop with an `h-64` default, not something a caller folds into `className` — two height utilities on one element don't resolve by written order. Where the map is context rather than subject (the conversation page) it drops to `h-40` on mobile. Pins are two steps of the same copper differentiated by *shape* (round = meeting, square = named place), never by a second hue; popups are re-grounded onto Ink Panel in `globals.css`, because Leaflet ships a white popup surface that would otherwise carry dark-theme text at ~1.8:1.
 
 ## Do's and Don'ts
 

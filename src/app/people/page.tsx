@@ -55,7 +55,10 @@ import {
   UsersIcon,
   XIcon,
 } from "@/components/icons";
-import { BUTTON_PRIMARY, BUTTON_GHOST, BUTTON_SECONDARY_CARD } from "@/lib/ui";
+import {
+  BUTTON_PRIMARY, BUTTON_GHOST, BUTTON_SECONDARY_CARD,
+  PILL_SWITCH_ON, PILL_SWITCH_OFF_TRACK,
+} from "@/lib/ui";
 
 // Meeting has no personId field of its own; this local shape threads one
 // through for per-place people-counting only (see placeStats below).
@@ -552,12 +555,27 @@ export default function PeoplePage() {
   // The letter rail is a fixed overlay pinned to the viewport's right edge, so
   // it doesn't reserve layout space on its own. When it's showing, widen the
   // container's right padding so right-aligned card content (place, "21h ago")
-  // never runs under it. On wide screens the container is centered with gutters
-  // and the rail sits well clear, but the extra padding there is harmless.
+  // never runs under it.
+  //
+  // The clearance has to be pointer-dependent, because the rail's width is.
+  // `pr-9` (36px) was measured against the rail's *fine-pointer* geometry —
+  // 4px pl + a ~14px letter + 4px pr ≈ 24px. But globals.css inflates every
+  // `button` to `min-width: 44px` under `(pointer: coarse)`, which makes the
+  // same rail 4 + 44 + 4 = 52px on a phone. At 375px that left 16px of the
+  // content column running underneath a fixed overlay, and hit-testing at the
+  // rail's left edge returned the *search input*: a right-thumb tap at the end
+  // of "Search people…" landed on a letter and jumped the list instead of
+  // focusing the field. pr-14 (56px) clears the coarse rail with 4px to spare,
+  // and stays off desktop, where 56px against a 16px left padding would visibly
+  // push the column off-centre.
   const railVisible = view === "grid" && !loading && groups.length > 1;
 
   return (
-    <main id="main" tabIndex={-1} className={`max-w-3xl mx-auto py-8 pl-4 ${railVisible ? "pr-9" : "pr-4"}`}>
+    <main
+      id="main"
+      tabIndex={-1}
+      className={`max-w-3xl mx-auto py-8 pl-4 ${railVisible ? "pr-9 [@media(pointer:coarse)]:pr-14" : "pr-4"}`}
+    >
       <Link
         href="/"
         className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors mb-4"
@@ -680,17 +698,23 @@ export default function PeoplePage() {
         <div className="flex items-center bg-slate-800 rounded-lg p-1 flex-shrink-0" role="group" aria-label="View mode">
           {([
             { key: "grid", label: "Grid", Icon: SquareIcon },
-            { key: "web", label: "Web", Icon: UsersIcon },
+            { key: "web", label: "Connections", Icon: UsersIcon },
             { key: "map", label: "Map", Icon: CompassIcon },
             { key: "places", label: "Places", Icon: MapPinIcon },
           ] as const).map(({ key, label, Icon }) => (
+            // This is a SWITCH, not a filter: picking one replaces the whole
+            // directory below it. It used to signal the active view with
+            // bg-slate-700 on a bg-slate-800 track — about a 1.1:1 step, the
+            // faintest selected-state in the app, on the one screen where
+            // guessing wrong costs a full re-render. It now uses the same solid
+            // copper as the home filter pills and the lens toggle.
             <button
               key={key}
               onClick={() => setView(key)}
               aria-pressed={view === key}
               aria-label={label}
               className={`flex items-center justify-center gap-1.5 text-sm min-h-[36px] min-w-[44px] sm:min-w-0 px-2.5 sm:px-3 py-1.5 rounded-md transition-colors ${
-                view === key ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white"
+                view === key ? PILL_SWITCH_ON : PILL_SWITCH_OFF_TRACK
               }`}
             >
               <Icon className="w-4 h-4 flex-shrink-0" />
@@ -961,10 +985,18 @@ function LetterRail({ present, onJump }: { present: Set<string>; onJump: (letter
         // Absent letters used to render at 1.35:1 — invisible placeholders that
         // still consumed rail height. Omitted entirely instead.
         return has ? (
+          // Two sizing corrections here. The glyph was `text-[10px]` — the
+          // Micro token, which DESIGN.md reserves for a single character inside
+          // a compact badge and bars from anything the reader has to act on.
+          // These are navigation controls, so they belong at Label (12px). And
+          // the button measured 15.5x14px on a fine pointer, under WCAG 2.2
+          // SC 2.5.8's 24x24 floor; the 24px minimum fixes that without
+          // touching the coarse-pointer path, where globals.css already gives
+          // it 44px.
           <button
             key={letter}
             onClick={() => onJump(letter)}
-            className="text-[10px] leading-[14px] font-semibold text-slate-300 hover:text-cyan-300 active:text-cyan-300 transition-colors px-1"
+            className="flex items-center justify-center min-h-[24px] min-w-[24px] text-xs leading-none font-semibold text-slate-300 hover:text-cyan-300 active:text-cyan-300 transition-colors px-1"
           >
             {letter}
           </button>

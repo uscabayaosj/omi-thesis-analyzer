@@ -20,7 +20,7 @@ import { confidenceLabel, formatDeadline } from "@/lib/adhd";
 import { Inline } from "@/components/Prose";
 import { pullAndMerge } from "@/lib/sync";
 import { ArrowLeftIcon, CheckSquareIcon, SquareIcon, ClipboardIcon } from "@/components/icons";
-import { LINK_BACK } from "@/lib/ui";
+import { LINK_BACK, PILL_REFINE_ON, PILL_REFINE_OFF } from "@/lib/ui";
 
 type AgeFilter = "all" | "overdue" | "stale";
 type DirFilter = "all" | "mine" | "theirs";
@@ -52,10 +52,10 @@ function FilterRow<T extends string>({
           key={o.key}
           onClick={() => onChange(o.key)}
           aria-pressed={value === o.key}
+          // REFINE pill (see lib/ui.ts): these narrow the list below rather
+          // than replacing it, so they take the copper tint, not the fill.
           className={`px-3 py-2 min-h-[44px] rounded-full text-sm transition-colors ${
-            value === o.key
-              ? "border border-cyan-500/50 bg-cyan-950/40 text-cyan-200"
-              : "bg-slate-800 text-slate-300 hover:text-white"
+            value === o.key ? PILL_REFINE_ON : PILL_REFINE_OFF
           }`}
         >
           {o.label}

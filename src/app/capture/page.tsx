@@ -120,8 +120,27 @@ export default function CapturePage() {
       <p className="mt-6 mb-1 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">System</p>
       <h1 className="font-bold text-white mb-4">Capture</h1>
 
+      {/* The old copy read "The store isn't configured here, so there is
+          nothing to show." — a bare sentence, no card, no next step, and "the
+          store" appears nowhere else in the UI. On a passive-capture product
+          this is the screen that answers "is my pendant recording?", so
+          answering it with an unnamed service's configuration state is the
+          worst possible dead end: the user cannot tell whether recording is
+          quietly working, quietly broken, or simply not set up here. Says which
+          it is now, and where recordings still are. */}
       {status && !status.configured && (
-        <p className="text-slate-400">The store isn&apos;t configured here, so there is nothing to show.</p>
+        <div className="card p-6 space-y-3">
+          <p className="text-slate-100 font-semibold">Nothing is being recorded on this device.</p>
+          <p className="text-slate-300 text-sm">
+            Capture runs on the deployed app, where the recording store lives. This copy of TRACE
+            isn&apos;t connected to it, so it has no sessions to report — that&apos;s expected on a local
+            or preview build, and nothing has been lost.
+          </p>
+          <p className="text-slate-300 text-sm">
+            Conversations already recorded and transcribed are on the{" "}
+            <Link href="/" className="text-cyan-400 hover:underline">conversations list</Link> as usual.
+          </p>
+        </div>
       )}
 
       {/* A failed read used to leave this page as a bare heading: the note was

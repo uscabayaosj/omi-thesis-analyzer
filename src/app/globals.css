@@ -423,6 +423,28 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
   }
 }
 
+/* Dark basemap, done locally.
+
+   The map was the one surface in the app that ignored "no light mode": stock
+   OSM tiles are daylight cartography, and on the conversation page that put a
+   rectangle of white directly above the ADHD analysis — the brightest, largest
+   object on the screen outranking "Do today", which is exactly backwards.
+   Themed pins and popups don't compensate; the tiles are ~90% of the pixels.
+
+   Scoped to `.leaflet-tile-pane`, never the container: the marker, popup and
+   control panes are siblings, so filtering the whole map would invert the
+   copper pins to teal and the popup text along with them. Only the raster
+   imagery is touched.
+
+   `invert(1) hue-rotate(180deg)` is the standard pair — invert alone flips the
+   hue wheel too, turning green parkland magenta; the rotation puts it back.
+   Brightness is pulled down and saturation pulled in so the result settles into
+   the Night Pasture / Ink Panel range instead of glaring, and reads as a quiet
+   ground for the pins rather than competing with them. */
+.leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.82) saturate(0.55);
+}
+
 /* Leaflet popups — `leaflet/dist/leaflet.css` ships a white popup surface, so
    every colour the app injects into a popup was a dark-theme colour on white:
    the meeting link measured 1.81:1 and the muted meta 2.75:1. Since tapping a

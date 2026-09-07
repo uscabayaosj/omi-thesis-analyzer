@@ -38,3 +38,47 @@ export const BUTTON_SECONDARY_CARD =
 // The "← Back" link at the top of every sub-page.
 export const LINK_BACK =
   "text-slate-400 hover:text-white text-sm mb-6 inline-flex items-center gap-1.5 min-h-[44px] py-2";
+
+/* ── Single-select pills ──
+ *
+ * One interaction — "pick exactly one of these" — had grown three visual
+ * dialects: solid copper fill (home filter pills, the conversation lens
+ * toggle), a copper tint wash (the commitments filters, SectionNav), and on
+ * /people's view switcher a plain grey step with no copper at all. The last of
+ * those was the real defect: `bg-slate-800 → bg-slate-700` is roughly a 1.1:1
+ * change, which made the weakest selected-state in the app land on its most
+ * modal screen.
+ *
+ * The two surviving treatments are kept, because they are doing different
+ * jobs — but the difference is now named rather than incidental:
+ *
+ *   SWITCH  (solid copper fill) — changes *what you are looking at*. The
+ *           choices are mutually exclusive and one is always active: the home
+ *           filter pills, the Thesis/ADHD/Both lens toggle, /people's view
+ *           modes, the calendar's selected day. Solid fill is what DESIGN.md
+ *           reserves for true single-select navigation, and this is it.
+ *
+ *   REFINE  (copper tint wash) — narrows a list that is already on screen, or
+ *           jumps within it. The page does not change identity: the commitments
+ *           age/direction filters, SectionNav's section chips. A tint reads as
+ *           an adjustment; a fill would over-claim.
+ *
+ * Both keep the One Ink Rule — copper is still the only colour meaning
+ * "active" — and neither introduces a second hue.
+ */
+
+// SWITCH, selected. slate-950 on cyan-400 is 7.87:1; the branch this pairs
+// against carries its own colour, so the detector's cross-branch reading of the
+// ternary is a false positive.
+export const PILL_SWITCH_ON = "bg-cyan-400 text-slate-950"; // impeccable-disable-line gray-on-color
+
+// SWITCH, unselected, sitting directly on the page field.
+export const PILL_SWITCH_OFF = "bg-slate-800 text-slate-300 hover:text-white";
+
+// SWITCH, unselected, sitting inside a segmented track that is itself
+// slate-800 — the track supplies the fill, so the pill must not repeat it.
+export const PILL_SWITCH_OFF_TRACK = "text-slate-300 hover:text-white";
+
+// REFINE, selected / unselected.
+export const PILL_REFINE_ON = "border border-cyan-500/50 bg-cyan-950/40 text-cyan-200";
+export const PILL_REFINE_OFF = "bg-slate-800 text-slate-300 hover:text-white";
