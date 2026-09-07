@@ -297,6 +297,18 @@ export async function getConversationRow(sql: Sql, id: string): Promise<Conversa
   return rows[0] ?? null;
 }
 
+/** Just the timestamp, for callers that only need it to order or batch
+ *  conversations — `getConversationRow` selects the full row, `transcript_segments`
+ *  (the heaviest column in the schema) included, which is wasteful when all
+ *  that's wanted is `created_at` for a set of ids. */
+export async function getConversationCreatedAt(sql: Sql, ids: string[]): Promise<Map<string, string>> {
+  if (ids.length === 0) return new Map();
+  const rows = (await withTimeout(
+    sql`SELECT id, created_at FROM conversations WHERE id = ANY(${ids})`
+  )) as { id: string; created_at: string }[];
+  return new Map(rows.map((r) => [r.id, r.created_at]));
+}
+
 /** Permanent: `conversations` is TRACE's own store, not a cache of anything
  *  else, so there is no re-fetch to fall back on. Returns how many rows
  *  actually existed to delete, which may be less than `ids.length`. */
