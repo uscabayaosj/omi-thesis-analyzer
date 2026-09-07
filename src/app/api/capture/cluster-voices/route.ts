@@ -18,10 +18,27 @@ import { friendlyError } from "@/lib/api-error";
 
 export const maxDuration = 300;
 
-/** Two conversations per call: one audio assembly plus one inference per
- *  speaker each, comfortably inside the 300s ceiling with headroom for a cold
- *  model load. The client loops until `remaining` is 0. */
-const DEFAULT_MAX_CONVERSATIONS = 2;
+/** ONE conversation per call, and one is also the ceiling.
+ *
+ *  The binding constraint is memory, not the 300s duration this comment used
+ *  to cite. assembleSessionAudio decodes an entire session — every touched
+ *  chunk's PCM held at once, plus the concatenated voiced buffer — and that
+ *  stays resident for the whole iteration because extractSpeakerPcm slices
+ *  out of it. Add the ~400MB fp32 model, which is loaded and warm by the time
+ *  a second conversation starts, and two assemblies do not fit in the 2GB
+ *  Fluid Standard instance.
+ *
+ *  Measured in production, not estimated: a single conversation completes in
+ *  ~110s and returns 200; a batch of two was SIGKILLed (exit 137). The client
+ *  loops until `remaining` is 0, so a smaller batch costs round trips, not
+ *  throughput — and each round trip is independently safe and cancellable.
+ *
+ *  Raising this REQUIRES raising the instance memory first (a `functions`
+ *  block in vercel.json). Note that an OOM is uncatchable, so the attempts
+ *  counter below cannot bound it: the row is never written and the loop stops
+ *  on the 500 instead. */
+const DEFAULT_MAX_CONVERSATIONS = 1;
+const MAX_CONVERSATIONS_CEILING = 1;
 
 /** How many times a caught embed exception may leave a pair owing before it
  *  settles as a permanent null. This buys retries across transient failures
@@ -129,7 +146,7 @@ async function handle(req: NextRequest) {
       .slice()
       .sort((a, b) => (createdAtById.get(a) ?? "").localeCompare(createdAtById.get(b) ?? ""));
 
-    const limit = Math.max(1, Math.min(body.maxConversations ?? DEFAULT_MAX_CONVERSATIONS, 5));
+    const limit = Math.max(1, Math.min(body.maxConversations ?? DEFAULT_MAX_CONVERSATIONS, MAX_CONVERSATIONS_CEILING));
     const batch = byCreated.slice(0, limit);
 
     for (const conversationId of batch) {
