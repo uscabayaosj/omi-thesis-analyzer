@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { capSpeakerSegments, CLIP_MAX_MS } from "../src/lib/capture/clip.ts";
+import { capSpeakerSegments, CLIP_MAX_MS, capPcmForEmbedding, EMBED_MAX_SAMPLES } from "../src/lib/capture/clip.ts";
 
 test("CLIP_MAX_MS is 15 seconds", () => {
   assert.equal(CLIP_MAX_MS, 15_000);
@@ -40,4 +40,56 @@ test("ignores segments with no positive duration", () => {
     { start: 1, end: 20 },
   ];
   assert.deepEqual(capSpeakerSegments(segs, 15_000), segs);
+});
+
+// ── embedding input cap ──
+//
+// Regression: enroll-voice and cluster-voices were SIGKILLed (exit 137) in
+// production. Every embedAudio call site fed WavLM a speaker's ENTIRE cluster.
+// The feature extractor downsamples 16kHz by 320x and self-attention is
+// quadratic in the resulting frames, so a 20-minute speaker (19.2M samples ->
+// 60k frames) needs a ~14GB attention matrix. Bounding the input is the fix;
+// no instance size survives an unbounded one.
+
+test("EMBED_MAX_SAMPLES is 30s at 16kHz", () => {
+  assert.equal(EMBED_MAX_SAMPLES, 30 * 16_000);
+});
+
+test("capPcmForEmbedding leaves a short clip untouched", () => {
+  const pcm = new Float32Array(16_000); // 1s
+  assert.equal(capPcmForEmbedding(pcm), pcm, "must not copy when already short");
+});
+
+test("capPcmForEmbedding truncates a long clip to the cap", () => {
+  const pcm = new Float32Array(20 * 60 * 16_000); // 20 minutes — the OOM case
+  assert.equal(capPcmForEmbedding(pcm).length, EMBED_MAX_SAMPLES);
+});
+
+test("capPcmForEmbedding keeps the leading samples, not a copy of the tail", () => {
+  const pcm = new Float32Array(EMBED_MAX_SAMPLES + 10);
+  pcm[0] = 0.5;
+  pcm[EMBED_MAX_SAMPLES + 5] = 0.25;
+  const out = capPcmForEmbedding(pcm);
+  assert.equal(out[0], 0.5);
+  assert.equal(out.length, EMBED_MAX_SAMPLES);
+});
+
+test("capPcmForEmbedding is exact at the boundary", () => {
+  const pcm = new Float32Array(EMBED_MAX_SAMPLES);
+  assert.equal(capPcmForEmbedding(pcm).length, EMBED_MAX_SAMPLES);
+});
+
+test("capPcmForEmbedding handles an empty buffer", () => {
+  assert.equal(capPcmForEmbedding(new Float32Array(0)).length, 0);
+});
+
+test("capPcmForEmbedding does not hand back a view onto the uncapped buffer", () => {
+  // A subarray would share `buffer` with the 20-minute original, so a consumer
+  // reading pcm.buffer would still see every sample and the cap would be a
+  // no-op. The truncated result must own exactly its own bytes.
+  const pcm = new Float32Array(20 * 60 * 16_000);
+  const out = capPcmForEmbedding(pcm);
+  assert.equal(out.byteOffset, 0);
+  assert.equal(out.buffer.byteLength, EMBED_MAX_SAMPLES * 4);
+  assert.notEqual(out.buffer, pcm.buffer);
 });
