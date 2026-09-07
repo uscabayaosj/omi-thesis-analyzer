@@ -5,7 +5,12 @@ import Link from "next/link";
 import { type PendingSuggestion, type Person } from "@/lib/people";
 import { BUTTON_PRIMARY, optionLabel } from "@/lib/ui";
 import { getAnalysisAge } from "@/lib/storage";
-import { buildVoiceEvidence, loadConversationCached, type VoiceEvidence } from "@/lib/voice-evidence";
+import {
+  buildVoiceEvidence,
+  conversationTitle,
+  loadConversationCached,
+  type VoiceEvidence,
+} from "@/lib/voice-evidence";
 import { PlayIcon, PauseIcon } from "@/components/icons";
 
 function formatSpeech(seconds: number): string {
@@ -147,6 +152,65 @@ function VoiceEvidenceBlock({ conversationId, speakerId }: { conversationId: str
   );
 }
 
+/**
+ * Everything a group resolves besides `members[0]` — whose conversation the
+ * evidence block above already shows and links. The grouping threshold is an
+ * uncalibrated guess, and this list is the only way to catch it guessing
+ * wrong before answering once, incorrectly, for several conversations: a
+ * reviewer who doesn't recognize one of these titles knows to Ignore instead
+ * of naming the voice.
+ *
+ * Titles require a fetch, but every one of these conversations was already
+ * being fetched — one per card — before grouping existed; `loadConversationCached`
+ * just lets the cards that now share a group share the fetch too, so the
+ * total distinct fetches across the queue do not increase. Each link renders
+ * immediately with its own relative age and swaps to the real title if and
+ * when it resolves — never a loading state, never a skeleton — and degrades
+ * silently back to that age label on failure, same as `VoiceEvidenceBlock`.
+ */
+function OtherGroupMembers({ members }: { members: PendingSuggestion[] }) {
+  const others = members.slice(1);
+  // `others` is a fresh array every render (it's a slice of a prop that is
+  // itself sometimes a fresh array) — the joined ids are what's actually
+  // stable, so that's the effect's real dependency.
+  const key = others.map((m) => m.conversationId).join("|");
+  const [titles, setTitles] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let live = true;
+    others.forEach((m) => {
+      loadConversationCached(m.conversationId)
+        .then((c) => {
+          if (live) setTitles((cur) => ({ ...cur, [m.conversationId]: conversationTitle(c) }));
+        })
+        .catch(() => {
+          // Silent by design — the age-label fallback already makes the link
+          // usable; see VoiceEvidenceBlock's own failure handling above.
+        });
+    });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  if (others.length === 0) return null;
+
+  return (
+    <p className="text-slate-400 text-xs mb-3 break-words">
+      Also heard in{" "}
+      {others.map((m, i) => (
+        <span key={m.id}>
+          <Link href={`/conversation/${m.conversationId}`} className="text-cyan-400 hover:underline">
+            {titles[m.conversationId] ?? getAnalysisAge(m.date).label}
+          </Link>
+          {i < others.length - 1 ? ", " : "."}
+        </span>
+      ))}
+    </p>
+  );
+}
+
 export default function VoicePendingCard({
   suggestion: s,
   members,
@@ -180,6 +244,8 @@ export default function VoicePendingCard({
       </div>
 
       <VoiceEvidenceBlock conversationId={s.conversationId} speakerId={s.speakerId ?? 0} />
+
+      {members.length > 1 && <OtherGroupMembers members={members} />}
 
       {members.length > 1 && (
         <p className="text-slate-400 text-xs mb-3 break-words">

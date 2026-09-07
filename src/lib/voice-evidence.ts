@@ -47,6 +47,14 @@ function fallbackTitle(createdAt: string): string {
   });
 }
 
+/** The one rule for what a conversation is called, everywhere it's shown as a
+ *  link or heading: its own title if it has one, else a time-derived stand-in.
+ *  Pulled out of `buildVoiceEvidence` so a second caller (the group-members
+ *  link list) can't drift from this by restating the `??`/`trim()` logic. */
+export function conversationTitle(conversation: Conversation): string {
+  return conversation.structured?.title?.trim() || fallbackTitle(conversation.created_at);
+}
+
 export function buildVoiceEvidence(conversation: Conversation, speakerId: number): VoiceEvidence {
   const segments = conversation.transcript_segments ?? [];
   const mine = segments.filter((s) => speakerOf(s) === speakerId);
@@ -76,7 +84,7 @@ export function buildVoiceEvidence(conversation: Conversation, speakerId: number
   }, 0);
 
   return {
-    title: conversation.structured?.title?.trim() || fallbackTitle(conversation.created_at),
+    title: conversationTitle(conversation),
     quotes,
     othersPresent: others,
     lineCount: mine.length,

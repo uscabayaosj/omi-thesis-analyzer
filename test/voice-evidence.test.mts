@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildVoiceEvidence } from "../src/lib/voice-evidence.ts";
+import { buildVoiceEvidence, conversationTitle } from "../src/lib/voice-evidence.ts";
 import type { Conversation } from "../src/lib/conversation-types.ts";
 
 const conv = (over: Partial<Conversation> = {}): Conversation => ({
@@ -124,4 +124,36 @@ test("a speaker with no segments yields an empty but valid evidence block", () =
   assert.deepEqual(e.quotes, []);
   assert.equal(e.lineCount, 0);
   assert.equal(e.speechSeconds, 0);
+});
+
+test("conversationTitle uses the structured title when there is one", () => {
+  assert.equal(conversationTitle(conv()), "Field visit");
+});
+
+test("conversationTitle falls back when the structured title is whitespace-only", () => {
+  const title = conversationTitle(conv({ structured: { title: "   ", overview: "" } }));
+  assert.notEqual(title, "   ");
+  assert.notEqual(title, "");
+});
+
+test("conversationTitle falls back when structured is missing", () => {
+  const title = conversationTitle(conv({ structured: undefined }));
+  assert.notEqual(title, "");
+});
+
+test("conversationTitle yields 'Untitled conversation' for an unparseable timestamp", () => {
+  assert.equal(
+    conversationTitle(conv({ structured: undefined, created_at: "not a date" })),
+    "Untitled conversation"
+  );
+});
+
+test("conversationTitle's fallback varies with created_at", () => {
+  const morning = conversationTitle(conv({ structured: undefined, created_at: "2026-09-07T06:40:00.000Z" }));
+  const evening = conversationTitle(conv({ structured: undefined, created_at: "2026-09-10T19:05:00.000Z" }));
+  assert.notEqual(morning, "");
+  assert.notEqual(morning, "Field visit");
+  // The real assertion: the fallback is a function of created_at, not a
+  // constant. Locale-independent, so it holds wherever this suite runs.
+  assert.notEqual(morning, evening);
 });
