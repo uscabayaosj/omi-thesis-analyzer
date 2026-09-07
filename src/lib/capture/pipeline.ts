@@ -134,7 +134,7 @@ export async function assembleSessionAudio(
   return { assembled: assembleVoiced(pieces), chunkIds, paths };
 }
 
-function extractPeopleWithVoicePrints(raw: unknown): { id: string; name: string; voicePrint?: number[] }[] {
+export function extractPeopleWithVoicePrints(raw: unknown): { id: string; name: string; voicePrint?: number[] }[] {
   if (!raw || typeof raw !== "object") return [];
   const out: { id: string; name: string; voicePrint?: number[] }[] = [];
   for (const [id, v] of Object.entries(raw as Record<string, unknown>)) {

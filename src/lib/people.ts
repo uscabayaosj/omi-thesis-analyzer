@@ -407,9 +407,17 @@ export function removePending(id: string): void {
 
 /** One write for the whole batch. Grouping assigns a value to every voice card
  *  at once, and this namespace re-serializes wholesale on every write and
- *  schedules a push — 44 individual writes would be 44 of both. */
-export function setVoiceGroups(entries: { id: string; groupId: string }[]): void {
-  if (entries.length === 0) return;
+ *  schedules a push — 44 individual writes would be 44 of both.
+ *
+ *  Returns false only when a write was attempted and dropped (writeMap's
+ *  quota guard) — true when nothing needed changing. A minutes-long backfill
+ *  ending in "Voices grouped." while the queue never moved, because the
+ *  write silently lost to a full quota, is exactly the silent data loss
+ *  writeMap's own doc comment warns callers not to swallow; the caller
+ *  (runVoiceGrouping) surfaces this and stops rather than looping on writes
+ *  that can never land. */
+export function setVoiceGroups(entries: { id: string; groupId: string }[]): boolean {
+  if (entries.length === 0) return true;
   const map = pruneTombstones(readMap<PendingSuggestion | Tombstone>(PENDING_NS));
   let changed = false;
   for (const { id, groupId } of entries) {
@@ -419,7 +427,7 @@ export function setVoiceGroups(entries: { id: string; groupId: string }[]): void
     map[id] = { ...cur, voiceGroupId: groupId, timestamp: new Date().toISOString() };
     changed = true;
   }
-  if (changed) writeMap(PENDING_NS, map);
+  return changed ? writeMap(PENDING_NS, map) : true;
 }
 
 /**

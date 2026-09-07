@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getStore, getNamespaceData } from "@/lib/kv";
 import { ensureCaptureSchemaOnce, getVoiceClusters } from "@/lib/capture/store";
 import { bestMatch } from "@/lib/capture/identify";
-import { voiceMatchThreshold } from "@/lib/capture/pipeline";
+import { voiceMatchThreshold, extractPeopleWithVoicePrints } from "@/lib/capture/pipeline";
 import { voiceKey } from "@/lib/capture/cluster";
 import { friendlyError } from "@/lib/api-error";
 
@@ -50,14 +50,16 @@ export async function POST(req: NextRequest) {
     if (!sql) return NextResponse.json({ error: "store not configured" }, { status: 503 });
     await ensureCaptureSchemaOnce(sql);
 
-    const raw = (await getNamespaceData(sql, "omi-people")) as Record<string, unknown> | null;
-    const gallery: { personId: string; embedding: number[] }[] = [];
-    for (const [id, v] of Object.entries(raw ?? {})) {
-      if (id.startsWith("__") || !v || typeof v !== "object") continue;
-      const r = v as Record<string, unknown>;
-      if ("deleted" in r || typeof r.name !== "string") continue;
-      if (Array.isArray(r.voicePrint)) gallery.push({ personId: id, embedding: r.voicePrint as number[] });
-    }
+    // Same gallery extraction identifySpeakers uses (pipeline.ts), not a
+    // hand-rolled copy: the inline version this route used to have skipped
+    // extractPeopleWithVoicePrints's per-element numeric check on `voicePrint`
+    // (it only confirmed `Array.isArray`), so a malformed entry reached
+    // bestMatch → cosineSimilarity, which throws on anything that isn't a
+    // clean number[] and 500s the whole sweep.
+    const people = extractPeopleWithVoicePrints(await getNamespaceData(sql, "omi-people"));
+    const gallery = people
+      .filter((p): p is { id: string; name: string; voicePrint: number[] } => !!p.voicePrint)
+      .map((p) => ({ personId: p.id, embedding: p.voicePrint }));
     if (gallery.length === 0) return NextResponse.json({ matched: [] });
 
     const wanted = new Map(body.voices.map((v) => [voiceKey(v.conversationId, v.speakerId), v]));
@@ -67,8 +69,14 @@ export async function POST(req: NextRequest) {
     const matched: { conversationId: string; speakerId: number; personId: string }[] = [];
     for (const row of rows) {
       const key = voiceKey(row.conversationId, row.speakerId);
-      if (!wanted.has(key) || !row.embedding) continue;
-      const hit = bestMatch(row.embedding, gallery, threshold);
+      const embedding = row.embedding;
+      if (!wanted.has(key) || !embedding) continue;
+      // cosineSimilarity (identify.ts) throws on a length mismatch instead of
+      // returning a score — the same guard cluster.ts applies before calling
+      // it, so a gallery entry embedded at a different dimension (a model
+      // swap) can't 500 the whole sweep over one bad pairing.
+      const compatibleGallery = gallery.filter((g) => g.embedding.length === embedding.length);
+      const hit = bestMatch(embedding, compatibleGallery, threshold);
       if (hit) matched.push({ conversationId: row.conversationId, speakerId: row.speakerId, personId: hit.personId });
     }
 

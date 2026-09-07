@@ -13,6 +13,11 @@ function formatSpeech(seconds: number): string {
   return `~${Math.round(seconds / 60)} min of speech`;
 }
 
+// Single source of truth for the clip-playback failure copy, shared by the
+// <audio> "error" event and both play() rejection handlers below — they all
+// mean the same thing to the user, so they must all say the same thing.
+const CLIP_LOAD_ERROR = "Couldn’t load the audio for this voice.";
+
 /**
  * The reason this card is answerable at all. Everything here comes from the
  * conversation the suggestion already points at — what this voice said, who
@@ -32,6 +37,16 @@ function VoiceEvidenceBlock({ conversationId, speakerId }: { conversationId: str
   const [loadingClip, setLoadingClip] = useState(false);
   const [clipError, setClipError] = useState<string | null>(null);
 
+  // What a play() rejection needs undone: an AbortError or NotAllowedError
+  // resolves the promise's rejection branch but fires no "error" event on the
+  // element, so nothing else clears loadingClip/playing — the button was
+  // stuck disabled on "Loading…" forever until this ran on the rejection too.
+  const handlePlayFailure = () => {
+    setLoadingClip(false);
+    setPlaying(false);
+    setClipError(CLIP_LOAD_ERROR);
+  };
+
   // Nothing preloads: 44 cards must never mean 44 session decodes. The element
   // is created on the first tap and reused for every replay after it.
   const togglePlay = () => {
@@ -39,7 +54,7 @@ function VoiceEvidenceBlock({ conversationId, speakerId }: { conversationId: str
       if (playing) {
         audio.pause();
       } else {
-        audio.play().catch(() => {});
+        audio.play().catch(handlePlayFailure);
       }
       return;
     }
@@ -53,15 +68,13 @@ function VoiceEvidenceBlock({ conversationId, speakerId }: { conversationId: str
     el.addEventListener("pause", () => setPlaying(false));
     el.addEventListener("ended", () => setPlaying(false));
     el.addEventListener("error", () => {
-      setLoadingClip(false);
-      setPlaying(false);
       // The body is JSON when the route failed; the element cannot read it, so
       // this stays generic rather than guessing which failure it was.
-      setClipError("Couldn’t load the audio for this voice.");
+      handlePlayFailure();
       setAudio(null);
     });
     setAudio(el);
-    el.play().catch(() => {});
+    el.play().catch(handlePlayFailure);
   };
 
   useEffect(() => () => audio?.pause(), [audio]);

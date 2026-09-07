@@ -127,6 +127,14 @@ export async function ensureCaptureSchemaOnce(sql: Sql): Promise<void> {
 
 const iso = (ms: number) => new Date(ms).toISOString();
 const toMs = (v: unknown) => new Date(v as string).getTime();
+// A TIMESTAMPTZ column comes back from the Neon driver as a `Date` (its
+// pg-types parsers run over every result), never the string its column type
+// might suggest. Callers of getConversationCreatedAt sort these as ISO
+// strings, so this normalizes both shapes it could actually see instead of
+// asserting one with `as` — an `as string` cast here previously lied about
+// the type and let two `.localeCompare` call sites crash on a real `Date`.
+const isoOrEmpty = (v: unknown): string =>
+  v instanceof Date ? v.toISOString() : typeof v === "string" ? v : "";
 
 // ── chunks ──
 
@@ -310,8 +318,8 @@ export async function getConversationCreatedAt(sql: Sql, ids: string[]): Promise
   if (ids.length === 0) return new Map();
   const rows = (await withTimeout(
     sql`SELECT id, created_at FROM conversations WHERE id = ANY(${ids})`
-  )) as { id: string; created_at: string }[];
-  return new Map(rows.map((r) => [r.id, r.created_at]));
+  )) as { id: string; created_at: unknown }[];
+  return new Map(rows.map((r) => [r.id, isoOrEmpty(r.created_at)]));
 }
 
 /** Permanent: `conversations` is TRACE's own store, not a cache of anything

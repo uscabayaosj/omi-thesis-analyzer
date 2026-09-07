@@ -156,7 +156,30 @@ async function handle(req: NextRequest) {
 
       // The assembly is the expensive half, so it is paid once per
       // conversation and reused for every speaker in it.
-      const { assembled } = await assembleSessionAudio(sql, session);
+      let assembled: Awaited<ReturnType<typeof assembleSessionAudio>>["assembled"];
+      try {
+        ({ assembled } = await assembleSessionAudio(sql, session));
+      } catch (e) {
+        // readBlob (a non-200 Blob read) or parseChunk (corrupt bytes) throws
+        // here — a session whose blobs are missing or damaged, the failure
+        // mode this backfill is most likely to hit. Left unguarded, this used
+        // to escape the loop entirely: the rest of the batch was skipped, no
+        // group_id was ever written, and the same conversation (oldest-first)
+        // was reselected and re-thrown on every subsequent call with no way
+        // out. Settle this conversation's owing speakers exactly like the
+        // per-speaker embed catch below: could be transient (a Blob hiccup)
+        // or permanent (chunks genuinely gone), so attempts is bumped rather
+        // than jumped to the cap — a later call retries it, and a
+        // deterministic failure still settles once MAX_EMBED_ATTEMPTS is hit.
+        console.error(`backfill assembly failed for ${conversationId}:`, e);
+        for (const speakerId of speakers) {
+          const priorAttempts = known.get(voiceKey(conversationId, speakerId))?.attempts ?? 0;
+          const row: VoiceClusterRow = { conversationId, speakerId, embedding: null, groupId: null, attempts: priorAttempts + 1 };
+          await upsertVoiceCluster(sql, row);
+          known.set(voiceKey(conversationId, speakerId), row);
+        }
+        continue;
+      }
       const segments = (conversation.transcript_segments as { speaker_id: number; start: number; end: number }[]) ?? [];
 
       for (const speakerId of speakers) {
@@ -228,7 +251,7 @@ async function handle(req: NextRequest) {
     // `byCreated.length - batch.length` gap: that snapshot is 0 whenever the
     // whole owing set fit in one batch (always true of the last call, often
     // true of the first), which would hide a pair that just landed below the
-    // attempts cap in the catch branch and is still genuinely owing. `known`
+    // attempts cap in a catch branch and is still genuinely owing. `known`
     // was kept current by every write above, so re-filtering `wanted` with
     // the same `isOwing` predicate that chose the batch reports what actually
     // still needs work, and the two can never disagree about what "owing"
@@ -239,7 +262,8 @@ async function handle(req: NextRequest) {
     // finds anything owing processes a non-empty batch, and every owing pair
     // it touches either settles this call (an embedding is written, or a
     // structural null at the cap) or has its `attempts` strictly incremented
-    // by the catch branch. Since a conversation stays in the owing set until
+    // by a catch branch (assembly or per-speaker embed). Since a conversation
+    // stays in the owing set until
     // every one of its speakers has settled, and batches are drawn oldest
     // first from that set, the oldest `limit` owing conversations are
     // reselected on every subsequent call until they settle — which, even in

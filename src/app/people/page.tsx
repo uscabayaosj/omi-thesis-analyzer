@@ -163,6 +163,11 @@ export default function PeoplePage() {
   // nothing left to scan — a tap with no response reads as a broken button.
   const [backfillNote, setBackfillNote] = useState<string | null>(null);
   const cancelBackfillRef = useRef(false);
+  // Same cancellation shape as the text-extraction backfill above: a ref
+  // checked at the top of each loop iteration, set by a "Stop" affordance.
+  // Safe to cancel anywhere — progress lives in voice_clusters rows
+  // server-side, so a stopped run just leaves work for the next press.
+  const cancelGroupingRef = useRef(false);
 
   const refresh = () => {
     setPeople(getPeople());
@@ -602,20 +607,33 @@ export default function PeoplePage() {
 
   /** Walks the backfill route until it reports nothing left. Deliberately manual:
    *  one audio assembly per conversation plus one inference per speaker is the
-   *  most expensive thing in this app, and it must never start on its own. */
+   *  most expensive thing in this app, and it must never start on its own.
+   *
+   *  A ~31-conversation backfill is ~16 sequential POSTs, each with a 300s
+   *  ceiling — potentially tens of minutes with the disabled button as the
+   *  only control. cancelGroupingRef (checked at the top of every iteration,
+   *  same pattern as cancelBackfillRef above) makes it abortable; a stop
+   *  mid-run is safe because progress already lives in voice_clusters rows
+   *  server-side, not in this loop's state. */
   const runVoiceGrouping = async () => {
     const voices = pending
       .filter((s) => s.kind === "voice" && typeof s.speakerId === "number")
       .map((s) => ({ conversationId: s.conversationId, speakerId: s.speakerId!, id: s.id }));
     if (voices.length === 0) return;
 
+    cancelGroupingRef.current = false;
     setGroupingBusy(true);
     setGroupingNote("Grouping voices…");
     const byKey = new Map(voices.map((v) => [`${v.conversationId}:${v.speakerId}`, v.id]));
     let total = 0;
 
     try {
+      let completed = false;
       for (;;) {
+        if (cancelGroupingRef.current) {
+          setGroupingNote(null);
+          break;
+        }
         const res = await fetchJson<{ processed: number; remaining: number; groups: Record<string, string> }>(
           "/api/capture/cluster-voices",
           {
@@ -625,23 +643,37 @@ export default function PeoplePage() {
           }
         );
 
-        setVoiceGroups(
+        // A dropped write here (quota) must not be swallowed: the queue would
+        // silently stay ungrouped while the loop keeps announcing progress.
+        const saved = setVoiceGroups(
           Object.entries(res.groups)
             .map(([key, groupId]) => ({ id: byKey.get(key), groupId }))
             .filter((e): e is { id: string; groupId: string } => !!e.id)
         );
         refresh();
+        if (!saved) {
+          setGroupingNote("Grouped, but the result couldn’t be saved — storage may be full.");
+          break;
+        }
 
         total += res.processed;
-        if (res.remaining === 0) break;
+        if (res.remaining === 0) {
+          completed = true;
+          break;
+        }
         setGroupingNote(`Grouping voices — ${total} of ${total + res.remaining} conversations…`);
       }
-      setGroupingNote("Voices grouped.");
+      if (completed) setGroupingNote("Voices grouped.");
     } catch (e) {
       setGroupingNote(e instanceof Error ? e.message : "Couldn’t finish grouping — try again.");
     } finally {
       setGroupingBusy(false);
+      cancelGroupingRef.current = false;
     }
+  };
+
+  const cancelVoiceGrouping = () => {
+    cancelGroupingRef.current = true;
   };
 
   // ── add person ──
@@ -785,9 +817,19 @@ export default function PeoplePage() {
                   <strong className="font-semibold">{ungroupedVoices.length}</strong> unrecognized voices.
                   Group them and the same person across conversations becomes one card.
                 </p>
-                <button onClick={runVoiceGrouping} disabled={groupingBusy} className={`${BUTTON_PRIMARY} py-2 px-4 disabled:opacity-50`}>
-                  {groupingBusy ? "Grouping…" : "Group similar voices"}
-                </button>
+                {groupingBusy ? (
+                  <div className="flex items-center gap-2 text-sm text-slate-400 flex-shrink-0" role="status" aria-live="polite">
+                    <RefreshIcon className="w-4 h-4 animate-spin" />
+                    Grouping…
+                    <button onClick={cancelVoiceGrouping} className="text-slate-400 hover:text-white underline">
+                      Stop
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={runVoiceGrouping} className={`${BUTTON_PRIMARY} py-2 px-4`}>
+                    Group similar voices
+                  </button>
+                )}
               </div>
             )}
             {groupingNote && (
