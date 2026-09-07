@@ -190,3 +190,27 @@ test("stitchWantedAudio defaults to a 200ms gap between separate ranges", () => 
   ]);
   assert.equal(out.length, s(100) + s(200) + s(100));
 });
+
+test("stitchWantedAudio slices from the CHUNK's origin, not the span's", () => {
+  // Every other stitchWantedAudio test here uses a constant-filled chunk whose
+  // span starts exactly at the chunk start, so `d.startedAtMs` and
+  // `sp.startMs` are the same number and the two are indistinguishable.
+  // Swapping them is the highest-consequence bug this function can have: it
+  // reads real audio from the wrong place in the chunk, throws nothing, and
+  // writes a voiceprint from whatever was actually said there.
+  //
+  // Here the span deliberately starts 137ms into the chunk and the PCM is a
+  // ramp, so every sample names its own index. Correct origin reads at 8000
+  // (500ms into the chunk); the wrong one reads at 5808 (363ms into the span)
+  // — same LENGTH, different audio, which is why this asserts values.
+  const pcm = new Int16Array(16_000);
+  for (let i = 0; i < pcm.length; i++) pcm[i] = i;
+  const spans: AbsSpan[] = [{ chunkId: "c1", startMs: 30_137, endMs: 31_000 }];
+  const decoded = new Map([["c1", { startedAtMs: 30_000, pcm }]]);
+
+  const out = stitchWantedAudio(decoded, spans, [{ startMs: 30_500, endMs: 30_600 }]);
+
+  assert.equal(out.length, s(100));
+  assert.equal(out[0], 8_000, "500ms into the chunk, not 363ms into the span");
+  assert.equal(out[out.length - 1], 8_000 + s(100) - 1);
+});

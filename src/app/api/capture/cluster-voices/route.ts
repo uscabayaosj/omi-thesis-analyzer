@@ -44,10 +44,13 @@ export const maxDuration = 300;
  *  loops until `remaining` is 0, so a smaller batch costs round trips, not
  *  throughput — and each round trip is independently safe and cancellable.
  *
- *  Raising this REQUIRES its own measurement first (and possibly raising the
- *  instance memory, a `functions` block in vercel.json). Note that an OOM is
- *  uncatchable, so the attempts counter below cannot bound it: the row is
- *  never written and the loop stops on the 500 instead. */
+ *  Raising this REQUIRES raising the instance memory first (a `functions`
+ *  block in vercel.json), then re-measuring. The targeted decode cut the
+ *  per-conversation cost, but the resident WavLM model that made two
+ *  assemblies fatal is unchanged.
+ *
+ *  Note that an OOM is uncatchable, so the attempts counter below cannot
+ *  bound it: the row is never written and the loop stops on the 500. */
 const DEFAULT_MAX_CONVERSATIONS = 1;
 const MAX_CONVERSATIONS_CEILING = 1;
 
