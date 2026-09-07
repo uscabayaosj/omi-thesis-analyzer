@@ -104,6 +104,11 @@ async function ensureCaptureSchema(sql: Sql): Promise<void> {
           created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
           PRIMARY KEY (conversation_id, speaker_id)
         )`,
+      // Retry counter for a null-embedding row, so a deterministic embed
+      // failure (malformed PCM, a segment that always throws) settles after a
+      // bounded number of attempts instead of being retried forever. Added
+      // after first deploy, hence ALTER rather than a column in the CREATE.
+      sql`ALTER TABLE voice_clusters ADD COLUMN IF NOT EXISTS attempts INT NOT NULL DEFAULT 0`,
     ]),
     20_000
   );
@@ -328,33 +333,38 @@ export interface VoiceClusterRow {
   /** null = unembeddable (session gone, or an Omi import with no audio). */
   embedding: number[] | null;
   groupId: string | null;
+  /** Retries spent on a null-embedding row; optional so callers that never
+   *  retry (pipeline.ts's first-pass insert) can omit it and get 0. */
+  attempts?: number;
 }
 
 export async function getVoiceClusters(sql: Sql, conversationIds: string[]): Promise<VoiceClusterRow[]> {
   if (conversationIds.length === 0) return [];
   const rows = (await withTimeout(sql`
-    SELECT conversation_id, speaker_id, embedding, group_id
+    SELECT conversation_id, speaker_id, embedding, group_id, attempts
     FROM voice_clusters WHERE conversation_id = ANY(${conversationIds})`)) as {
     conversation_id: string;
     speaker_id: number;
     embedding: number[] | null;
     group_id: string | null;
+    attempts: number;
   }[];
   return rows.map((r) => ({
     conversationId: r.conversation_id,
     speakerId: r.speaker_id,
     embedding: r.embedding,
     groupId: r.group_id,
+    attempts: r.attempts,
   }));
 }
 
 export async function upsertVoiceCluster(sql: Sql, r: VoiceClusterRow): Promise<void> {
   await withTimeout(sql`
-    INSERT INTO voice_clusters (conversation_id, speaker_id, embedding, group_id)
+    INSERT INTO voice_clusters (conversation_id, speaker_id, embedding, group_id, attempts)
     VALUES (${r.conversationId}, ${r.speakerId},
-            ${r.embedding === null ? null : JSON.stringify(r.embedding)}::jsonb, ${r.groupId})
+            ${r.embedding === null ? null : JSON.stringify(r.embedding)}::jsonb, ${r.groupId}, ${r.attempts ?? 0})
     ON CONFLICT (conversation_id, speaker_id) DO UPDATE SET
-      embedding = EXCLUDED.embedding, group_id = EXCLUDED.group_id`);
+      embedding = EXCLUDED.embedding, group_id = EXCLUDED.group_id, attempts = EXCLUDED.attempts`);
 }
 
 export async function setVoiceClusterGroups(

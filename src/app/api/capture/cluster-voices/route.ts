@@ -23,6 +23,15 @@ export const maxDuration = 300;
  *  model load. The client loops until `remaining` is 0. */
 const DEFAULT_MAX_CONVERSATIONS = 2;
 
+/** How many times a caught embed exception may leave a pair owing before it
+ *  settles as a permanent null. This buys retries across transient failures
+ *  (cold-start OOM, a model hiccup) while capping a deterministic failure
+ *  (malformed PCM, a segment that always throws) to a bounded number of
+ *  attempts — without the cap, the same pair reoccupies the same batch slot
+ *  on every call (the batch is a prefix of the oldest-owing set) and the
+ *  client's loop never sees `remaining` reach 0. */
+const MAX_EMBED_ATTEMPTS = 3;
+
 interface Voice {
   conversationId: string;
   speakerId: number;
@@ -96,6 +105,17 @@ async function handle(req: NextRequest) {
     const existing = await getVoiceClusters(sql, conversationIds);
     const known = new Map(existing.map((r) => [voiceKey(r.conversationId, r.speakerId), r]));
 
+    // A pair is owing when it has no row at all, or it has a null-embedding
+    // row that hasn't yet spent its retries. A row with an embedding, or a
+    // null row at the attempt cap, is settled and never revisited — that's
+    // what guarantees the owing set shrinks on every call (see the route's
+    // doc comment / task report for the termination argument).
+    const isOwing = (v: Voice): boolean => {
+      const row = known.get(voiceKey(v.conversationId, v.speakerId));
+      if (!row) return true;
+      return row.embedding === null && (row.attempts ?? 0) < MAX_EMBED_ATTEMPTS;
+    };
+
     // created_at for every conversation in play — used both to order the
     // owing batch below and to keep clustering order stable further down.
     // A light accessor (id + created_at only) stands in for the full row
@@ -104,7 +124,7 @@ async function handle(req: NextRequest) {
 
     // Conversations still owing at least one embedding, oldest first so the
     // client's loop makes deterministic progress across calls.
-    const owing = [...new Set([...wanted.values()].filter((v) => !known.has(voiceKey(v.conversationId, v.speakerId))).map((v) => v.conversationId))];
+    const owing = [...new Set([...wanted.values()].filter(isOwing).map((v) => v.conversationId))];
     const byCreated = owing
       .slice()
       .sort((a, b) => (createdAtById.get(a) ?? "").localeCompare(createdAtById.get(b) ?? ""));
@@ -114,7 +134,7 @@ async function handle(req: NextRequest) {
 
     for (const conversationId of batch) {
       const speakers = [...wanted.values()]
-        .filter((v) => v.conversationId === conversationId && !known.has(voiceKey(conversationId, v.speakerId)))
+        .filter((v) => v.conversationId === conversationId && isOwing(v))
         .map((v) => v.speakerId);
 
       const [session, conversation] = await Promise.all([
@@ -123,10 +143,11 @@ async function handle(req: NextRequest) {
       ]);
 
       // No session or no conversation means no audio to embed — ever. Record
-      // that as a null embedding so the loop stops retrying it forever.
+      // that as a null embedding at the attempt cap so it is settled
+      // immediately and the loop never retries it.
       if (!session || !conversation) {
         for (const speakerId of speakers) {
-          const row: VoiceClusterRow = { conversationId, speakerId, embedding: null, groupId: null };
+          const row: VoiceClusterRow = { conversationId, speakerId, embedding: null, groupId: null, attempts: MAX_EMBED_ATTEMPTS };
           await upsertVoiceCluster(sql, row);
           known.set(voiceKey(conversationId, speakerId), row);
         }
@@ -144,8 +165,10 @@ async function handle(req: NextRequest) {
         )[0];
         if (!cluster) {
           // No segments cluster for this speaker in this conversation — a
-          // real business case (not a failure), so the null is permanent.
-          const row: VoiceClusterRow = { conversationId, speakerId, embedding: null, groupId: null };
+          // real business case (not a failure), so the null is permanent
+          // (attempts at the cap: it can never succeed, so it must not be
+          // retried at all).
+          const row: VoiceClusterRow = { conversationId, speakerId, embedding: null, groupId: null, attempts: MAX_EMBED_ATTEMPTS };
           await upsertVoiceCluster(sql, row);
           known.set(voiceKey(conversationId, speakerId), row);
           continue;
@@ -155,10 +178,18 @@ async function handle(req: NextRequest) {
         try {
           embedding = await embedAudio(int16ToFloat32(extractSpeakerPcm(assembled, session.startedAtMs, cluster)));
         } catch (e) {
-          // Transient failure (cold-start OOM, model hiccup, etc.). Write
-          // nothing: this pair stays owing, so a later run retries it,
-          // instead of a permanent null exiling it from grouping forever.
-          console.error(`backfill embed failed for ${conversationId}:${speakerId}:`, e);
+          // Could be transient (cold-start OOM, model hiccup) or deterministic
+          // (malformed PCM, a segment that always throws) — we can't tell
+          // which from here. Write a null embedding with attempts bumped from
+          // whatever this pair already had (0 if no row yet): still owing
+          // below the cap, so a later run retries it, but settled once the
+          // cap is hit so a permanently-failing pair can't occupy the same
+          // batch slot forever.
+          const priorAttempts = known.get(voiceKey(conversationId, speakerId))?.attempts ?? 0;
+          console.error(`backfill embed failed for ${conversationId}:${speakerId} (attempt ${priorAttempts + 1}):`, e);
+          const row: VoiceClusterRow = { conversationId, speakerId, embedding: null, groupId: null, attempts: priorAttempts + 1 };
+          await upsertVoiceCluster(sql, row);
+          known.set(voiceKey(conversationId, speakerId), row);
           continue;
         }
         const row: VoiceClusterRow = { conversationId, speakerId, embedding, groupId: null };
