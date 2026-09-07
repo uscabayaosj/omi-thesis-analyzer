@@ -66,7 +66,7 @@ voice from anything other than the user's own confirmation.
 | Backfill trigger | An explicit "Group similar voices" button, batched, with progress | Backfilling 44 cards means one audio assembly per distinct conversation plus one inference per speaker. That is real compute with a 300s function ceiling; it runs when the user asks, in batches the ceiling can hold, showing how far along it is. Never on page load. |
 | Grouping threshold | `CAPTURE_VOICE_GROUP_THRESHOLD`, default 0.85 — above the 0.8 match threshold | A false *match* mislabels one conversation's segments. A false *group* merges two people into a single decision the user then answers once, wrongly, for both. Grouping should be the more conservative of the two. |
 | Enrollment from a group | Enroll once, from the member with the most speech | Enrolling from all N members means N audio assemblies for one button press. The longest sample is the best single one, and `averageEmbeddings` already strengthens the print on every later conversation. |
-| Embedding on empty gallery | Remove the "nobody is enrolled yet, skip the model" early return in `identifySpeakers` | That bail (`pipeline.ts:174`) is correct today — with no gallery, no inference can change the labeling. Once embeddings are *stored for grouping*, it is exactly backwards: the empty-gallery case is when every speaker is unmatched and grouping matters most. This is a deliberate reversal with a real cost (one model load plus one inference per cluster on sessions that previously skipped both) and is the price of "you never have to backfill again". |
+| Embedding on empty gallery | **Keep** the "nobody is enrolled yet, skip the model" early return in `identifySpeakers` (`pipeline.ts:174`) | Removing it would record embeddings for the pre-enrollment period too, at the cost of a model load plus one inference per cluster on sessions that today skip both. Not worth it, because the gap it leaves is bounded and self-closing: the bail only fires while *no* person has a voiceprint. The moment the first voice is named the gallery is non-empty, and every session after that records embeddings for its unmatched clusters as a by-product of matching. The one-time backlog from before that — today's 44 — is exactly what the backfill button is for. |
 
 ## Architecture
 
@@ -196,10 +196,14 @@ CREATE TABLE IF NOT EXISTS voice_clusters (
 
 **Write-on-capture.** In `identifySpeakers`, every cluster that ends up
 unmatched gets its embedding written here alongside the existing
-`unmatchedSpeakers` return. This requires dropping the empty-gallery early
-return (see Decisions) so that a first-ever session, where nothing can match,
-still records embeddings. From this change forward, no conversation ever needs
-backfilling.
+`unmatchedSpeakers` return. The embedding is already in hand at that point —
+it was computed to compare against the gallery — so this is a write, not new
+compute.
+
+The empty-gallery early return stays (see Decisions), so this covers every
+session captured after the first enrollment and none before it. Conversations
+from the pre-enrollment period reach `voice_clusters` only through the
+backfill below. That is a one-time backlog, not a standing requirement.
 
 **Backfill.** `POST /api/capture/cluster-voices`, body
 `{ voices: [{conversationId, speakerId}], maxConversations?: number }`
@@ -297,8 +301,10 @@ optimization, not a correctness requirement.
   embeddings: two clear groups, a below-threshold pair staying separate,
   determinism under input reordering, stable `group_id` across two runs where
   the second adds a member.
-- `test/capture-identify.test.mts` — extended for embeddings recorded on an
-  empty gallery.
+- `test/capture-identify.test.mts` — extended to assert that a matched cluster
+  writes no row, an unmatched one writes its embedding, and an empty gallery
+  still short-circuits before the model (the bail is now load-bearing for cost,
+  so it gets a test that fails if someone removes it).
 
 Routes are covered by their pure helpers; no HTTP-level tests exist in this
 repo and this work does not add the harness for them.
@@ -319,10 +325,11 @@ rendering, then the sibling sweep.
   under the ceiling, but the total is whatever it is. It is opt-in and
   resumable, which is the mitigation; a hard cap is not specified because
   stopping halfway leaves a half-grouped queue.
-- **Dropping the empty-gallery bail costs every future first session.** A model
-  load plus one inference per cluster on sessions that previously skipped both.
-  Accepted deliberately (see Decisions); if it proves painful the bail can come
-  back at the cost of needing backfill forever.
+- **A long pre-enrollment period means a long backfill.** Keeping the bail means
+  no conversation captured before the first enrollment has an embedding, so the
+  backfill has to assemble audio for all of them. That set is closed and
+  shrinking-by-definition (it stops growing the moment one voice is named), but
+  it is whatever it already is — here, the conversations behind 44 cards.
 - **0.85 is a guess.** The grouping threshold has no calibration behind it, only
   the argument that it should exceed the 0.8 match threshold. It is an env var
   for that reason. A too-low value merges two people into one card; the user
