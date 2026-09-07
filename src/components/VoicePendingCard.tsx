@@ -6,6 +6,7 @@ import { type PendingSuggestion, type Person } from "@/lib/people";
 import { BUTTON_PRIMARY, optionLabel } from "@/lib/ui";
 import { getAnalysisAge } from "@/lib/storage";
 import { buildVoiceEvidence, loadConversationCached, type VoiceEvidence } from "@/lib/voice-evidence";
+import { PlayIcon, PauseIcon } from "@/components/icons";
 
 function formatSpeech(seconds: number): string {
   if (seconds < 60) return `${Math.round(seconds)}s of speech`;
@@ -25,6 +26,45 @@ function formatSpeech(seconds: number): string {
 function VoiceEvidenceBlock({ conversationId, speakerId }: { conversationId: string; speakerId: number }) {
   const [evidence, setEvidence] = useState<VoiceEvidence | null>(null);
   const [failed, setFailed] = useState(false);
+
+  const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [loadingClip, setLoadingClip] = useState(false);
+  const [clipError, setClipError] = useState<string | null>(null);
+
+  // Nothing preloads: 44 cards must never mean 44 session decodes. The element
+  // is created on the first tap and reused for every replay after it.
+  const togglePlay = () => {
+    if (audio) {
+      if (playing) {
+        audio.pause();
+      } else {
+        void audio.play();
+      }
+      return;
+    }
+    setLoadingClip(true);
+    setClipError(null);
+    const el = new Audio(
+      `/api/capture/speaker-audio?conversationId=${encodeURIComponent(conversationId)}&speakerId=${speakerId}`
+    );
+    el.addEventListener("canplay", () => setLoadingClip(false));
+    el.addEventListener("play", () => setPlaying(true));
+    el.addEventListener("pause", () => setPlaying(false));
+    el.addEventListener("ended", () => setPlaying(false));
+    el.addEventListener("error", () => {
+      setLoadingClip(false);
+      setPlaying(false);
+      // The body is JSON when the route failed; the element cannot read it, so
+      // this stays generic rather than guessing which failure it was.
+      setClipError("Couldn’t load the audio for this voice.");
+      setAudio(null);
+    });
+    setAudio(el);
+    void el.play();
+  };
+
+  useEffect(() => () => audio?.pause(), [audio]);
 
   useEffect(() => {
     let live = true;
@@ -54,6 +94,25 @@ function VoiceEvidenceBlock({ conversationId, speakerId }: { conversationId: str
         {evidence.lineCount} {evidence.lineCount === 1 ? "line" : "lines"}
         {evidence.speechSeconds > 0 && ` · ${formatSpeech(evidence.speechSeconds)}`}
       </p>
+
+      {evidence.canPlay && (
+        <div className="mt-2">
+          <button
+            onClick={togglePlay}
+            disabled={loadingClip}
+            aria-label={playing ? "Pause this voice" : "Play this voice"}
+            className="inline-flex items-center gap-2 min-h-[44px] px-3 rounded-lg bg-slate-800 border border-slate-700 text-sm text-slate-200 hover:border-cyan-500/50 transition-colors disabled:opacity-50"
+          >
+            {playing ? <PauseIcon className="w-4 h-4" /> : <PlayIcon className="w-4 h-4" />}
+            {loadingClip ? "Loading…" : playing ? "Pause" : "Play this voice"}
+          </button>
+          {clipError && (
+            <p className="text-red-400 text-xs mt-1 break-words" role="alert">
+              {clipError}
+            </p>
+          )}
+        </div>
+      )}
 
       {evidence.quotes.length > 0 && (
         <ul className="mt-2 space-y-1">
