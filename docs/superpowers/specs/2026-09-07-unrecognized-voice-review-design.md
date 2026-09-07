@@ -65,7 +65,7 @@ voice from anything other than the user's own confirmation.
 | Embedding storage | New capture-side table `voice_clusters`, **not** `PendingSuggestion` | WavLM-base-plus-sv is 512-dimensional: ~9KB of JSON floats per card, ~400KB across 44. `omi-people-pending` is localStorage, re-serializes wholesale on every write, syncs through `/api/store`, and already carries a quota-loss guard (`writeMap`, `src/lib/people.ts:88`). The pending record carries a short `voiceGroupId` string instead. |
 | Backfill trigger | An explicit "Group similar voices" button, batched, with progress | Backfilling 44 cards means one audio assembly per distinct conversation plus one inference per speaker. That is real compute with a 300s function ceiling; it runs when the user asks, in batches the ceiling can hold, showing how far along it is. Never on page load. |
 | Grouping threshold | `CAPTURE_VOICE_GROUP_THRESHOLD`, default 0.85 — above the 0.8 match threshold | A false *match* mislabels one conversation's segments. A false *group* merges two people into a single decision the user then answers once, wrongly, for both. Grouping should be the more conservative of the two. |
-| Enrollment from a group | Enroll once, from the member with the most speech | Enrolling from all N members means N audio assemblies for one button press. The longest sample is the best single one, and `averageEmbeddings` already strengthens the print on every later conversation. |
+| Enrollment from a group | Enroll once, from the **most recent** member | Enrolling from all N means N audio assemblies for one button press. The longest sample would be the better single one, but finding it means fetching every member's transcript just to measure — work on a path that must stay free. Most-recent is known without asking anyone, is the sample the user most likely just listened to, and `averageEmbeddings` strengthens the print on every later conversation regardless. |
 | Embedding on empty gallery | **Keep** the "nobody is enrolled yet, skip the model" early return in `identifySpeakers` (`pipeline.ts:174`) | Removing it would record embeddings for the pre-enrollment period too, at the cost of a model load plus one inference per cluster on sessions that today skip both. Not worth it, because the gap it leaves is bounded and self-closing: the bail only fires while *no* person has a voiceprint. The moment the first voice is named the gallery is non-empty, and every session after that records embeddings for its unmatched clusters as a by-product of matching. The one-time backlog from before that — today's 44 — is exactly what the backfill button is for. |
 
 ## Architecture
@@ -237,17 +237,20 @@ beside the existing "Add all N" affordance, posts repeatedly while
 returned `groupId` onto its pending record via a new
 `setVoiceGroup(id, groupId)` in `src/lib/people.ts`. The loop is abortable; a
 failed call stops it with the friendly error and keeps whatever groups were
-already assigned. The button is hidden when no voice card lacks a group, and
-when the store is unavailable.
+already assigned. The button is hidden once no voice card lacks a group. It is *not* hidden when
+the store is unavailable — the client cannot know that without a probe request
+on page load, which this design will not spend — so in local dev the first call
+returns 503 and that message lands in the progress line, exactly as the page's
+other store-backed actions already behave there.
 
 **Group rendering.** Voice cards are bucketed by `voiceGroupId` (an absent one
 is its own bucket) and each bucket renders one card:
 
 - Header: "This voice · 9 conversations", the age of the most recent.
-- Evidence: from the member with the most speech, plus "Also heard in Tuesday's
-  field visit, Thursday's interview, …" as links.
-- Accept: enrolls once from that longest member, then removes **all** members.
-  A failed enroll removes nothing.
+- Evidence: from the most recent member, plus "Also heard in Tuesday's field
+  visit, Thursday's interview, …" as links.
+- Accept: enrolls once from that member, then removes **all** members. A failed
+  enroll removes nothing.
 - Ignore: removes all members, undoable through the existing `restorePending`
   path.
 
