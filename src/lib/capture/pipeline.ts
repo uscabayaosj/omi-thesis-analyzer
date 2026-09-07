@@ -34,7 +34,11 @@ function envNumber(name: string, fallback: number, valid: (v: number) => boolean
 
 const vadThreshold = () => envNumber("CAPTURE_VAD_DBFS", VAD_DEFAULTS.thresholdDbfs);
 // Cosine similarity: only (0, 1] is a meaningful "same speaker" cutoff.
-const voiceMatchThreshold = () => envNumber("CAPTURE_VOICE_MATCH_THRESHOLD", 0.8, (v) => v > 0 && v <= 1);
+export const voiceMatchThreshold = () => envNumber("CAPTURE_VOICE_MATCH_THRESHOLD", 0.8, (v) => v > 0 && v <= 1);
+// Grouping is deliberately stricter than matching: a false match mislabels one
+// conversation, a false group makes the user answer for two people at once.
+export const voiceGroupThreshold = () =>
+  envNumber("CAPTURE_VOICE_GROUP_THRESHOLD", 0.85, (v) => v > 0 && v <= 1);
 const minSpeakerMs = () => envNumber("CAPTURE_MIN_SPEAKER_MS", 3000, (v) => v >= 0);
 
 function blobPathFor(startedAtMs: number, chunkId: string): string {
