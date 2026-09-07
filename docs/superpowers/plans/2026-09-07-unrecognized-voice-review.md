@@ -17,7 +17,7 @@
 - **Degrade, never block.** A failed evidence fetch, a missing clip, or an unavailable store leaves the card's picker/Add/Ignore fully working.
 - **Tests are pure-function only.** This repo has no localStorage stub, no route-invocation harness, and no `sql`/model mocking in `test/`. Do not add that machinery. Route handlers, `identifySpeakers`, and localStorage mutators are verified by `npm run build` plus the manual checks listed per phase. A local `globalThis.fetch` stub inside one test file is *not* that machinery and is explicitly permitted (Task 2 uses one).
 - **Local dev has no store.** `getStore()` refuses `DATABASE_URL` outside prod builds, so every new route returns 503 in dev and every control that depends on one must not render.
-- **Existing card behaviour is frozen.** Accept/Add/Ignore semantics, error copy, and the 44px minimum tap targets stay exactly as they are.
+- **Existing card behaviour is frozen.** Accept/Add/Ignore semantics, error copy, and the 44px minimum tap targets stay exactly as they are. *(One deliberate exception, adjudicated during execution: from Task 14 on, ignoring an ungrouped voice card offers an undo it previously lacked. The group path needs one, the parallel text-suggestion path already had one, and ignoring tombstones user data — so the asymmetry was the defect, not the fix.)*
 - **Threshold env vars:** `CAPTURE_VOICE_MATCH_THRESHOLD` default `0.8` (existing), `CAPTURE_VOICE_GROUP_THRESHOLD` default `0.85` (new).
 - **Clip cap:** ~15s of speech, path `speaker-clips/{conversationId}/{speakerId}.wav`, `access: "private"`, `addRandomSuffix: false`.
 - **Commit style:** conventional prefix, and every commit ends with `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`.
