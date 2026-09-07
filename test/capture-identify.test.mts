@@ -8,6 +8,7 @@ import {
   groupBySpeaker,
   bestMatch,
   extractSpeakerPcm,
+  segmentsToAbsRanges,
 } from "../src/lib/capture/identify.ts";
 
 test("int16ToFloat32 normalizes to [-1, 1)", () => {
@@ -82,4 +83,19 @@ test("extractSpeakerPcm slices a speaker's segments back out of the assembled bu
   const pcm = extractSpeakerPcm(assembled, conversationStartMs, cluster);
   assert.equal(pcm.length, s(1000));
   assert.ok(pcm.every((v) => v === 7));
+});
+
+test("segmentsToAbsRanges converts session-relative seconds to absolute wall-clock ms", () => {
+  const ranges = segmentsToAbsRanges(5_000, [
+    { start: 0, end: 1 },
+    { start: 2.5, end: 3 },
+  ]);
+  assert.deepEqual(ranges, [
+    { startMs: 5_000, endMs: 6_000 },
+    { startMs: 7_500, endMs: 8_000 },
+  ]);
+});
+
+test("segmentsToAbsRanges returns nothing for an empty segment list", () => {
+  assert.deepEqual(segmentsToAbsRanges(5_000, []), []);
 });

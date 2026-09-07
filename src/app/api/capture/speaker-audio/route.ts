@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { getStore } from "@/lib/kv";
 import { ensureCaptureSchemaOnce, getSessionByConversationId, getConversationRow } from "@/lib/capture/store";
-import { assembleSessionAudio, readBlob } from "@/lib/capture/pipeline";
-import { groupBySpeaker, extractSpeakerPcm } from "@/lib/capture/identify";
+import { assembleTargetedAudio, readBlob } from "@/lib/capture/pipeline";
+import { groupBySpeaker, segmentsToAbsRanges } from "@/lib/capture/identify";
 import { encodeWav } from "@/lib/capture/assemble";
 import { capSpeakerSegments } from "@/lib/capture/clip";
 import { friendlyError } from "@/lib/api-error";
@@ -81,11 +81,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: `no segments for speaker ${speakerId}` }, { status: 404 });
     }
 
-    const { assembled } = await assembleSessionAudio(sql, session);
-    const pcm = extractSpeakerPcm(assembled, session.startedAtMs, {
-      ...cluster,
-      segments: capSpeakerSegments(cluster.segments),
-    });
+    // Cap to CLIP_MAX_MS (~15s) BEFORE decoding anything — the segments going
+    // in, not the samples coming out — then decode only the chunks that
+    // capped audio actually touches. See assembleTargetedAudio's doc comment
+    // (pipeline.ts) for why this is not byte-identical to slicing the old
+    // full session assembly when a segment spans a chunk boundary.
+    const ranges = segmentsToAbsRanges(session.startedAtMs, capSpeakerSegments(cluster.segments));
+    const { pcm } = await assembleTargetedAudio(sql, session, ranges);
     const bytes = encodeWav(pcm);
 
     // Best-effort: the user gets their audio either way, the next play just

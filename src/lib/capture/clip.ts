@@ -61,6 +61,16 @@ export function capSpeakerSegments<T extends { start: number; end: number }>(
  */
 export const EMBED_MAX_SAMPLES = 30 * SAMPLE_RATE;
 
+/** EMBED_MAX_SAMPLES expressed as a millisecond segment budget, so
+ *  capSpeakerSegments can bound a speaker's segments to the embedding window
+ *  BEFORE any audio is decoded — see enroll-voice and cluster-voices, which
+ *  used to assemble a speaker's entire cluster and rely on
+ *  capPcmForEmbedding below to truncate it only after the (SIGKILL-prone)
+ *  decode had already happened. Derived, not hand-picked, so there is one
+ *  source of truth: change EMBED_MAX_SAMPLES and this follows instead of
+ *  drifting out of sync with a second constant. */
+export const EMBED_MAX_MS = (EMBED_MAX_SAMPLES / SAMPLE_RATE) * 1000;
+
 /**
  * Copies on truncation rather than returning a `subarray` view. A view shares
  * the original `buffer`, so any consumer that reaches for `pcm.buffer` instead
@@ -68,6 +78,13 @@ export const EMBED_MAX_SAMPLES = 30 * SAMPLE_RATE;
  * the bound would silently do nothing — the exact failure this exists to
  * prevent, in a form no test of this function would catch. 30s is 1.9MB; the
  * copy is not worth reasoning about the alternative.
+ *
+ * Left as the LAST line of defence, not the primary bound: enroll-voice and
+ * cluster-voices now cap a speaker's SEGMENTS to EMBED_MAX_MS before any
+ * decode happens (capSpeakerSegments), so in the ordinary case this call
+ * inside embedAudio is a no-op. It stays exactly as it was regardless — a
+ * future caller of embedAudio that forgets to cap its segments still cannot
+ * feed the model an unbounded, OOM-inducing input.
  */
 export function capPcmForEmbedding(
   pcm: Float32Array,

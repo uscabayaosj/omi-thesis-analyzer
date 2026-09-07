@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { capSpeakerSegments, CLIP_MAX_MS, capPcmForEmbedding, EMBED_MAX_SAMPLES } from "../src/lib/capture/clip.ts";
+import {
+  capSpeakerSegments,
+  CLIP_MAX_MS,
+  capPcmForEmbedding,
+  EMBED_MAX_SAMPLES,
+  EMBED_MAX_MS,
+} from "../src/lib/capture/clip.ts";
 
 test("CLIP_MAX_MS is 15 seconds", () => {
   assert.equal(CLIP_MAX_MS, 15_000);
@@ -53,6 +59,19 @@ test("ignores segments with no positive duration", () => {
 
 test("EMBED_MAX_SAMPLES is 30s at 16kHz", () => {
   assert.equal(EMBED_MAX_SAMPLES, 30 * 16_000);
+});
+
+// ── segment budget derived from the embedding sample cap ──
+//
+// enroll-voice and cluster-voices now cap a speaker's SEGMENTS to this many
+// ms before decoding any audio (targeted assembly), instead of decoding the
+// whole cluster and relying on capPcmForEmbedding to truncate it afterward.
+// This must be derived from EMBED_MAX_SAMPLES, not a second hand-picked
+// constant, or the two can silently drift apart.
+
+test("EMBED_MAX_MS is EMBED_MAX_SAMPLES expressed in milliseconds", () => {
+  assert.equal(EMBED_MAX_MS, 30_000);
+  assert.equal(EMBED_MAX_MS, (EMBED_MAX_SAMPLES / 16_000) * 1000);
 });
 
 test("capPcmForEmbedding leaves a short clip untouched", () => {

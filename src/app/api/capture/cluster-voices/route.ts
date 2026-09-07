@@ -10,8 +10,10 @@ import {
   setVoiceClusterGroups,
   type VoiceClusterRow,
 } from "@/lib/capture/store";
-import { assembleSessionAudio, voiceGroupThreshold } from "@/lib/capture/pipeline";
-import { groupBySpeaker, extractSpeakerPcm, int16ToFloat32 } from "@/lib/capture/identify";
+import { decodeChunksForRanges, voiceGroupThreshold } from "@/lib/capture/pipeline";
+import { groupBySpeaker, segmentsToAbsRanges, int16ToFloat32 } from "@/lib/capture/identify";
+import { stitchWantedAudio, type WantedRange } from "@/lib/capture/assemble";
+import { capSpeakerSegments, EMBED_MAX_MS } from "@/lib/capture/clip";
 import { embedAudio } from "@/lib/capture/embed";
 import { clusterEmbeddings, voiceKey, type ClusterItem } from "@/lib/capture/cluster";
 import { friendlyError } from "@/lib/api-error";
@@ -21,22 +23,34 @@ export const maxDuration = 300;
 /** ONE conversation per call, and one is also the ceiling.
  *
  *  The binding constraint is memory, not the 300s duration this comment used
- *  to cite. assembleSessionAudio decodes an entire session — every touched
- *  chunk's PCM held at once, plus the concatenated voiced buffer — and that
- *  stays resident for the whole iteration because extractSpeakerPcm slices
- *  out of it. Add the ~400MB fp32 model, which is loaded and warm by the time
- *  a second conversation starts, and two assemblies do not fit in the 2GB
- *  Fluid Standard instance.
+ *  to cite. This route used to call assembleSessionAudio, which decodes an
+ *  entire session — every touched chunk's PCM held at once, plus the
+ *  concatenated voiced buffer — kept resident for the whole iteration
+ *  because extractSpeakerPcm sliced out of it. Add the ~400MB fp32 model,
+ *  loaded and warm by the time a second conversation starts, and two
+ *  assemblies did not fit in the 2GB Fluid Standard instance.
  *
- *  Measured in production, not estimated: a single conversation completes in
- *  ~110s and returns 200; a batch of two was SIGKILLed (exit 137). The client
+ *  Measured in production, not estimated: a single conversation completed in
+ *  ~110s and returned 200; a batch of two was SIGKILLed (exit 137). The route
+ *  has since moved to decodeChunksForRanges/stitchWantedAudio (pipeline.ts /
+ *  assemble.ts), decoding only the chunks each still-owing speaker's capped
+ *  (EMBED_MAX_MS) segments touch, so a single conversation's memory floor is
+ *  now well below the old full-session decode. The ceiling is deliberately
+ *  left at 1 anyway rather than re-tuned upward here: that would need its own
+ *  production measurement (the ~400MB model and per-speaker embedding cost
+ *  are unchanged, and this fix's job was the decode, not the batch size), and
+ *  raising it is not required to close today's incidents — the targeted
+ *  decode is what turns an hour of backfill into a normal one. The client
  *  loops until `remaining` is 0, so a smaller batch costs round trips, not
  *  throughput — and each round trip is independently safe and cancellable.
  *
  *  Raising this REQUIRES raising the instance memory first (a `functions`
- *  block in vercel.json). Note that an OOM is uncatchable, so the attempts
- *  counter below cannot bound it: the row is never written and the loop stops
- *  on the 500 instead. */
+ *  block in vercel.json), then re-measuring. The targeted decode cut the
+ *  per-conversation cost, but the resident WavLM model that made two
+ *  assemblies fatal is unchanged.
+ *
+ *  Note that an OOM is uncatchable, so the attempts counter below cannot
+ *  bound it: the row is never written and the loop stops on the 500. */
 const DEFAULT_MAX_CONVERSATIONS = 1;
 const MAX_CONVERSATIONS_CEILING = 1;
 
@@ -171,34 +185,14 @@ async function handle(req: NextRequest) {
         continue;
       }
 
-      // The assembly is the expensive half, so it is paid once per
-      // conversation and reused for every speaker in it.
-      let assembled: Awaited<ReturnType<typeof assembleSessionAudio>>["assembled"];
-      try {
-        ({ assembled } = await assembleSessionAudio(sql, session));
-      } catch (e) {
-        // readBlob (a non-200 Blob read) or parseChunk (corrupt bytes) throws
-        // here — a session whose blobs are missing or damaged, the failure
-        // mode this backfill is most likely to hit. Left unguarded, this used
-        // to escape the loop entirely: the rest of the batch was skipped, no
-        // group_id was ever written, and the same conversation (oldest-first)
-        // was reselected and re-thrown on every subsequent call with no way
-        // out. Settle this conversation's owing speakers exactly like the
-        // per-speaker embed catch below: could be transient (a Blob hiccup)
-        // or permanent (chunks genuinely gone), so attempts is bumped rather
-        // than jumped to the cap — a later call retries it, and a
-        // deterministic failure still settles once MAX_EMBED_ATTEMPTS is hit.
-        console.error(`backfill assembly failed for ${conversationId}:`, e);
-        for (const speakerId of speakers) {
-          const priorAttempts = known.get(voiceKey(conversationId, speakerId))?.attempts ?? 0;
-          const row: VoiceClusterRow = { conversationId, speakerId, embedding: null, groupId: null, attempts: priorAttempts + 1 };
-          await upsertVoiceCluster(sql, row);
-          known.set(voiceKey(conversationId, speakerId), row);
-        }
-        continue;
-      }
       const segments = (conversation.transcript_segments as { speaker_id: number; start: number; end: number }[]) ?? [];
 
+      // One cluster — and its capped (EMBED_MAX_MS), absolute-ms ranges —
+      // per still-owing speaker, computed BEFORE any decode: a speaker with
+      // no cluster settles permanently right here without ever paying for a
+      // chunk fetch, and a speaker that does have one contributes only its
+      // capped ranges to what gets decoded below, not its whole cluster.
+      const rangesBySpeaker = new Map<number, WantedRange[]>();
       for (const speakerId of speakers) {
         const cluster = groupBySpeaker(
           segments.filter((s) => s.speaker_id === speakerId).map((s) => ({ ...s, text: "" }))
@@ -213,10 +207,50 @@ async function handle(req: NextRequest) {
           known.set(voiceKey(conversationId, speakerId), row);
           continue;
         }
+        rangesBySpeaker.set(
+          speakerId,
+          segmentsToAbsRanges(session.startedAtMs, capSpeakerSegments(cluster.segments, EMBED_MAX_MS))
+        );
+      }
+      if (rangesBySpeaker.size === 0) continue; // every speaker settled above — nothing left to decode
 
+      // The decode is the expensive half, so it is paid once per conversation
+      // — across the UNION of every still-owing speaker's capped ranges —
+      // and reused (via the pure stitchWantedAudio) for each speaker below.
+      // Same reuse the old per-conversation assembleSessionAudio call gave,
+      // just scoped to the audio actually wanted instead of the whole
+      // session.
+      const unionRanges = [...rangesBySpeaker.values()].flat();
+      let decoded: Awaited<ReturnType<typeof decodeChunksForRanges>>["decoded"];
+      try {
+        ({ decoded } = await decodeChunksForRanges(sql, session.spans, unionRanges));
+      } catch (e) {
+        // readBlob (a non-200 Blob read) or parseChunk (corrupt bytes) throws
+        // here — a session whose blobs are missing or damaged, the failure
+        // mode this backfill is most likely to hit. Left unguarded, this used
+        // to escape the loop entirely: the rest of the batch was skipped, no
+        // group_id was ever written, and the same conversation (oldest-first)
+        // was reselected and re-thrown on every subsequent call with no way
+        // out. Settle this conversation's still-owing speakers exactly like
+        // the per-speaker embed catch below: could be transient (a Blob
+        // hiccup) or permanent (chunks genuinely gone), so attempts is bumped
+        // rather than jumped to the cap — a later call retries it, and a
+        // deterministic failure still settles once MAX_EMBED_ATTEMPTS is hit.
+        console.error(`backfill assembly failed for ${conversationId}:`, e);
+        for (const speakerId of rangesBySpeaker.keys()) {
+          const priorAttempts = known.get(voiceKey(conversationId, speakerId))?.attempts ?? 0;
+          const row: VoiceClusterRow = { conversationId, speakerId, embedding: null, groupId: null, attempts: priorAttempts + 1 };
+          await upsertVoiceCluster(sql, row);
+          known.set(voiceKey(conversationId, speakerId), row);
+        }
+        continue;
+      }
+
+      for (const [speakerId, ranges] of rangesBySpeaker) {
         let embedding: number[];
         try {
-          embedding = await embedAudio(int16ToFloat32(extractSpeakerPcm(assembled, session.startedAtMs, cluster)));
+          const pcm = stitchWantedAudio(decoded, session.spans, ranges);
+          embedding = await embedAudio(int16ToFloat32(pcm));
         } catch (e) {
           // Could be transient (cold-start OOM, model hiccup) or deterministic
           // (malformed PCM, a segment that always throws) — we can't tell
