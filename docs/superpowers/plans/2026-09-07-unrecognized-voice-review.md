@@ -1801,7 +1801,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `PendingSuggestion.voiceGroupId` (Task 12).
-- Produces: `VoicePendingCard` gains a required `members: PendingSuggestion[]` prop (the group, longest-sample first, `[suggestion]` when ungrouped); `onAcceptExisting` / `onAcceptNew` / `onIgnore` now act on the whole group.
+- Produces: `VoicePendingCard` gains a required `members: PendingSuggestion[]` prop (the group, most-recent member first, `[suggestion]` when ungrouped); `onAcceptExisting` / `onAcceptNew` / `onIgnore` now act on the whole group.
 
 - [ ] **Step 1: Bucket the pending list**
 
