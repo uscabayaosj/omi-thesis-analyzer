@@ -39,7 +39,7 @@ function VoiceEvidenceBlock({ conversationId, speakerId }: { conversationId: str
       if (playing) {
         audio.pause();
       } else {
-        void audio.play();
+        audio.play().catch(() => {});
       }
       return;
     }
@@ -61,7 +61,7 @@ function VoiceEvidenceBlock({ conversationId, speakerId }: { conversationId: str
       setAudio(null);
     });
     setAudio(el);
-    void el.play();
+    el.play().catch(() => {});
   };
 
   useEffect(() => () => audio?.pause(), [audio]);
