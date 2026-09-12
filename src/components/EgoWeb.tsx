@@ -45,9 +45,29 @@ export default function EgoWeb({ self, rels, people, onNavigate }: EgoWebProps) 
       role="group"
       aria-label={`Relationship web for ${self.name}, ${rels.length} ${rels.length === 1 ? "person" : "people"}`}
     >
+      <defs>
+        <radialGradient id="ego-node" cx="38%" cy="35%" r="65%">
+          <stop offset="0%" stopColor="#3d3228" />
+          <stop offset="100%" stopColor="#1a1510" />
+        </radialGradient>
+        <radialGradient id="ego-center" cx="38%" cy="35%" r="65%">
+          <stop offset="0%" stopColor="#f0d3ae" />
+          <stop offset="100%" stopColor="#a25a26" />
+        </radialGradient>
+        <filter id="ego-glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur in="SourceAlpha" stdDeviation="4" result="blur" />
+          <feFlood floodColor="#d99a5e" floodOpacity="0.4" result="color" />
+          <feComposite in="color" in2="blur" operator="in" result="glow" />
+          <feMerge>
+            <feMergeNode in="glow" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
       {nodes.map((n) => (
         <line key={`e-${n.rel.id}`} x1={CX} y1={CY} x2={n.x} y2={n.y}
-          stroke="#7a6b58" strokeWidth={1.5} strokeDasharray={REL_DASH[n.rel.type]} />
+          stroke="#7a6b58" strokeWidth={1.5} strokeLinecap="round"
+          strokeDasharray={REL_DASH[n.rel.type]} />
       ))}
       {nodes.map((n) => {
         const { otherRole } = roleFor(n.rel, self.id);
@@ -75,22 +95,19 @@ export default function EgoWeb({ self, rels, people, onNavigate }: EgoWebProps) 
             aria-label={`Open ${nameOf(n.oid)} — ${label}`}
             style={{ cursor: "pointer" }}
           >
-            {/* The visible node is r=20, which lands near 16px once the viewBox
-                is scaled down to a phone. A transparent, larger concentric
-                circle carries the hit area so the target stays thumb-sized
-                without inflating the drawing. `min-height` cannot do this job:
-                it has no effect on SVG elements. */}
             <circle cx={n.x} cy={n.y} r={30} fill="transparent" />
-            <circle cx={n.x} cy={n.y} r={20} fill="#262019" stroke="#7a6b58" />
+            <circle cx={n.x} cy={n.y} r={20}
+              fill="url(#ego-node)" stroke="#5a4e3f" strokeWidth={1.2} />
             <text x={n.x} y={n.y + 3} textAnchor="middle" fill="#dcd2bf" fontSize={10}>
-              {nameOf(n.oid).split(" ")[0].slice(0, 8)}
+              {nameOf(n.oid).split(" ")[0]}
             </text>
           </g>
         );
       })}
-      <circle cx={CX} cy={CY} r={26} fill="#b96d33" />
+      <circle cx={CX} cy={CY} r={26}
+        fill="url(#ego-center)" filter="url(#ego-glow)" />
       <text x={CX} y={CY + 4} textAnchor="middle" fill="#14100d" fontSize={11} fontWeight={700}>
-        {self.name.split(" ")[0].slice(0, 8)}
+        {self.name.split(" ")[0]}
       </text>
     </svg>
   );

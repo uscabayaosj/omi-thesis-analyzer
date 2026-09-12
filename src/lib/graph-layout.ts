@@ -18,7 +18,10 @@ function mulberry32(seed: number): () => number {
 export function computeLayout(
   ids: string[],
   edges: LayoutEdge[],
-  opts: { width?: number; height?: number; iterations?: number; seed?: number } = {}
+  opts: {
+    width?: number; height?: number; iterations?: number; seed?: number;
+    repulsion?: number; springLen?: number;
+  } = {}
 ): Map<string, { x: number; y: number }> {
   const width = opts.width ?? 600;
   const height = opts.height ?? 400;
@@ -40,9 +43,9 @@ export function computeLayout(
 
   if (ids.length <= 1) return pos;
 
-  const REPULSION = 4000;
+  const REPULSION = opts.repulsion ?? 4000;
   const SPRING = 0.02;
-  const SPRING_LEN = 90;
+  const SPRING_LEN = opts.springLen ?? 90;
   const CENTER_PULL = 0.008;
 
   for (let iter = 0; iter < iterations; iter++) {
