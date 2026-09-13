@@ -42,7 +42,6 @@ export default function HelpPage() {
       </Link>
 
       <header className="mb-6">
-        <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">Manual</p>
         <h1 className="font-bold text-white">How this works</h1>
         <p className="font-serif italic text-slate-400 mt-1">
           The parts that aren&apos;t obvious, and what happens to your data.

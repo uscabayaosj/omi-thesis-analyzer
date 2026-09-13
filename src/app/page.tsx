@@ -286,7 +286,7 @@ function LocationMark({ hasLocation }: { hasLocation: boolean }) {
 }
 
 const ConversationRow = memo(function ConversationRow({
-  convo, selectMode, isSelected, isAnalyzed, isAnalyzedEither, isAdhd, enrichment, gist, onToggleSelect,
+  convo, selectMode, isSelected, isAnalyzed, isAnalyzedEither, isAdhd, enrichment, gist, onToggleSelect, stationNumber,
 }: {
   convo: Conversation;
   selectMode: boolean;
@@ -294,6 +294,7 @@ const ConversationRow = memo(function ConversationRow({
   isAnalyzed: boolean;
   isAnalyzedEither: boolean;
   isAdhd: boolean;
+  stationNumber?: number;
   /** The enrichment pass's record, when one exists — supplies the title and
    *  overview for conversations Omi returned bare. Passed in rather than read
    *  per row so the list keeps no storage access in its render path. */
@@ -318,25 +319,28 @@ const ConversationRow = memo(function ConversationRow({
         }`}
       >
         <div className="flex items-start gap-3">
+          {stationNumber != null && (
+            <span className="font-mono text-[11px] text-slate-500 mt-1.5 w-6 text-right flex-shrink-0 tabular-nums">{stationNumber}</span>
+          )}
           <div
             className={`w-5 h-5 mt-1 flex-shrink-0 rounded border-2 flex items-center justify-center transition-colors ${
               isSelected ? "bg-cyan-400 border-cyan-400" : "border-slate-600"
             }`}
             aria-hidden="true"
           >
-            {isSelected && <CheckIcon className="w-3 h-3 text-white" />}
+            {isSelected && <CheckIcon className="w-3 h-3 text-slate-950" />}
           </div>
           <LensBadges thesis={isAnalyzed} adhd={isAdhd} />
           <div className="flex-1 min-w-0">
-            <h2 className="font-semibold text-white truncate">
+            <h2 className="font-semibold text-white text-base tracking-[-0.01em] truncate">
               {conversationTitle(convo, enrichment, gist)}
             </h2>
             <LensState thesis={isAnalyzed} adhd={isAdhd} />
             {(convo.structured?.overview || enrichment?.overview) && (
-              <p className="text-slate-400 font-serif italic text-sm mt-1 line-clamp-1">{convo.structured?.overview || enrichment?.overview}</p>
+              <p className="text-slate-400 font-serif italic text-sm mt-1 tracking-[0.005em] line-clamp-1">{convo.structured?.overview || enrichment?.overview}</p>
             )}
             <div className="flex items-center gap-3 mt-2 text-xs text-slate-400 flex-wrap">
-              <span className="font-mono whitespace-nowrap">{formatDateTime(convo.created_at)}</span>
+              <span className="font-mono whitespace-nowrap tracking-[0.01em]">{formatDateTime(convo.created_at)}</span>
               {convo.structured?.category && (
                 <span className="bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap max-w-[16ch] truncate" title={convo.structured.category}>{convo.structured.category}</span>
               )}
@@ -356,24 +360,23 @@ const ConversationRow = memo(function ConversationRow({
          before saying which conversation it was — twenty-seven times down a
          day's list. */
       aria-label={`${conversationTitle(convo, enrichment, gist)}${isAnalyzedEither ? " (analyzed)" : ""}`}
-      className={`card p-5 block transition-colors min-h-[44px] border-l-2 ${
-        isAnalyzedEither
-          ? "border-l-emerald-500/40 hover:border-emerald-500/50"
-          : "border-l-transparent hover:border-cyan-500/50"
-      }`}
+      className="card p-5 block transition-colors min-h-[44px] hover:border-cyan-500/30"
     >
       <div className="flex items-start gap-3">
+        {stationNumber != null && (
+          <span className="font-mono text-[11px] text-slate-500 mt-1.5 w-6 text-right flex-shrink-0 tabular-nums">{stationNumber}</span>
+        )}
         <LensBadges thesis={isAnalyzed} adhd={isAdhd} />
         <div className="flex-1 min-w-0">
-          <h2 className="font-semibold text-white truncate">
+          <h2 className="font-semibold text-white text-base tracking-[-0.01em] truncate">
             {conversationTitle(convo, enrichment, gist)}
           </h2>
           <LensState thesis={isAnalyzed} adhd={isAdhd} />
           {(convo.structured?.overview || enrichment?.overview) && (
-            <p className="text-slate-400 font-serif italic text-sm mt-1 line-clamp-2">{convo.structured?.overview || enrichment?.overview}</p>
+            <p className="text-slate-400 font-serif italic text-sm mt-1 tracking-[0.005em] line-clamp-2">{convo.structured?.overview || enrichment?.overview}</p>
           )}
           <div className="flex items-center gap-3 mt-2 text-xs text-slate-400 flex-wrap">
-            <span className="font-mono whitespace-nowrap">{formatDateTime(convo.created_at)}</span>
+            <span className="font-mono whitespace-nowrap tracking-[0.01em]">{formatDateTime(convo.created_at)}</span>
             {convo.structured?.category && (
               <span className="bg-slate-800 px-2 py-0.5 rounded-full whitespace-nowrap max-w-[16ch] truncate" title={convo.structured.category}>{convo.structured.category}</span>
             )}
@@ -1101,29 +1104,21 @@ function HomeInner() {
   return (
     <main id="main" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-8">
       <header className="mb-6">
-        {/* Dateline — the masthead's one signature touch: today's date set
-            like a journal entry's opening line, mono-tracked and quiet. It's
-            what makes the page read as "today's page in the journal" rather
-            than a static app title, without adding any new color or icon. */}
-        <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400" aria-hidden={!todayDateline}>
-          {todayDateline || " "}
-        </p>
-
-        {/* Wordmark: the mark carries the brand's navy/cyan two-tone, so it is
-            sized to the cap-height of TRACE and tracked wide to match the logo
-            lockup rather than sitting as a generic leading icon. */}
-        <h1 className="mb-2 flex items-center gap-3 font-bold text-white">
-          <TraceMark className="w-10 h-10 flex-shrink-0 text-white" />
-          <span className="tracking-[0.18em]">TRACE</span>
-        </h1>
-        <p className="text-slate-400 font-serif italic text-[0.95rem]">
-          Personal &amp; research assistant — your recorded conversations as thesis evidence and a daily plan
+        <div className="flex items-center gap-2.5 mb-2">
+          <TraceMark className="w-8 h-8 flex-shrink-0 text-white" />
+          <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
+            {todayDateline || "Field notes"}
+          </span>
+        </div>
+        <h1 className="mb-1 font-bold text-white font-serif">Field Notes</h1>
+        <p className="text-slate-400 text-sm">
+          {todayDateline ? `Traverse ${selectedDate.replace(/-/g, ".")}` : "Your recorded conversations as thesis evidence and a daily plan"}
         </p>
 
         {/* Contents — the journal's table of contents rather than app-shell nav.
             This used to list all seven destinations at equal weight, which had
             two costs. Under the One Ink Rule exactly one thing per screen may
-            carry copper, and nothing above the fold was spending it: the home
+            carry the accent, and nothing above the fold was spending it: the home
             page offered fourteen controls and marked none of them as the move.
             And with seven links plus the toolbar, the first conversation card
             landed around y≈700 on an 812px phone — the screen whose whole job
@@ -1131,16 +1126,10 @@ function HomeInner() {
 
             Now it carries only the three destinations that are part of a day's
             work, with Daily Rollup — the screen the ADHD lens exists to reach —
-            taking the copper. The other four (How this works, Search analyses,
+            taking the accent. The other four (How this works, Search analyses,
             Usage, Capture) moved to the footer nav at the end of the page; none
             of them is something you go to *before* looking at today. */}
         <nav aria-label="Sections" className="mt-5">
-          {/* 11px, not 10px: the Micro step (10px) is reserved for a single
-              glyph inside a circular badge. This is a running head and belongs
-              on the Eyebrow step like every other one in the app. */}
-          <p className="mb-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
-            Contents
-          </p>
           <div className="flex flex-wrap items-center gap-2">
             {/* Carries the day you are browsing. `href="/rollup"` dropped it,
                 so jumping to the rollup from 25 Aug landed on a day picker and
@@ -1581,7 +1570,7 @@ function HomeInner() {
 
       {!loading && !error && conversations.length === 0 && (
         <div className="card p-8 text-center">
-          <MicIcon className="w-10 h-10 mx-auto mb-4 text-slate-600" />
+          <MicIcon className="w-10 h-10 mx-auto mb-4 text-slate-500 survey-listen" />
           <p className="text-slate-300">No conversations found.</p>
           <p className="text-slate-400 text-sm mt-2">Wear your pendant and have a conversation, then come back.</p>
         </div>
@@ -1647,10 +1636,11 @@ function HomeInner() {
                   {formatDateTime(`${day}T12:00:00`, { weekday: "long", day: "numeric", month: "long" })}
                 </p>
                 <div className="space-y-3">
-                  {items.map((convo) => (
+                  {items.map((convo, i) => (
                     <ConversationRow
                       key={convo.id}
                       convo={convo}
+                      stationNumber={i + 1}
                       selectMode={selectMode}
                       isSelected={selected.has(convo.id)}
                       isAnalyzed={analyzedIds.has(convo.id)}
@@ -1664,10 +1654,11 @@ function HomeInner() {
                 </div>
               </div>
             ))
-          : shown.map((convo) => (
+          : shown.map((convo, i) => (
               <ConversationRow
                 key={convo.id}
                 convo={convo}
+                stationNumber={i + 1}
                 selectMode={selectMode}
                 isSelected={selected.has(convo.id)}
                 isAnalyzed={analyzedIds.has(convo.id)}

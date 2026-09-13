@@ -166,9 +166,6 @@ function WeekPageInner() {
       </Link>
 
       <header className="mb-6">
-        <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
-          Planning
-        </p>
         <h1 className="font-bold text-white mb-2 flex items-center gap-2">
           <CalendarIcon className="w-6 h-6 text-cyan-400 flex-shrink-0" />
           This Week

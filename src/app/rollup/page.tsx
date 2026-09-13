@@ -81,7 +81,7 @@ function RollupSectionBlock({
   icon: ComponentType<{ className?: string }>;
   heading: string;
   content: string;
-  /** The day's answer. Rendered on the copper treatment so it does not sit at
+  /** The day's answer. Rendered on the accent treatment so it does not sit at
    *  the same visual weight as the six supporting sections. */
   lead?: boolean;
 }) {
@@ -649,11 +649,6 @@ function RollupPageInner() {
             plan — roughly 1300px down at 375px — so the screen never said
             which day you were reading until you had scrolled past its whole
             contents. The running head is exactly where that belongs. */}
-        <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
-          {selectedDay
-            ? formatDateTime(`${selectedDay}T12:00:00`, { weekday: "long", day: "numeric", month: "long", year: "numeric" })
-            : "Planning"}
-        </p>
         <h1 className="font-bold text-white mb-2 flex items-center gap-2">
           <CalendarIcon className="w-6 h-6 text-cyan-400 flex-shrink-0" />
           Daily Rollup
@@ -957,7 +952,7 @@ function RollupPageInner() {
                   identical cards, so "Tomorrow's plan" and "Let go today" had
                   exactly equal visual claim and the plan's first line sat below
                   the fold on a phone. The plan is the answer this page exists
-                  to give: it leads, on the copper treatment, and the remaining
+                  to give: it leads, on the accent treatment, and the remaining
                   six sit behind one disclosure. */}
               <div className="stagger-in space-y-6">
                 <details className="card p-0 overflow-hidden" open={restOpen} onToggle={(e) => setRestOpen((e.target as HTMLDetailsElement).open)}>
@@ -978,7 +973,7 @@ function RollupPageInner() {
                     the last thing a day-close said was what got dropped —
                     followed by a dev version footer. It ends on completion
                     now, and on the one number that carries into tomorrow. */}
-                <div className="card p-5 border-cyan-500/30 text-center">
+                <div className="card p-5 border-cyan-500/30 text-center survey-stamp">
                   <p className="font-serif text-slate-200">Day closed.</p>
                   <p className="text-sm text-slate-400 mt-1">
                     {carriedCount === 0

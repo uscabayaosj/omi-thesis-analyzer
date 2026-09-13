@@ -1,11 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 64 64">
-  <!-- TRACE: voice → lines. A waveform on the left resolves into ruled journal
-       lines on the right — speech becoming notes. Copper on brand-leather. -->
-  <rect width="64" height="64" fill="#2a1c10"/>
-  <g stroke="#b96d33" stroke-width="3.2" stroke-linecap="round" fill="none">
+  <rect width="64" height="64" fill="#141e18"/>
+  <g stroke="#4a8dc8" stroke-width="3.2" stroke-linecap="round" fill="none">
     <path d="M10 27v10M15.5 20v24M21 14v36M26.5 22v20"/>
   </g>
-  <g stroke="#d99a5e" stroke-width="3.2" stroke-linecap="round" fill="none">
+  <g stroke="#5b9bd5" stroke-width="3.2" stroke-linecap="round" fill="none">
     <path d="M34 24h20M34 32h20M34 40h12"/>
   </g>
 </svg>

@@ -819,9 +819,6 @@ export default function ConversationPage() {
       {!loading && !conversation && (storedAnalysis || adhd) && (
         <>
           <header className="mb-6">
-            <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
-              Saved copy
-            </p>
             <h1 className="font-bold text-white mb-2">
               {storedAnalysis?.title || adhdTitle || "Saved analysis"}
             </h1>
@@ -864,9 +861,6 @@ export default function ConversationPage() {
           leaving a bare error card with no heading. */}
       {!loading && !conversation && !storedAnalysis && !adhd && (
         <header className="mb-6">
-          <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
-            Unavailable
-          </p>
           {/* The body used to assert "Omi couldn't be reached" regardless of
               why. When the cause is a 404 the banner above simultaneously says
               the conversation was deleted — two different diagnoses on one
@@ -886,9 +880,6 @@ export default function ConversationPage() {
       {conversation && (
         <>
           <header className="mb-6">
-            <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
-              {conversation.structured?.category || "Entry"}
-            </p>
             {/* The emoji comes straight from Omi and is an uncontrolled
                 multi-hue glyph at the top of a nine-colour palette that bans a
                 second accent by name — the one saturated thing on the page,
@@ -1369,7 +1360,7 @@ export default function ConversationPage() {
 
             {customResult && (
               <div className="card mt-2 p-6 border-amber-500/30">
-                <div className="analysis-section" style={{ background: "var(--custom-analysis-bg, rgba(245, 158, 11, 0.06))" }}>
+                <div className="analysis-section" style={{ background: "var(--custom-analysis-bg, rgba(212, 160, 58, 0.06))" }}>
                   <h3 className="flex items-center gap-2" style={{ color: "var(--custom-analysis-text)" }}>
                     <CogIcon className="w-[1.05em] h-[1.05em] flex-shrink-0" />
                     Custom Analysis

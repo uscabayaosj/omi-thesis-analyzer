@@ -1,12 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Source_Serif_4 } from "next/font/google";
+import { Barlow } from "next/font/google";
 import "./globals.css";
 
-// Journal serif for headings and datelines — self-hosted by next/font, so it
-// stays available offline in the installed PWA.
-const sourceSerif = Source_Serif_4({
+const barlow = Barlow({
   subsets: ["latin"],
-  variable: "--font-source-serif",
+  weight: ["400", "600", "700"],
+  style: ["normal", "italic"],
+  variable: "--font-barlow",
 });
 import ServiceWorkerRegistration from "@/components/sw-register";
 import AppVersion from "@/components/app-version";
@@ -43,7 +43,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#161311",
+  themeColor: "#0b110e",
 };
 
 export default function RootLayout({
@@ -52,22 +52,23 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`dark ${sourceSerif.variable}`}>
+    <html lang="en" className={`dark ${barlow.variable}`}>
       <head />
-      {/* No background utility here. globals.css sets the body background
-          unlayered (the lamplight gradient + paper grain over --background),
-          and unlayered author styles beat every Tailwind layer regardless of
-          specificity — so `bg-slate-950` never applied. Leaving it in claimed
-          the field was #14100d when it has always rendered #161311, which is
-          the kind of dead declaration the next editor trusts. */}
       <body className="text-slate-100 antialiased min-h-screen">
-        {/* Bypass block (WCAG 2.4.1). Every route repeats a back link, an
-            eyebrow, a title, a subtitle and a nav row before its content, and
-            a keyboard user had to tab through all of it on every navigation. */}
+        <script
+          type="application/x-direction-contract"
+          data-seed="e0da3c73"
+          dangerouslySetInnerHTML={{ __html: [
+            "THESIS: The land itself as information design — every conversation is a survey point.",
+            "OWN-WORLD: USGS topo survey palette — forest-dark ground, contour cream text, survey blue accent, Barlow headings, section grid.",
+            "STORY: The researcher sees today's field notes as survey station entries. Analysis traces in like contour lines.",
+            "FIRST VIEWPORT: Dark topo field. Survey designation heading. Daily Rollup primary. Numbered station entries.",
+            "FORM: The Geological Survey Map, candidate 1 of 7, seed e0da3c73.",
+            "FINISH: unreviewed and undocumented is unfinished.",
+          ].join("\n") }}
+        />
         <a
           href="#main"
-          // slate-950 (#14100d) on cyan-400 (copper #d99a5e) = 7.87:1 — the same
-          // near-black-on-copper pair every primary uses, not washed-out gray.
           className="sr-only focus:not-sr-only focus:fixed focus:z-[100] focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:min-h-[44px] focus:inline-flex focus:items-center focus:rounded-lg focus:bg-cyan-400 focus:text-slate-950 focus:font-medium" // impeccable-disable-line gray-on-color
         >
           Skip to content

@@ -88,9 +88,6 @@ export default function UsagePage() {
         Back to conversations
       </Link>
 
-      <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
-        System
-      </p>
       <h1 className="font-bold text-white mb-2">Usage</h1>
 
       <div className="mb-4">

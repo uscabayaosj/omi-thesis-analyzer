@@ -117,8 +117,7 @@ export default function CapturePage() {
         <ArrowLeftIcon className="w-4 h-4" />
         Back to conversations
       </Link>
-      <p className="mt-6 mb-1 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">System</p>
-      <h1 className="font-bold text-white mb-4">Capture</h1>
+      <h1 className="font-bold text-white mb-4 mt-6">Capture</h1>
 
       {/* The old copy read "The store isn't configured here, so there is
           nothing to show." — a bare sentence, no card, no next step, and "the

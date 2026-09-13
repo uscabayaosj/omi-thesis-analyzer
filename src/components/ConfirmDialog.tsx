@@ -15,16 +15,16 @@ const TONE: Record<Tone, { border: string; icon: string; confirm: string }> = {
     // own rule, and an amber-filled confirm made this the app's second-most
     // prominent primary-looking button in a colour that is not the primary.
     // The caution tone keeps an amber *icon* (a marginal warning mark) but its
-    // confirm button is the copper primary like every other primary action.
+    // confirm button is the accent primary like every other primary action.
     border: "border-amber-500/30",
     icon: "text-amber-400",
-    // slate-950 on cyan-400 (copper #d99a5e) measures 7.87:1.
+    // slate-950 on cyan-400 (survey blue #5b9bd5) measures 6.44:1.
     confirm: "bg-cyan-400 hover:bg-cyan-300 text-slate-950", // impeccable-disable-line gray-on-color
   },
   danger: {
     border: "border-red-500/30",
     icon: "text-red-400",
-    // red-600 (#b04a2e) with lamp-paper text is 4.83:1. The old hover stepped
+    // red-600 (#a83a28) with contour-cream text is 4.53:1. The old hover stepped
     // up to red-500, which dropped the pair to 3.55:1 — a destructive button
     // that failed AA precisely while the pointer was on it. Hover now darkens
     // instead of lightening, so the contrast improves under the cursor.

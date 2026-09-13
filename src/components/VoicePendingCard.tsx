@@ -136,7 +136,7 @@ function VoiceEvidenceBlock({ conversationId, speakerId }: { conversationId: str
       {evidence.quotes.length > 0 && (
         <ul className="mt-2 space-y-1">
           {evidence.quotes.map((q, i) => (
-            <li key={i} className="text-sm text-slate-300 border-l-2 border-slate-700 pl-3 break-words">
+            <li key={i} className="text-sm text-slate-300 pl-3 break-words">
               “{q}”
             </li>
           ))}

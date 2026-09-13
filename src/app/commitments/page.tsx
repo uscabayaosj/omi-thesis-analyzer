@@ -53,7 +53,7 @@ function FilterRow<T extends string>({
           onClick={() => onChange(o.key)}
           aria-pressed={value === o.key}
           // REFINE pill (see lib/ui.ts): these narrow the list below rather
-          // than replacing it, so they take the copper tint, not the fill.
+          // than replacing it, so they take the accent tint, not the fill.
           className={`px-3 py-2 min-h-[44px] rounded-full text-sm transition-colors ${
             value === o.key ? PILL_REFINE_ON : PILL_REFINE_OFF
           }`}
@@ -159,9 +159,6 @@ export default function CommitmentsPage() {
       </Link>
 
       <header className="mb-6">
-        <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
-          Ledger
-        </p>
         <h1 className="font-bold text-white">Open promises</h1>
         <p className="font-serif italic text-slate-400 mt-1">
           Everything still owed, in either direction. Whoever has waited longest is first.

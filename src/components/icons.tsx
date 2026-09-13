@@ -347,8 +347,8 @@ export function TraceMark({ className }: IconProps) {
     <svg className={className} viewBox="0 0 64 64" fill="none" aria-hidden="true">
       <defs>
         <linearGradient id="trace-node" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#e6b988" />
-          <stop offset="100%" stopColor="#c97f45" />
+          <stop offset="0%" stopColor="#7bb3e8" />
+          <stop offset="100%" stopColor="#3a78b4" />
         </linearGradient>
         {/* Cuts the head notch, the spine gap, and the slots the arm traces
             run through — all as one mask so the mark works on any background

@@ -98,9 +98,6 @@ export default function PlaceDetailPage() {
 
       {!editing ? (
         <div className="mb-4">
-          <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
-            Location
-          </p>
           <div className="flex items-start justify-between gap-3">
             <h1 className="font-bold text-white">{place.name}</h1>
             <button onClick={() => { setNameDraft(place.name); setNotesDraft(place.notes); setPinDraft({ lat: place.lat, lng: place.lng }); setEditing(true); }}

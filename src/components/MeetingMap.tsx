@@ -11,18 +11,15 @@ function esc(s: string): string {
 
 /* Leaflet builds its markers and popups from raw HTML strings, so these can't
    be Tailwind classes and can't read CSS custom properties. Naming them here
-   keeps the map on the same palette as the rest of the app instead of letting
-   hexes drift inline: the meeting pin previously shipped stock Tailwind cyan
-   (#22d3ee) ringed in stock slate (#0f172a) — the pre-remap TRACE palette,
-   electric blue in a warm lamplit app — plus a box-shadow that broke the Flat
-   Field Rule. Meeting and place pins stay distinguishable by shape and by two
-   steps of the same copper, not by two different hues. */
+   keeps the map on the same palette as the rest of the app. Meeting and place
+   pins stay distinguishable by shape and by two steps of survey blue, not by
+   two different hues. */
 const PIN = {
-  meeting: "#d99a5e", // copper-brand-light
-  place: "#b96d33", // copper-brand
-  stroke: "#14100d", // slate-950
-  link: "#d99a5e", // 7.01:1 on the themed popup surface
-  muted: "#a89a88", // graphite — 6.13:1 there
+  meeting: "#5b9bd5",
+  place: "#4a8dc8",
+  stroke: "#0b110e",
+  link: "#5b9bd5",
+  muted: "#8a9f8e",
 } as const;
 
 export interface MapMarker {
@@ -91,10 +88,10 @@ export default function MeetingMap({ markers, places, onNameLocation, className,
         bounds.extend([m.lat, m.lng]);
       }
 
-      // Named places: copper pin + label, popup links to the place page.
+      // Named places: survey-blue pin + label, popup links to the place page.
       const placeIcon = L.divIcon({
         className: "",
-        html: `<div style="width:14px;height:14px;border-radius:4px;background:${PIN.place};border:2px solid ${PIN.stroke}"></div>`,
+        html: `<div style="width:14px;height:14px;border-radius:6px;background:${PIN.place};border:2px solid ${PIN.stroke}"></div>`,
         iconSize: [14, 14],
         iconAnchor: [7, 7],
       });

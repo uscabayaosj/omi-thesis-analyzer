@@ -458,9 +458,6 @@ function GroupAnalysisContent() {
       </Link>
 
       <header className="mb-6">
-        <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
-          Synthesis
-        </p>
         <h1 className="font-bold text-white mb-2 flex items-center gap-2">
           <CompassIcon className="w-6 h-6 text-cyan-400 flex-shrink-0" />
           Group Analysis
@@ -684,7 +681,7 @@ function GroupAnalysisContent() {
 
         {customResult && (
           <div className="enter-rise card mt-2 p-6 border-amber-500/30">
-            <div className="analysis-section" style={{ background: "var(--custom-analysis-bg, rgba(245, 158, 11, 0.06))" }}>
+            <div className="analysis-section" style={{ background: "var(--custom-analysis-bg, rgba(212, 160, 58, 0.06))" }}>
               <h3 className="flex items-center gap-2" style={{ color: "var(--custom-analysis-text)" }}>
                 <CogIcon className="w-[1.05em] h-[1.05em] flex-shrink-0" />
                 Custom Group Analysis

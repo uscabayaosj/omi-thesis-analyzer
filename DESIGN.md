@@ -1,55 +1,48 @@
 ---
 name: TRACE
-description: A lamplit field journal for turning Omi wearable recordings into thesis evidence and daily executive-function structure.
+description: A survey-map instrument for turning Omi wearable recordings into thesis evidence and daily executive-function structure.
 colors:
-  night-pasture: "#161311"
-  lamp-paper: "#f6f1e7"
-  ink-panel: "#221c17"
-  ink-panel-raised: "#2e261e"
-  brand-leather: "#2a1c10"
-  copper-brand: "#b96d33"
-  copper-brand-light: "#d99a5e"
-  copper-brand-deep: "#a25a26"
-  graphite: "#a89a88"
-  graphite-nontext: "#7a6b58"
-  amber-marginalia: "#fbbf24"
-  amber-marginalia-wash: "rgba(245, 158, 11, 0.06)"
-  sage-green: "#a9bd8f"
-  alert-clay: "#e98d72"
+  forest-ground: "#0b110e"
+  survey-panel: "#141e18"
+  survey-panel-raised: "#1c2a22"
+  contour-cream: "#ddd6c4"
+  survey-blue: "#4a8dc8"
+  survey-blue-light: "#5b9bd5"
+  survey-blue-deep: "#3a78b4"
+  section-gray: "#8a9f8e"
+  contour-brown: "#8a7558"
+  vegetation-green: "#7eb868"
+  topo-red: "#c44536"
+  amber-marker: "#e8b84e"
 typography:
   display:
-    fontFamily: "'Source Serif 4', Georgia, serif"
+    fontFamily: "'Barlow', ui-sans-serif, system-ui, sans-serif"
     fontSize: "clamp(1.5rem, 4vw, 2.25rem)"
     fontWeight: 700
     lineHeight: 1.2
-    letterSpacing: "normal"
+    letterSpacing: "-0.01em"
   headline:
-    fontFamily: "'Source Serif 4', Georgia, serif"
+    fontFamily: "'Barlow', ui-sans-serif, system-ui, sans-serif"
     fontSize: "clamp(1.15rem, 3vw, 1.5rem)"
     fontWeight: 600
     lineHeight: 1.25
   title:
-    fontFamily: "'Source Serif 4', Georgia, serif"
+    fontFamily: "'Barlow', ui-sans-serif, system-ui, sans-serif"
     fontSize: "clamp(1rem, 2.5vw, 1.25rem)"
     fontWeight: 600
     lineHeight: 1.3
-  subtitle:
-    fontFamily: "'Source Serif 4', Georgia, serif"
-    fontSize: "0.95rem"
-    fontWeight: 400
-    fontStyle: "italic"
-    lineHeight: 1.5
   body:
     fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif"
     fontSize: "0.875rem"
     fontWeight: 400
     lineHeight: 1.7
+  subtitle:
+    fontFamily: "'Barlow', ui-sans-serif, system-ui, sans-serif"
+    fontSize: "0.95rem"
+    fontWeight: 400
+    fontStyle: "italic"
+    lineHeight: 1.5
   label:
-    fontFamily: "ui-monospace, SFMono-Regular, monospace"
-    fontSize: "0.75rem"
-    fontWeight: 500
-    lineHeight: 1.4
-  eyebrow:
     fontFamily: "ui-monospace, SFMono-Regular, monospace"
     fontSize: "0.6875rem"
     fontWeight: 500
@@ -57,15 +50,14 @@ typography:
     letterSpacing: "0.14em"
     textTransform: "uppercase"
   micro:
-    fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif"
+    fontFamily: "ui-sans-serif, system-ui, sans-serif"
     fontSize: "0.625rem"
     fontWeight: 600
     lineHeight: 1
 rounded:
-  xs: "4px"
   sm: "6px"
   md: "8px"
-  lg: "12px"
+  lg: "10px"
   full: "9999px"
 spacing:
   xs: "4px"
@@ -75,197 +67,170 @@ spacing:
   xl: "32px"
 components:
   button-primary:
-    backgroundColor: "{colors.copper-brand}"
-    textColor: "#14100d"
+    backgroundColor: "{colors.survey-blue-light}"
+    textColor: "{colors.forest-ground}"
     rounded: "{rounded.md}"
     padding: "8px 20px"
   button-primary-hover:
-    backgroundColor: "#e6b988"
+    backgroundColor: "#7bb3e8"
   button-secondary:
-    backgroundColor: "{colors.ink-panel}"
-    textColor: "{colors.lamp-paper}"
+    backgroundColor: "#1a2620"
+    textColor: "{colors.contour-cream}"
     rounded: "{rounded.md}"
     padding: "8px 16px"
   button-secondary-hover:
-    backgroundColor: "{colors.ink-panel-raised}"
+    backgroundColor: "#24332b"
   pill-switch-on:
-    backgroundColor: "{colors.copper-brand-light}"
-    textColor: "#14100d"
+    backgroundColor: "{colors.survey-blue-light}"
+    textColor: "{colors.forest-ground}"
     rounded: "{rounded.full}"
   pill-refine-on:
-    backgroundColor: "rgba(42, 25, 13, 0.4)"
-    borderColor: "rgba(185, 109, 51, 0.5)"
-    textColor: "#f0d3ae"
+    backgroundColor: "rgba(12, 26, 46, 0.4)"
+    textColor: "#a3cdf0"
     rounded: "{rounded.full}"
   card:
-    backgroundColor: "{colors.ink-panel}"
+    backgroundColor: "{colors.survey-panel}"
     rounded: "{rounded.lg}"
     padding: "20px"
-  badge:
-    backgroundColor: "{colors.ink-panel}"
-    textColor: "{colors.graphite}"
-    rounded: "{rounded.full}"
-    padding: "2px 8px"
 ---
 
 # Design System: TRACE
 
 ## Overview
 
-**Creative North Star: "The Field Journal"**
+**Creative North Star: "The Survey Map"**
 
-This is a researcher's dark notebook, not a product marketing itself. Every screen reads as a page you turn to record, review, or close out — precise, patient, and unhurried, because the two people this journal serves are the same person: a PhD researcher extracting thesis evidence, and someone using the same tool at the end of the day to see what actually needs doing. The copper accent behaves like a branding iron’s mark on leather: it marks what matters (the primary lens, the active state, the thing to act on) and disappears everywhere else. Amber behaves like a marginal note — the custom-analysis lens and its "saved" chip are handwritten asides against the notebook's default page, not a competing brand color.
+This is a researcher's field instrument, not a productivity app performing for engagement. Every screen reads as a page from a geological survey — precise, institutional, legible under dim field conditions. The palette draws from USGS topographic maps: a dark forest ground replaces the daylight paper of the original, but the color vocabulary is the same one Montana ranchers read daily: blue for primary features, green for vegetation and verified states, red for cultural features and alerts, brown for contour lines and elevation metadata. The section grid on the page ground is the one material signature: it places every screen on a surveyed field rather than in a generic dark container.
 
-The palette stays muted and clinical on purpose: desaturated slate, low-glare, nothing performing for attention. Warmth exists, but only where it's earned — amber for a personal aside, emerald for a thing genuinely done and checked off — never as decoration. This system explicitly rejects three lanes it could easily fall into: a productivity app selling itself (no gamification, no cheerful microcopy, no streaks), a clinical intake form (despite the ADHD framing, nothing reads as diagnostic or sterile), and a busy analytics dashboard (no multi-panel data-viz energy — this is a small set of calm, sequential pages, not a control room).
+Barlow carries the heading voice — a geometric grotesk with the institutional precision of survey-plate lettering, loaded through `next/font/google` and self-hosted for offline PWA use. Body text stays system sans for native rendering of dense generated prose.
 
 **Key Characteristics:**
-- Single dark surface family (night pasture → ink panel → ink panel raised), no light mode
-- One accent color carries all "this is active / this is primary" meaning: branding-iron copper
+- Single dark surface family (forest ground → survey panel → survey panel raised), dark-only
+- One accent color carries all "primary/active/interactive" meaning: survey blue
 - Flat by default — depth comes from tonal layering, not shadows
-- Every interactive target is at least 44px tall; this is a phone-in-pocket tool as much as a desk tool
-- Amber and emerald are single-purpose accents (custom lens; done/verified) — never used decoratively
+- Section grid on the page ground (160px repeating linear gradient)
+- Every interactive target at least 44px; this is a phone-in-pocket tool
+- Station numbers on conversation list entries, reading as a survey log
+- No eyebrows or kickers above headings — the heading carries its own weight
 
 ## Colors
 
-The palette is a narrow, deliberately dark stack: one background, one panel color one step lighter, one accent, and two single-purpose signal colors. Nothing else is introduced.
+The palette is a narrow, cool-toned stack: one forest-dark ground, one panel color one step lighter, one institutional blue accent, and three single-purpose signal colors.
 
 ### Primary
-- **Copper Brand** (`#b96d33`): The one color that means "this is primary, active, or mine to act on" — primary buttons, active filter pill, selected-item border, links, the app's own icon accent. Taken straight from the TRACE mark's nodes (now copper). Used sparingly against the dark field so it reads as a mark, not a wash. Because the active fill (Tailwind's `cyan-400` token, remapped to `#d99a5e`, a light copper) is a *light* copper, anything filled with it carries a near-black label, never white: warm-white on it fails AA, while the near-black label clears contrast comfortably — the bright-on-dark pairing is the logo's own contrast relationship.
-- **Copper Brand — Light** (`#d99a5e`): A lighter step of the same ink, used only for icon/heading accents inside content blocks (e.g. the icon beside an analysis section heading) where full-strength copper would be too loud against panel text.
-- **Brand Leather** (`#2a1c10`): The logo lockup's ground. It is *not* a UI surface — the app field stays Night Pasture. Brand Leather appears only where the brand mark needs its own ground: the PWA icon, the manifest `theme_color`, and the browser chrome.
+- **Survey Blue** (`#4a8dc8`): The one color that means "primary, active, or interactive" — primary buttons, active filter pills, selected-item borders, links, focus rings, map pins. Used sparingly against the dark field so it reads as a survey marker, not a wash. The lighter step (`#5b9bd5`) fills active surfaces; the deeper step (`#3a78b4`) anchors the TraceMark icon gradient.
 
 ### Neutral
-- **Night Pasture** (`#161311`): The base page background, and — reused deliberately — the recessed color for form inputs (textarea, "try again" button), so inputs read as sunken *below* the panel surface rather than floating on it.
-- **Ink Panel** (`#221c17`): The card/panel surface, one step lighter than the field. Every card, block, and toolbar sits at this level.
-- **Ink Panel, Raised** (`#2e261e`): The hover/pressed state for panels, and the default border color for panels at rest. One hex, two roles — border when idle, fill on interaction.
-- **Lamp Paper** (`#f6f1e7`): Primary text color, at full opacity for headings and ~90% for analysis body copy.
-- **Graphite** (`#a89a88`): Muted/secondary text — timestamps, helper copy, placeholders, badge text. This is the single muted-text value; the app previously mixed it with a darker non-text tone (`#7a6b58`), which failed WCAG AA for body text. Graphite clears the 4.5:1 text threshold against both Night Pasture and Ink Panel. **Muted never means illegible** — if something needs to recede further, reduce its size or weight, don't darken it past this value. `#7a6b58` (Graphite, Non-Text) survives only as a non-text tone (the calendar's "has entries" dot, list markers), where the 3:1 non-text threshold applies.
+- **Forest Ground** (`#0b110e`): The page background. Very dark with a green tint — the topo map field seen under dim conditions, not warm brown and not pure black.
+- **Survey Panel** (`#141e18`): The card/panel surface, one tonal step above the field.
+- **Survey Panel, Raised** (`#1c2a22`): The hover/pressed state for panels, and the border hover color.
+- **Contour Cream** (`#ddd6c4`): Primary text color. Named for the warm buff of topo-map contour lines and annotation.
+- **Section Gray** (`#8a9f8e`): Muted/secondary text — timestamps, helper copy, placeholders. Clears 4.5:1 against both Forest Ground and Survey Panel.
+- **Contour Brown** (`#8a7558`): Placeholder text and tertiary metadata — the color of contour elevation numbers on a topo map.
 
 ### Named Rules
-**The One Ink Rule.** Copper Brand is the only color allowed to mean "primary." If a second element on screen needs to look important, it does not get its own color — it gets weight, size, or position instead.
+**The One Accent Rule.** Survey Blue is the only color allowed to mean "primary." If a second element needs to look important, it gets weight, size, or position instead.
 
-**The Two Greys Rule.** There are exactly two muted greys, and only one of them is ever allowed to carry text: Graphite (`#a89a88`) for any text, and Graphite, Non-Text (`#7a6b58`) for non-text marks only (dots, markers, decorative icons). A third, darker grey is never introduced for "extra quiet" text — quieter is expressed through size and weight. Audit test: every text colour in the app must clear 4.5:1 against both Night Pasture and Ink Panel; `#7a6b58` fails both, which is exactly why it is barred from text.
+**The Grid Ground Rule.** The section grid on the page background is the world's signature material. It stays visible on the page field and disappears on panel surfaces.
 
 ### Signal Colors (single-purpose, not decorative)
-- **Amber Marginalia** (`#fbbf24`, on a `rgba(245, 158, 11, 0.06)` wash): Reserved entirely for the Custom Analysis lens — its icon, heading, "saved" chip, and active border. Never appears anywhere the custom lens isn't involved.
-- **Sage Green** (`#a9bd8f`, Tailwind's `emerald` scale): Reserved for "done" and "verified" states only — a completed commitment, an analyzed badge, a saved rollup. Always paired with a checkmark or explicit status text, never color alone.
-- **Alert Clay** (`#e98d72`, Tailwind's `red` scale): Errors only — failed fetch, failed analysis. Always paired with a warning icon and explanatory text.
+- **Amber Marker** (`#e8b84e`): Reserved for the Custom Analysis lens — its icon, heading, and active border.
+- **Vegetation Green** (`#7eb868`): Reserved for "done" and "verified" states. Always paired with a checkmark or status text.
+- **Topo Red** (`#c44536`): Errors only. Always paired with a warning icon and explanatory text.
 
 ## Typography
 
-**Display Font:** Source Serif 4, loaded through `next/font/google` in `src/app/layout.tsx` and exposed as `--font-serif` (`'Source Serif 4', Georgia, 'Times New Roman', serif`). It is the *only* webfont in the app, and it carries the journal voice: every `h1`/`h2`/`h3` and the italic Subtitle gloss. `next/font` self-hosts it and inlines the `@font-face`, so there is no render-blocking request to a third party.
+**Display Font:** Barlow, loaded through `next/font/google` and exposed as `--font-barlow` / `--font-survey`. A geometric grotesk with the institutional precision of survey-plate lettering.
 
-**Body Font:** System sans (`ui-sans-serif, system-ui, -apple-system`) — deliberately not the serif. Body copy is dense generated text read at arm's length, and the system stack keeps it native and instant on a phone-installed PWA.
-**Label/Mono Font:** System mono (`ui-monospace, SFMono-Regular`) — used narrowly for small structured metadata (a commitment's "who → who" direction, a transcript timestamp), never for prose.
+**Body Font:** System sans (`ui-sans-serif, system-ui, -apple-system`) — native rendering for dense generated prose.
 
-**Character:** Plain and legible over expressive. The type system does one job — make dense structured output (five thesis dimensions, six ADHD categories) scannable at a glance — and gets out of the way otherwise.
+**Label Font:** System mono (`ui-monospace, SFMono-Regular`) — timestamps, datelines, station metadata, traverse designations.
+
+**Character:** Institutional and precise. The type system makes dense structured output scannable at a glance.
 
 ### Hierarchy
-- **Display** (700, `clamp(1.5rem, 4vw, 2.25rem)`, 1.2): Page-level `h1` only — "Thesis Analyzer," a conversation's title.
-- **Headline** (600, `clamp(1.15rem, 3vw, 1.5rem)`, 1.25): `h2`, section-level headings.
-- **Title** (600, `clamp(1rem, 2.5vw, 1.25rem)`, 1.3): `h3`, individual analysis-block headings (e.g. "Do today," "RQ1 — Documentary Record").
-- **Subtitle** (400 italic serif, 0.95rem, 1.5): The one-line gloss directly under a page or section heading — what this screen is, or what a list is showing ("Every meeting, most recent first"). Italic serif because it is the journal's own aside about its content, not content itself; it never carries a control or a fact the reader must act on. Sits fractionally above Body so it reads as part of the heading block rather than as the first line of the copy beneath it.
-- **Body** (400, 0.875rem/14px, 1.7): Analysis prose and card copy. The unusually tall 1.7 line-height is deliberate — this is dense generated text read at arm's length, not marketing copy.
-- **Label** (500, 0.75rem/12px mono, 1.4): Timestamps, confidence tags, directional metadata ("them → me").
-- **Eyebrow** (500, 0.6875rem/11px mono, uppercase, 0.14em tracking): The running head above a page or section title — "Directory," "Planning," "Profile," "Location," a conversation's own category. One step below Label because it sits *above* a heading and must not compete with it; the wide tracking and uppercase are what make it read as a running head rather than as small body text. Never used for anything the reader needs to act on.
-- **Micro** (600, 0.625rem/10px sans, 1): A single glyph inside a compact circular badge (the T/A lens dots, the accordion's numbered dimension markers) — the smallest step, reserved for exactly that role. It exists because 12px (Label) doesn't fit comfortably as a centered single character inside a 20px circle; two components converged on 10px independently before either used a token for it.
+- **Display** (700, `clamp(1.5rem, 4vw, 2.25rem)`, 1.2): Page-level `h1` only.
+- **Headline** (600, `clamp(1.15rem, 3vw, 1.5rem)`, 1.25): `h2`, section headings.
+- **Title** (600, `clamp(1rem, 2.5vw, 1.25rem)`, 1.3): `h3`, analysis-block headings.
+- **Subtitle** (400 italic, 0.95rem/15.2px, 1.5): The one-line gloss under a page heading — what this screen is or what a list shows. Italic Barlow because it's the system's aside about its content.
+- **Body** (400, 0.875rem/14px, 1.7): Analysis prose and card copy.
+- **Label** (500, 0.6875rem/11px mono, uppercase, 0.14em tracking): Datelines, traverse designations, timestamps.
+- **Micro** (600, 0.625rem/10px sans, 1): Single glyph inside compact circular badges (lens dots, dimension markers).
 
 ### Named Rules
-**The Fluid-Only Rule.** Headings never get a fixed pixel size; every heading level is a `clamp()` that scales between phone and desktop. There is no separate "mobile type scale" to maintain.
+**The Fluid-Only Rule.** Headings never get a fixed pixel size; every heading level is a `clamp()` that scales between phone and desktop.
 
 ## Layout
 
-Single-column, sequential, mobile-first. There is no sidebar, no multi-column grid, no split view anywhere in the app — every screen is a vertically stacked list of cards inside a `max-w-3xl` (768px) centered container with `px-4 py-8`. Cards and sections stack with consistent rhythm (`space-y-3` for list items, `space-y-4`–`space-y-6` for larger sections). This holds even on desktop: the container simply centers with margin, it does not gain columns.
+Single-column, sequential, mobile-first. No sidebar, no multi-column grid — every screen is a vertically stacked list inside `max-w-3xl` (768px) centered with `px-4 py-8`. Cards stack with `space-y-3` for list items, `space-y-4` to `space-y-6` for larger sections.
 
-Mobile specifics: safe-area insets on all four edges (notches, PWA standalone bottom bar), scroll-snap on the conversation list, and every tappable element enforced at a 44px minimum height/width under `(pointer: coarse)`.
-
-### Named Rules
-**The Single Column Rule.** No screen in this app ever splits into side-by-side panels. A researcher reading one thing at a time, in order, is the entire interaction model — resist the urge to add a sidebar or a two-pane layout even on wide viewports.
+Mobile: safe-area insets on all four edges, every tappable element at 44px minimum height/width under `(pointer: coarse)`.
 
 ## Elevation & Depth
 
-Flat by default, no shadows anywhere in the codebase. Depth is conveyed entirely through tonal layering — night field → ink panel → ink panel raised — plus a 1px border at the panel's resting state. The only "elevation" gesture the system uses is a subtle background lightening (or a `scale(0.98)` press on touch) on interaction, never a shadow.
+Flat by default, no shadows. Depth is conveyed through tonal layering — forest ground → survey panel → survey panel raised — plus a 1px border at rest.
 
 ### Named Rules
-**The Flat Field Rule.** Nothing casts a shadow. If a surface needs to read as "above" another, lighten it one tonal step instead.
+**The Flat Field Rule.** Nothing casts a shadow. If a surface needs to read as "above" another, lighten it one tonal step.
 
 ## Shapes
 
-- **xs (4px):** The smallest radius — checkbox squares, focus-ring outline.
-- **sm (6px):** Compact chip-style buttons (quick-prompt presets).
-- **md (8px):** The default control radius — buttons, textareas, the `.analysis-section` block, skeleton loaders.
-- **lg (12px):** Cards — the system's signature radius, applied via the shared `.card` class to every panel in the app.
-- **full:** Pills and badges — filter toggles, status chips ("analyzed," "saved," lens badges), the circular selection checkmark.
+- **sm (6px):** Compact chip-style buttons.
+- **md (8px):** Default control radius — buttons, textareas, skeleton loaders.
+- **lg (10px):** Cards — the system's signature radius, applied via `.card`.
+- **full:** Pills and badges — filter toggles, status chips, lens badges.
 
-No decorative borders beyond the 1px panel border at rest; borders exist to delineate a container, never as ornament.
+No decorative borders beyond the 1px panel border at rest.
 
 ## Components
 
-Every interactive component shares one behavior contract: `background` and `transform` transition at 0.1–0.15s, hover lightens the surface one tonal step (desktop), `:active` does the same plus a `scale(0.98)` press (touch), and `prefers-reduced-motion` strips the transition and the shimmer/spin animations entirely while keeping the state change itself.
+Every interactive component shares one behavior contract: `background` and `transform` transition at 100–150ms, hover lightens one tonal step, `:active` adds `scale(0.97)`, and `prefers-reduced-motion` strips transforms.
 
 ### Buttons
-- **Shape:** 8px radius (`rounded-lg`), 44px minimum height always.
-- **Primary:** Copper Brand background, `slate-950` label (never white — see Colors), `font-medium`, used for the one primary action per screen (Run Custom Analysis, Generate Rollup). Lives as `BUTTON_PRIMARY` in `src/lib/ui.ts` so the brand colour has exactly one definition; call sites append only padding and layout.
-- **Secondary:** one tonal step lighter than whatever surface it sits on, lightening one further step on hover — used for every non-primary action (Cancel, Refresh, Deselect All). On the page field this is Ink Panel background (`bg-slate-800`) → Ink Panel Raised on hover; **inside a `.card`, that step must shift down to `bg-slate-700` → `bg-slate-600`**, since a card's own background already *is* Ink Panel — a secondary button using `bg-slate-800` there is invisible at rest (confirmed bug, fixed across the toolbar, both confirm dialogs, and both quick-prompt-preset blocks: same-color-as-container, no shape until hovered). The rule is relative to the immediate surface, never a fixed class.
-- **Parity Action:** for two or more independent, co-equal actions sharing one control (e.g. the selection toolbar's Group Thesis / Run ADHD — different actions, not a preference order), no button claims solid-fill copper at rest, since only one action per screen is allowed that mark under the One Ink Rule. All of them share one class and three tiers instead: flat slate with nothing selected; a copper-tinted **ready** wash (`border-cyan-500/50 bg-cyan-950/40 text-cyan-200`, `hover:` one step up) — the same wash `ConversationRow` uses for a selected item, not a new pattern — as soon as *anything* is selected, even if a given button's own minimum (Group Thesis needs 2, not 1) isn't met yet; and a solid-fill **full copper** flash on `:active`, so an actual tap still reads as a distinct, heavier moment than just having a selection ready. A button whose own minimum isn't met yet **is disabled** (`disabled={selected.size < 2 || batchRunning}`), not left tappable with a no-op handler. That was the earlier rule here, and it was wrong in practice: with one conversation selected, Group Thesis carried the copper "ready" wash, invited a tap, and then did nothing at all — a control that looks pressable and silently refuses is worse than one that plainly says "not yet." The live count in the label (`Group Thesis (1)`) still carries the nuance of *why*. Disabled state (nothing selected, or a batch already running) is `bg-slate-700` here, not `bg-slate-800` — this toolbar is itself a `.card` (Ink Panel), so the Secondary Button "shift one step inside a card" rule applies just as much to this variant.
-- **Ghost/ text-link:** No background, `text-cyan-400` (remapped to light copper), underline on hover — used for low-emphasis actions inline in text ("Show all").
-- **Disabled:** Background drops to a flat slate; Primary/Parity Action buttons swap to a flat color directly, Secondary/Ghost buttons reduce opacity instead — either way, no hover/press feedback. Which flat slate depends on the immediate surface (page field vs. inside a `.card`) — see the Secondary Button rule.
+- **Shape:** 8px radius, 44px minimum height.
+- **Primary:** Survey Blue Light fill, Forest Ground text. Lives as `BUTTON_PRIMARY` in `src/lib/ui.ts`.
+- **Secondary:** One tonal step above the immediate surface.
+- **Ghost:** No background, muted text, panel wash on hover.
+- **Disabled:** Flat slate, no hover/press feedback.
 
 ### Badges / Chips
-- **Style:** Fully rounded (`rounded-full`), 10–12px text, a tinted background at ~15% opacity with a matching-hue 40%-opacity border (e.g. emerald wash + emerald border for "analyzed").
-- **Use:** Status only — lens badges (T/A dots), "analyzed," "saved," "not yet," folder tags. Never used as a primary navigation or filter control (filter pills use a solid-fill pattern instead, see Navigation).
+- **Style:** Fully rounded, 10–12px text, tinted background with matching-hue border.
+- **Use:** Status only — lens badges, "analyzed," "saved," folder tags.
 
 ### Cards / Containers
-- **Corner Style:** 12px (`.card`).
-- **Background:** Ink Panel at rest, Ink Panel Raised on hover/active.
-- **Shadow Strategy:** None — see Elevation & Depth.
-- **Border:** 1px, Ink Panel Raised color at rest; shifts to a tinted accent border (copper/amber/sage/clay at ~30–50% opacity) to signal the card's semantic state (selected, custom-lens, error).
-- **Internal Padding:** 16–24px (`p-4` to `p-6`), 32px for empty states.
+- **Corner Style:** 10px.
+- **Background:** Survey Panel at rest, Survey Panel Raised on hover.
+- **Shadow Strategy:** None.
+- **Border:** 1px, `#24332b` at rest.
 
 ### Inputs / Fields
-- **Style:** Night Pasture background (recessed below the panel it sits in), 1px Ink Panel Raised border, 8px radius, placeholder in a dim graphite tone.
-- **Focus:** Border shifts to the relevant accent color (amber for the custom-analysis textarea), plus the global 2px accent focus ring — no glow/shadow effect.
+- **Style:** Forest Ground background (recessed below panel), 1px border, 8px radius.
+- **Focus:** Border shifts to accent, plus 2px outline at 2px offset.
+- **Caret:** Survey Blue Light.
 
 ### Navigation
+- **Switch** (solid Survey Blue fill): Changes what you look at — filter pills, lens toggles, view modes.
+- **Refine** (blue tint wash): Narrows within a list — age/direction filters, section chips.
 
-**Single-select pills — two roles, one ink.** Every "pick exactly one of these" control in the app is one of two treatments, both defined once in `src/lib/ui.ts` (`PILL_SWITCH_*`, `PILL_REFINE_*`). Which one a control gets is decided by what changes when you press it, not by where it sits:
-
-- **Switch** (`PILL_SWITCH_ON` — solid Copper Brand fill, slate-950 label): the choice replaces *what you are looking at*. The home filter pills (All / Analyzed / Unanalyzed), the Thesis / ADHD Aid / Both lens toggle, `/people`'s Grid / Connections / Map / Places views, and the calendar's selected day. This is the system's only use of fill (not tint) for state, and it is reserved for exactly this. Unselected pills sit on Ink Panel on the page field (`PILL_SWITCH_OFF`), or carry no fill at all inside a segmented track that is already Ink Panel (`PILL_SWITCH_OFF_TRACK`) — the Secondary Button surface rule, applied to pills.
-- **Refine** (`PILL_REFINE_ON` — copper tint wash, `border-cyan-500/50 bg-cyan-950/40 text-cyan-200`): the choice narrows or moves within a list that is already on screen, and the page keeps its identity. `/commitments`' age and direction filters, `SectionNav`'s section chips. A tint reads as an adjustment; a fill would over-claim. This is the same wash `ConversationRow` uses for a selected row and the Parity Action's "ready" tier — not a new pattern.
-
-Both keep the One Ink Rule: copper is still the only colour that means "active," and neither role introduces a second hue. A grey-on-grey selected state is not a third option — `/people`'s view switcher used `bg-slate-700` on a `bg-slate-800` track, roughly a 1.1:1 step, and it was the faintest selected state in the app on its most modal screen.
-
-- Primary in-page navigation (Daily Rollup, Refresh) sits as icon + label buttons in the header, never a persistent nav bar or tab strip — the app has no chrome beyond what a given screen needs. On the conversations list, Daily Rollup is the one control that carries `BUTTON_PRIMARY`: the One Ink Rule allows exactly one copper mark per screen, and the home screen previously spent it on nothing while offering fourteen equal-weight controls above the fold. Destinations that are *about* the tool rather than part of a day's work (How this works, Search analyses, Usage, Capture, Backup / Restore) belong in the page footer, not the header.
-
-### Lens Badge (signature component)
-A stacked pair of small rounded-full pills ("Thesis" / "ADHD") shown beside every conversation list item, each independently lit (emerald fill + border) or dim (flat slate) depending on whether that lens has run. Reads as plain words, not a coded glyph — a first-time reader doesn't need a tooltip to know what's been processed. This is the system's one custom-invented primitive — a status readout that lets the researcher scan a whole list at a glance.
-
-### Calendar (month grid)
-The primary day-browsing entry point on the conversations list. A 7-column Monday-first grid inside a `.card`. The selected day reuses the filter pills' solid-fill pattern (Copper Brand background, slate-950 label) — the same "true single-select navigation" rule, not a new one. Today gets a copper ring (`border-cyan-500/60`) independent of selection, so it stays identifiable even when browsing a different day. Days with conversations get a small graphite dot; days without get none — no shadow, no elevation, just the dot and the two copper treatments. Future dates render dimmed (Graphite, one step below the `text-slate-300` of past days) but stay clickable rather than disabled — simplicity over guarding an edge case that just resolves to an empty state. They are dimmed, not faded out: because they remain real controls, they hold the same AA-legible Graphite as any other muted text.
-
-Collapsed to a one-line summary row by default (icon + selected day's label, chevron affordance) — the full grid would otherwise be the first thing painted on mobile, pushing that day's actual conversations below the fold. Tapping the row expands the grid; picking a day (or "Today") collapses it back automatically, so the grid never lingers once its job is done. The one exception: while group-select mode is active, picking a day does *not* collapse the grid, since batch-selecting across several days means jumping between them repeatedly — closing on every pick would fight that workflow. The month label doubles as a native `<input type="month">` (invisibly overlaid) for jumping distant months without a hand-built year picker.
+### Station Numbers (signature component)
+Small monospace numerals (11px, `tabular-nums`) in the left margin of each conversation entry. Muted (`text-slate-500`) so they orient without competing with the entry title.
 
 ### Map (Leaflet)
-
-Used by `MeetingMap` (conversation, `/people` map view, `/people/place/[id]`) and `LocationPicker`. The basemap is **CARTO `dark_all`**, defined once in `src/lib/map-tiles.ts` and imported by both — never a per-component tile URL.
-
-This matters more than it looks. The map is the only third-party surface in the app, and its tiles are ~90% of the component's pixels: on stock light OpenStreetMap tiles the map was a rectangle of daylight inside a system whose first constraint is "no light mode," and on the conversation page it put the brightest, largest object on the screen directly above the analysis — value contrast outranking "Do today." Themed pins, popups and attribution do not compensate for a light basemap; the tiles themselves have to be dark.
-
-Height is a `heightClass` prop with an `h-64` default, not something a caller folds into `className` — two height utilities on one element don't resolve by written order. Where the map is context rather than subject (the conversation page) it drops to `h-40` on mobile. Pins are two steps of the same copper differentiated by *shape* (round = meeting, square = named place), never by a second hue; popups are re-grounded onto Ink Panel in `globals.css`, because Leaflet ships a white popup surface that would otherwise carry dark-theme text at ~1.8:1.
+Dark basemap via CSS filter on `.leaflet-tile-pane`. Pins differentiated by shape (round = meeting, diamond = named place), both in survey blue. Popups re-grounded on Survey Panel.
 
 ## Do's and Don'ts
 
 ### Do:
-- **Do** keep Copper Brand as the only color that means "primary" — see the One Ink Rule.
-- **Do** convey elevation with tonal steps only, never a shadow — see the Flat Field Rule.
-- **Do** keep every screen single-column inside the 768px container — see the Single Column Rule.
-- **Do** enforce 44px minimum touch targets on every interactive element; this is used one-handed on a phone as often as on a desk.
-- **Do** pair Verified Green and Alert Red with an icon or explicit text, never color alone.
-- **Do** respect `prefers-reduced-motion` on every new animation, matching the existing shimmer/spin/scale-press pattern.
+- **Do** keep Survey Blue as the only color meaning "primary."
+- **Do** convey elevation with tonal steps only, never shadows.
+- **Do** keep every screen single-column inside the 768px container.
+- **Do** enforce 44px minimum touch targets on every interactive element.
+- **Do** pair Vegetation Green and Topo Red with an icon or text, never color alone.
 
 ### Don't:
-- **Don't** introduce a second accent color for "importance." A new primary action reuses Copper Brand; it does not get its own hue.
-- **Don't** add gamified feedback — no streaks, confetti, progress badges, or celebratory copy. This is a research and executive-function tool, not an engagement product.
-- **Don't** let the ADHD Aid surfaces drift toward a clinical/medical register (form-like labels, diagnostic tone, sterile whitespace). It should feel like the same field journal as the thesis lens, just a different page.
-- **Don't** add a sidebar, tab bar, or multi-column layout, even on desktop. If a screen feels cramped, that's a signal to add a wizard step or collapse content — not to add a column.
-- **Don't** use Amber Marginalia or Verified Green decoratively. They are reserved exactly for the custom-analysis lens and done/verified states, respectively.
+- **Don't** introduce a second accent color for "importance."
+- **Don't** add eyebrows or kickers above headings — they are banned.
+- **Don't** add a sidebar, tab bar, or multi-column layout.
+- **Don't** use Amber Marker or Vegetation Green decoratively.
+- **Don't** add gamified feedback — no streaks, confetti, or celebratory copy.
+- **Don't** add shadows or box-shadow effects.

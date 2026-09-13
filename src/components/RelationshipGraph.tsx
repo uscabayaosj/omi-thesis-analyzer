@@ -270,21 +270,21 @@ export default function RelationshipGraph({ people, onOpen, onOpenPlace }: Relat
 
       // Glow
       if (isSel || isHov) {
-        ctx.shadowColor = "#d99a5e";
+        ctx.shadowColor = "#5b9bd5";
         ctx.shadowBlur = isSel ? 16 : 8;
       }
 
       // Gradient fill
       const grad = ctx.createRadialGradient(x - r * 0.2, y - r * 0.3, r * 0.1, x, y, r);
       if (isSel) {
-        grad.addColorStop(0, "#e6b988");
-        grad.addColorStop(1, "#8a4d1f");
+        grad.addColorStop(0, "#7bb3e8");
+        grad.addColorStop(1, "#1a3a5a");
       } else if (node.kind === "place") {
-        grad.addColorStop(0, "#33291e");
-        grad.addColorStop(1, "#151210");
+        grad.addColorStop(0, "#1a2e24");
+        grad.addColorStop(1, "#0e1812");
       } else {
-        grad.addColorStop(0, "#3d3228");
-        grad.addColorStop(1, "#1a1510");
+        grad.addColorStop(0, "#1e3428");
+        grad.addColorStop(1, "#101a14");
       }
 
       ctx.beginPath();
@@ -303,7 +303,7 @@ export default function RelationshipGraph({ people, onOpen, onOpenPlace }: Relat
 
       // Stroke
       ctx.shadowBlur = 0;
-      ctx.strokeStyle = isSel ? "#d99a5e" : isHov ? "#7a6b58" : "#5a4e3f";
+      ctx.strokeStyle = isSel ? "#5b9bd5" : isHov ? "#5a7261" : "#2d3f34";
       ctx.lineWidth = (isSel ? 1.5 : 0.7) / globalScale;
       ctx.stroke();
 
@@ -313,7 +313,7 @@ export default function RelationshipGraph({ people, onOpen, onOpenPlace }: Relat
         const label = shortName(node.name as string);
         const fontSize = Math.max(2.5, Math.min(4, 11 / globalScale));
         ctx.font = `${isSel ? 600 : 400} ${fontSize}px -apple-system, "SF Pro Text", system-ui, sans-serif`;
-        ctx.fillStyle = isSel ? "#e6b988" : "#a89a88";
+        ctx.fillStyle = isSel ? "#7bb3e8" : "#8a9f8e";
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
         ctx.fillText(label, x, y + r + 1.5);
@@ -443,7 +443,7 @@ export default function RelationshipGraph({ people, onOpen, onOpenPlace }: Relat
           graphData={graphData}
           width={dims.w}
           height={dims.h}
-          backgroundColor="#221c17"
+          backgroundColor="#141e18"
 
           // Nodes
           nodeCanvasObject={nodeCanvasObject}

@@ -442,9 +442,6 @@ export default function PersonDetailPage() {
       </Link>
 
       {/* Header */}
-      <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
-        Profile
-      </p>
       <div className="card p-6 mb-6">
         <div className="flex items-start gap-4">
           <div className="relative flex-shrink-0 group">

@@ -69,10 +69,7 @@ export default function SearchPage() {
         Back to conversations
       </Link>
 
-      <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
-        Archive
-      </p>
-      <h1 className="font-bold text-white mb-6">Search Analyses</h1>
+      <h1 className="font-bold text-white mb-4">Search Analyses</h1>
 
       <div className="relative mb-6">
         <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
@@ -123,7 +120,7 @@ export default function SearchPage() {
               <li key={r.conversationId} className="card p-4">
                 <Link href={`/conversation/${r.conversationId}`} className="block">
                   <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="text-slate-200 font-serif font-medium">{r.title}</span>
+                    <span className="text-slate-200 font-serif font-semibold">{r.title}</span>
                     <span className="text-xs font-mono text-slate-400 flex-shrink-0">{formatDate(r.date)}</span>
                   </div>
                   <div className="space-y-1.5">
@@ -148,7 +145,7 @@ export default function SearchPage() {
             {result.groupResults.map((r) => (
               <li key={r.conversationIds.join(",")} className="card p-4">
                 <Link href={`/analyze-group?ids=${r.conversationIds.map(encodeURIComponent).join(",")}`} className="block">
-                  <div className="text-slate-200 font-serif font-medium mb-2">
+                  <div className="text-slate-200 font-serif font-semibold mb-2">
                     {r.conversationTitles.length > 0 ? r.conversationTitles.join(", ") : `${r.conversationIds.length} conversations`}
                   </div>
                   <div className="space-y-1.5">

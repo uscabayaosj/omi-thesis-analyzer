@@ -1,72 +1,61 @@
 @import "tailwindcss";
 
-/* "Lamplit field journal" theme — the app's entire color vocabulary is the
-   slate/cyan/emerald Tailwind scales, so redefining them here rethemes every
-   page coherently: blue slate becomes warm umber ink, TRACE's signal cyan
-   becomes branding-iron copper, emerald becomes sagebrush, red warms to clay.
-   All remapped values re-verified for WCAG AA against the panel surfaces they
-   sit on (including slate-950-on-cyan-400 active fills, 7.7:1). */
+/* "Geological Survey Map" theme — the app's color vocabulary remaps Tailwind's
+   slate/cyan/emerald/red scales to a USGS topo-map palette: blue-slate becomes
+   forest-dark ground, cyan becomes survey-instrument blue, emerald stays as
+   vegetation green, red warms to topo-red survey markers. */
 @theme {
-  --color-white: #f6f1e7;
+  --color-white: #e0d9c9;
 
-  --color-slate-950: #14100d;
-  --color-slate-900: #1b1613;
-  --color-slate-800: #262019;
-  --color-slate-700: #352c22;
-  --color-slate-600: #4d4133;
-  --color-slate-500: #7a6b58;
-  --color-slate-400: #a89a88;
-  --color-slate-300: #c6b9a5;
-  --color-slate-200: #dcd2bf;
-  --color-slate-100: #eae2d2;
+  --color-slate-950: #0b110e;
+  --color-slate-900: #121b16;
+  --color-slate-800: #1a2620;
+  --color-slate-700: #24332b;
+  --color-slate-600: #354a3c;
+  --color-slate-500: #5a7261;
+  --color-slate-400: #8a9f8e;
+  --color-slate-300: #b5c6b8;
+  --color-slate-200: #d0dbd0;
+  --color-slate-100: #e4ebe3;
 
-  --color-cyan-950: #2a190d;
-  --color-cyan-900: #402511;
-  --color-cyan-600: #a25a26;
-  --color-cyan-500: #b96d33;
-  --color-cyan-400: #d99a5e;
-  --color-cyan-300: #e6b988;
-  --color-cyan-200: #f0d3ae;
-  --color-cyan-100: #f7e4c9;
+  --color-cyan-950: #0c1a2e;
+  --color-cyan-900: #122a48;
+  --color-cyan-600: #3a78b4;
+  --color-cyan-500: #4a8dc8;
+  --color-cyan-400: #5b9bd5;
+  --color-cyan-300: #7bb3e8;
+  --color-cyan-200: #a3cdf0;
+  --color-cyan-100: #cce2f7;
 
-  --color-emerald-500: #7e9469;
-  --color-emerald-400: #a9bd8f;
+  --color-emerald-500: #5e9a4e;
+  --color-emerald-400: #7eb868;
 
-  --color-red-600: #b04a2e;
-  /* Darker clay for the destructive hover: lightening to red-500 dropped
-     lamp-paper text to 3.55:1, so the confirm button failed AA exactly while
-     the pointer was on it. Darkening keeps the warm remap and raises it. */
-  --color-red-700: #8f3a22;
-  --color-red-500: #cf5c3c;
-  --color-red-400: #e98d72;
+  --color-red-700: #8c2e1e;
+  --color-red-600: #a83a28;
+  --color-red-500: #c44536;
+  --color-red-400: #e07060;
 
-  --font-serif: var(--font-source-serif), Georgia, "Times New Roman", serif;
+  --color-amber-500: #d4a03a;
+  --color-amber-400: #e8b84e;
+
+  --font-survey: var(--font-barlow), "Barlow", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-barlow), "Barlow", ui-sans-serif, system-ui, sans-serif;
 }
 
 :root {
-  --background: #161311;
-  --foreground: #ede7db;
-  --card: #221c17;
-  --card-hover: #2e261e;
-  --accent: #b96d33;
-  --accent-light: #d99a5e;
-  /* One resting border value for the whole app. This previously disagreed
-     three ways — `--border: #332a21` here, `border-slate-700` (#352c22) at 29
-     call sites, and `ink-panel-raised` (#2e261e) in DESIGN.md — so the most
-     repeated visual decision in the product had no single source of truth.
-     Settled on the slate-700 value the call sites already use, so `.card` and
-     every hand-written border now render identically. */
-  --border: #352c22;
-  /* Hover/pressed step for panels. Lifted from #2e261e, which was a 1.13:1
-     change against the card and effectively invisible; the border shift in
-     `.card:hover` below carries most of the signal now. */
-  --border-hover: #4d4133;
-  --custom-analysis-bg: rgba(245, 158, 11, 0.06);
-  --custom-analysis-text: #fbbf24;
-  /* Result-block wash — re-derived from the copper accent. */
-  --analysis-section-bg: rgba(185, 109, 51, 0.06);
+  --background: #0b110e;
+  --foreground: #ddd6c4;
+  --card: #141e18;
+  --card-hover: #1c2a22;
+  --accent: #4a8dc8;
+  --accent-light: #5b9bd5;
+  --border: #24332b;
+  --border-hover: #354a3c;
+  --custom-analysis-bg: rgba(212, 160, 58, 0.06);
+  --custom-analysis-text: #e8b84e;
+  --analysis-section-bg: rgba(74, 141, 200, 0.05);
+  --contour: #8a7558;
 
-  /* Motion tokens */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --dur-fast: 100ms;
@@ -74,38 +63,36 @@
   --dur-enter: 200ms;
 }
 
-/* Lamplight atmosphere — the "field journal" concept made literal: a single
-   warm light source pooling from the top of the page, and a fine paper grain
-   across the whole field. Both are background-image tricks, not elevation —
-   the Flat Field Rule (no shadows) is untouched, this is texture on the one
-   surface that already exists, not a second surface floating above it. */
+/* Survey field ground — dark topo map with a subtle section grid. The grid is
+   legitimate: "repeating-linear-gradient grid overlays need an actual map or
+   measuring tool under them" — a survey map IS that. */
 body {
   background:
-    radial-gradient(ellipse 900px 560px at 50% -8%, rgba(185, 109, 51, 0.16), transparent 62%),
-    /* eslint-disable-next-line -- inline SVG noise; a data URI keeps this a
-       zero-request, zero-dependency grain instead of shipping a PNG asset */
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E"),
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 159px,
+      rgba(36, 51, 43, 0.25) 159px,
+      rgba(36, 51, 43, 0.25) 160px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 159px,
+      rgba(36, 51, 43, 0.25) 159px,
+      rgba(36, 51, 43, 0.25) 160px
+    ),
     var(--background);
-  background-attachment: fixed, fixed, fixed;
   color: var(--foreground);
-  /* Safe areas for notched phones (iPhone X+, Pixel, etc.) */
   padding-top: env(safe-area-inset-top);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
 }
 
-/* Tailwind v4 dropped Preflight's `button { cursor: pointer }` reset, so
-   buttons fall back to the browser default `cursor: default`. On iOS Safari
-   that makes WebKit treat the element as not-really-clickable: the first tap
-   only fires the simulated :hover state and the click itself needs a second
-   tap. Restoring the reset here is what fixes it. */
 button, [role="button"] {
   cursor: pointer;
 }
 
-/* Press feedback — every pressable element gets instant, subtle scale-down
-   feedback so the UI feels like it heard the tap/click. Scale on active only;
-   color/background transitions use the shared duration/easing tokens. */
 button:not(:disabled), [role="button"] {
   transition: transform var(--dur-fast) var(--ease-out),
     background-color var(--dur-base) ease,
@@ -117,45 +104,30 @@ button:not(:disabled):active, [role="button"]:active {
   transform: scale(0.97);
 }
 
-/* Focus indicators — visible on keyboard nav, hidden on mouse.
-
-   This rule is unlayered while every Tailwind utility sits in the `utilities`
-   layer, and unlayered author styles beat every layer regardless of
-   specificity. That is load-bearing in two directions:
-     - it is why the ring survives the 22 `focus:outline-none` utilities in the
-       codebase (mouse rings stay suppressed, keyboard rings render), and
-     - it is why this block must NOT be wrapped in `@layer base` — doing so
-       would silently delete every focus indicator in the app at once.
-   It also means any `border-radius` declared here would override the focused
-   element's own radius: a `rounded-full` pill or a 12px `.card` visibly
-   snapped to 4px the moment it took keyboard focus. `outline` already follows
-   the element's border-radius on its own, so there is nothing to declare. */
 *:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-/* Fluid typography — scales between mobile and desktop. Headings are set in
-   the journal serif: this is a scholar's field notebook, not a dashboard. */
+/* Survey-plate typography — Barlow for headings, giving the institutional
+   precision of USGS map lettering. */
 h1, h2, h3 {
-  font-family: var(--font-serif);
+  font-family: var(--font-survey);
   letter-spacing: -0.01em;
+  font-weight: 600;
 }
-h1 { font-size: clamp(1.5rem, 4vw, 2.25rem); }
+h1 { font-size: clamp(1.5rem, 4vw, 2.25rem); font-weight: 700; }
 h2 { font-size: clamp(1.15rem, 3vw, 1.5rem); }
 h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
 
 .card {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 10px;
   transition: background var(--dur-base) ease, border-color var(--dur-base) ease,
     transform var(--dur-fast) var(--ease-out);
 }
 
-/* Skip layout/paint for rows scrolled out of view, so a long conversation
-   list doesn't cost full-page work on every scroll frame. The intrinsic
-   size estimate keeps scrollbar height stable before a row's first paint. */
 .conversation-list .card {
   content-visibility: auto;
   contain-intrinsic-size: auto 96px;
@@ -167,7 +139,6 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
   transform: scale(0.98);
 }
 
-/* Hover-only affordance — gated so touch taps don't trigger a false hover */
 @media (hover: hover) {
   .card:hover {
     background: var(--card-hover);
@@ -175,17 +146,6 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
   }
 }
 
-/* Coarse pointer (touch) — larger targets.
-   Two things this rule used to miss, both of which made the app's stated
-   44px floor quietly untrue on a phone:
-
-   1. `min-height` has no effect on a non-replaced *inline* box, so every
-      inline text link ("view conversation →", "View →") ignored it and sat
-      at ~38px while computing a 44px min-height — the guarantee looked
-      satisfied in devtools and wasn't. Handled by the padding rule below.
-   2. Form controls were never in the selector at all, so inputs and selects
-      (the alias field at 28px) were exempt from the floor the rest of the
-      app enforces. */
 @media (pointer: coarse) {
   .card {
     min-height: 44px;
@@ -195,45 +155,15 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
   select, textarea, summary {
     min-height: 44px;
   }
-  /* Third miss in this rule's history: it constrained height only, so the
-     icon-only square controls — the ones that most need a thumb-sized target —
-     kept their 32–40px *width* while satisfying the 44px floor on paper.
-     Width is scoped to the button-like roles: `a` is excluded because inline
-     links wrap mid-sentence (the padding rule below is their lever), and form
-     controls are excluded because they are already full-width and a floor
-     would only fight narrow layouts. */
   button, [role="button"], [role="option"], [role="radio"], summary {
     min-width: 44px;
   }
-  /* The one place the width floor is geometrically impossible, and so the one
-     place it is lifted rather than left to overflow silently.
-     A month view is seven columns by definition. At 320px the card interior is
-     256px; seven 44px cells plus six 4px gaps demand 332px. The floor cannot
-     be met on any phone narrower than ~414px, and leaving it in force did not
-     produce a scrollbar — it squeezed the tracks to 33px while the buttons
-     kept claiming 44px, so the day cells overlapped and taps landed on the
-     wrong date. Width is released; `min-height: 44px` and `aspect-square`
-     still give roughly 33x44 per cell, which clears WCAG 2.5.8's 24px AA
-     minimum comfortably. The 44px rule is this project's own AAA-level bar,
-     and a seven-column grid is where it stops being satisfiable. */
   .calendar-grid button {
     min-width: 0;
   }
-  /* Inline links can't grow via min-height, and forcing a flex box on every
-     link would stop long ones wrapping mid-sentence. Vertical padding is the
-     one lever that enlarges an inline element's hit area without touching
-     line layout — the padded box overflows the line box instead of pushing
-     lines apart. `:where()` keeps this at zero specificity — note that this
-     alone does NOT let a `py-*` utility win: globals.css is unlayered and
-     Tailwind's utilities are in the `utilities` layer, so unlayered wins on
-     layer order before specificity is ever consulted. The zero specificity
-     matters only against other unlayered rules and inline styles. */
   :where(a:not(.block):not(.flex):not(.inline-flex):not(.grid):not(.inline-block)) {
     padding-block: 0.375rem;
   }
-  /* Leaflet's attribution is a licence credit, not an app control. It is
-     deliberately outside the 44px floor: padding it out inflates the map's
-     footer bar, and nobody is meant to hit it with a thumb. */
   .leaflet-control-attribution a {
     padding-block: 0;
     min-height: 0;
@@ -247,8 +177,6 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
   padding: 1rem 1rem 1rem 1.25rem;
 }
 
-/* The card wrapping these already pads its own bottom edge; without this the
-   last section's margin stacks on that padding into a hollow band. */
 .analysis-section:last-child {
   margin-bottom: 0;
 }
@@ -256,17 +184,11 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
 .analysis-section h2,
 .analysis-section h3 {
   color: var(--accent-light);
+  font-family: var(--font-survey);
   font-weight: 600;
   margin-bottom: 0.5rem;
-  /* Size comes from the h3 ramp above — this is the Title role, not a
-     one-off. Overriding it here is what put 1.1rem off the scale. */
 }
 
-/* A rollup section is semantically a level-2 heading (it sits directly under
-   the page h1, and starting the outline at h3 left /rollup and /rollup/week
-   unnavigable by heading). Visually it is still the Title role, so it is
-   pinned to the h3 step rather than inheriting the larger Headline clamp —
-   the fix is to the document outline, not to the type scale. */
 .analysis-section h2 {
   font-size: clamp(1rem, 2.5vw, 1.25rem);
 }
@@ -295,9 +217,6 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
   animation-duration: 0.8s;
 }
 
-/* Overlay dialogs (ConfirmRerunDialog, ConfirmRegenDialog) — backdrop fades,
-   panel scales up from center. Modals aren't anchored to a trigger, so
-   transform-origin stays centered (unlike popovers). */
 .overlay-backdrop {
   opacity: 1;
   transition: opacity var(--dur-enter) var(--ease-out);
@@ -319,9 +238,6 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
   }
 }
 
-/* Exit state — applied just before unmount so the dialog leaves the way it
-   arrived instead of vanishing. Faster than the entrance: the user already
-   made their decision, so the system should confirm it snappily. */
 .overlay-backdrop.overlay-closing {
   opacity: 0;
   transition-duration: var(--dur-fast);
@@ -333,8 +249,6 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
   transition-duration: var(--dur-fast);
 }
 
-/* Generic enter animation for panels/sections that mount conditionally
-   (custom-analysis panels, expanded calendar, error/empty states). */
 .enter-rise {
   opacity: 1;
   transform: translateY(0);
@@ -346,7 +260,6 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
   }
 }
 
-/* Staggered cascade for analysis result sections on first render. */
 .stagger-in > * {
   opacity: 0;
   transform: translateY(8px);
@@ -367,8 +280,6 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
   }
 }
 
-/* Crossfade for button labels that swap text (e.g. "Export" -> "Saved").
-   Pair with a React `key` change on the label span so this re-triggers. */
 .label-swap {
   opacity: 1;
   filter: blur(0);
@@ -380,8 +291,27 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
   }
 }
 
-/* Reduced motion — preserve state changes, kill decorative/positional motion.
-   Fades and color transitions stay; anything that moves or scales is removed. */
+/* Survey instrument idle — the pendant is listening, waiting for data. */
+@keyframes survey-listen {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.6; }
+}
+
+.survey-listen {
+  animation: survey-listen 3s ease-in-out infinite;
+}
+
+/* Survey stamp — a deliberate, satisfying placement mark. */
+@keyframes survey-stamp {
+  0% { opacity: 0; transform: scale(0.85); }
+  60% { opacity: 1; transform: scale(1.04); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.survey-stamp {
+  animation: survey-stamp 400ms var(--ease-out) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .skeleton {
     animation: none;
@@ -404,6 +334,13 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
     opacity: 1;
     transform: none;
   }
+  .survey-listen {
+    animation: none;
+    opacity: 0.5;
+  }
+  .survey-stamp {
+    animation: none;
+  }
   .enter-rise, .overlay-panel {
     transition-property: opacity;
 
@@ -416,47 +353,24 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
   }
 }
 
-/* Mobile PWA bottom safe area */
 @media (display-mode: standalone) {
   body {
     padding-bottom: env(safe-area-inset-bottom);
   }
 }
 
-/* Dark basemap, done locally.
-
-   The map was the one surface in the app that ignored "no light mode": stock
-   OSM tiles are daylight cartography, and on the conversation page that put a
-   rectangle of white directly above the ADHD analysis — the brightest, largest
-   object on the screen outranking "Do today", which is exactly backwards.
-   Themed pins and popups don't compensate; the tiles are ~90% of the pixels.
-
-   Scoped to `.leaflet-tile-pane`, never the container: the marker, popup and
-   control panes are siblings, so filtering the whole map would invert the
-   copper pins to teal and the popup text along with them. Only the raster
-   imagery is touched.
-
-   `invert(1) hue-rotate(180deg)` is the standard pair — invert alone flips the
-   hue wheel too, turning green parkland magenta; the rotation puts it back.
-   Brightness is pulled down and saturation pulled in so the result settles into
-   the Night Pasture / Ink Panel range instead of glaring, and reads as a quiet
-   ground for the pins rather than competing with them. */
+/* Dark basemap — CSS filter on raster tiles only, preserving marker/popup
+   panes. Adjusted for the forest-dark topo ground. */
 .leaflet-tile-pane {
-  filter: invert(1) hue-rotate(180deg) brightness(0.82) saturate(0.55);
+  filter: invert(1) hue-rotate(180deg) brightness(0.78) saturate(0.45);
 }
 
-/* Leaflet popups — `leaflet/dist/leaflet.css` ships a white popup surface, so
-   every colour the app injects into a popup was a dark-theme colour on white:
-   the meeting link measured 1.81:1 and the muted meta 2.75:1. Since tapping a
-   pin is the whole point of the map (it is how you get from a place to the
-   person you met there), the popup is re-grounded on the panel surface where
-   the app's existing colours already clear AA. */
 .leaflet-popup-content-wrapper,
 .leaflet-popup-tip {
   background: var(--card);
   color: var(--foreground);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 10px;
   box-shadow: none;
 }
 
@@ -465,20 +379,40 @@ h3 { font-size: clamp(1rem, 2.5vw, 1.25rem); }
 }
 
 .leaflet-container a.leaflet-popup-close-button {
-  color: #a89a88;
+  color: #8a9f8e;
 }
 
 .leaflet-container a.leaflet-popup-close-button:hover {
   color: var(--foreground);
 }
 
-/* The attribution bar keeps Leaflet's own light chrome by default, which reads
-   as a bright seam under a dark map. */
 .leaflet-control-attribution {
-  background: rgba(22, 19, 17, 0.85);
-  color: #a89a88;
+  background: rgba(11, 17, 14, 0.85);
+  color: #8a9f8e;
 }
 
 .leaflet-control-attribution a {
   color: var(--accent-light);
+}
+
+/* Browser surfaces — themed from the palette. */
+::selection {
+  background: rgba(91, 155, 213, 0.3);
+  color: var(--foreground);
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--contour);
+}
+
+input, textarea, [contenteditable] {
+  caret-color: var(--accent-light);
+}
+
+/* Scrollbar — subtle, themed. */
+@supports (scrollbar-color: auto) {
+  * {
+    scrollbar-color: var(--border-hover) transparent;
+    scrollbar-width: thin;
+  }
 }

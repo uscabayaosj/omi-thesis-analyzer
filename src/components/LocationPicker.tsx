@@ -37,9 +37,9 @@ const FALLBACK_ZOOM = 4;
 const ANCHOR_ZOOM = 9; // centered on a nearby meeting, no pin yet
 const PIN_ZOOM = 13; // centered on an existing pin
 
-// The pin the user is placing — copper, matching the place markers elsewhere.
+// The pin the user is placing — survey blue, matching the place markers elsewhere.
 function pinHtml(): string {
-  return '<div style="width:16px;height:16px;border-radius:4px;background:#b96d33;border:2px solid #14100d"></div>';
+  return '<div style="width:16px;height:16px;border-radius:6px;background:#4a8dc8;border:2px solid #0b110e"></div>';
 }
 
 export default function LocationPicker({ value, onChange, initialCenter, onResolveName, className }: LocationPickerProps) {

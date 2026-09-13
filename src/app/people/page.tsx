@@ -223,7 +223,7 @@ export default function PeoplePage() {
       const m = lastMeeting(p);
       if (m?.lat != null && m?.lng != null) {
         // Absorb into the place marker: a meeting that resolves to a named
-        // place is represented by that place's copper pin (whose popup lists
+        // place is represented by that place's survey-blue pin (whose popup lists
         // who was met there), so drop the duplicate person pin at the same spot.
         if (resolvePlaceFrom({ lat: m.lat, lng: m.lng }, places)) continue;
         markers.push({
@@ -772,9 +772,6 @@ export default function PeoplePage() {
         Back to conversations
       </Link>
 
-      <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
-        Directory
-      </p>
       <h1 className="mb-2 flex items-center gap-2.5 font-bold text-white">
         <UsersIcon className="w-8 h-8 flex-shrink-0" />
         People
@@ -920,7 +917,7 @@ export default function PeoplePage() {
             // bg-slate-700 on a bg-slate-800 track — about a 1.1:1 step, the
             // faintest selected-state in the app, on the one screen where
             // guessing wrong costs a full re-render. It now uses the same solid
-            // copper as the home filter pills and the lens toggle.
+            // survey blue as the home filter pills and the lens toggle.
             <button
               key={key}
               onClick={() => setView(key)}
@@ -1068,7 +1065,7 @@ export default function PeoplePage() {
                         </div>
                       )}
                       <div className="min-w-0 flex-1">
-                        <div className="font-serif font-medium text-white truncate">{p.name}</div>
+                        <div className="font-serif font-semibold text-white truncate">{p.name}</div>
                         {p.role && <div className="text-slate-400 font-serif italic text-sm truncate">{p.role}</div>}
                       </div>
                       {/* Meta only when there's a meeting: place (when known)
@@ -1139,9 +1136,7 @@ export default function PeoplePage() {
                 <Link
                   key={pl.id}
                   href={`/people/place/${pl.id}`}
-                  className={`card p-5 block transition-colors border-l-2 ${
-                    s ? "border-l-emerald-500/40 hover:border-emerald-500/50" : "border-l-transparent hover:border-cyan-500/50"
-                  }`}
+                  className="card p-5 block transition-colors hover:border-cyan-500/30"
                 >
                   <h2 className="font-serif text-lg text-white">{pl.name}</h2>
                   <p className="text-slate-400 font-mono text-xs mt-1">
