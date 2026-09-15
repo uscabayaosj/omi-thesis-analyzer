@@ -22,6 +22,7 @@ final class CaptureCoordinator {
 
     private let writer = ChunkWriter(directory: UploadQueue.directory)
     private var started = false
+    private var retryTimer: Timer?
 
     func start() {
         guard !started else { return }
@@ -62,6 +63,7 @@ final class CaptureCoordinator {
         }
         pending = uploads.pendingCount
         uploads.retryPending()
+        startRetryTimer()
         pendant.start()
     }
 
@@ -94,6 +96,14 @@ final class CaptureCoordinator {
             let ok = error == nil && (200..<300).contains((response as? HTTPURLResponse)?.statusCode ?? 0)
             DispatchQueue.main.async { self?.endNote = ok ? "Ended — it will appear in TRACE in a moment." : "Could not end it — check the connection." }
         }.resume()
+    }
+
+    private func startRetryTimer() {
+        retryTimer?.invalidate()
+        retryTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            guard self != nil else { return }
+            UploadQueue.shared.retryPending()
+        }
     }
 
     /// Tells TRACE the stream stopped so a quiet session closes promptly.

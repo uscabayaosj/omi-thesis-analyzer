@@ -388,6 +388,12 @@ export async function setVoiceClusterGroups(
 
 // ── status page ──
 
+export interface RecordingGap {
+  from: string;
+  to: string;
+  gapMs: number;
+}
+
 export interface CaptureStatus {
   lastChunkAt: string | null;
   open: { id: string; deviceId: string; startedAt: string; lastSpeechAt: string; voicedMs: number }[];
@@ -395,6 +401,8 @@ export interface CaptureStatus {
   failed: { id: string; startedAt: string; error: string; attempts: number }[];
   /** Newest chunks with their level percentiles — the VAD tuning readout. */
   recentChunks: { startedAt: string; durationMs: number; voicedMs: number; p10: number | null; p50: number | null; p90: number | null }[];
+  /** Gaps > 5 minutes between consecutive chunks in the last 7 days. */
+  gaps: RecordingGap[];
 }
 
 /** Just the sessions being captured right now — the one thing the home
@@ -408,8 +416,10 @@ export async function listOpenSessions(sql: Sql): Promise<CaptureStatus["open"]>
   return rows.map((o) => ({ id: o.id, deviceId: o.device_id, startedAt: o.started_at, lastSpeechAt: o.last_speech_at, voicedMs: o.voiced_ms }));
 }
 
+const GAP_THRESHOLD_MS = 5 * 60_000;
+
 export async function captureStatus(sql: Sql): Promise<CaptureStatus> {
-  const [last, open, counts, failed, recent] = await Promise.all([
+  const [last, open, counts, failed, recent, gapRows] = await Promise.all([
     withTimeout(sql`SELECT MAX(received_at) AS at FROM capture_chunks`) as Promise<{ at: string | null }[]>,
     listOpenSessions(sql),
     withTimeout(
@@ -421,6 +431,19 @@ export async function captureStatus(sql: Sql): Promise<CaptureStatus> {
     withTimeout(
       sql`SELECT started_at, duration_ms, voiced_ms, level_p10, level_p50, level_p90 FROM capture_chunks ORDER BY received_at DESC LIMIT 6`
     ) as Promise<{ started_at: string; duration_ms: number; voiced_ms: number; level_p10: number | null; level_p50: number | null; level_p90: number | null }[]>,
+    withTimeout(sql`
+      SELECT chunk_end, next_start, gap_ms::int AS gap_ms FROM (
+        SELECT
+          started_at + (duration_ms || ' ms')::interval AS chunk_end,
+          LEAD(started_at) OVER (ORDER BY started_at) AS next_start,
+          EXTRACT(EPOCH FROM LEAD(started_at) OVER (ORDER BY started_at) - (started_at + (duration_ms || ' ms')::interval)) * 1000 AS gap_ms
+        FROM capture_chunks
+        WHERE started_at >= now() - interval '7 days'
+      ) sub
+      WHERE gap_ms > ${GAP_THRESHOLD_MS}
+      ORDER BY chunk_end DESC
+      LIMIT 50
+    `) as Promise<{ chunk_end: string; next_start: string; gap_ms: number }[]>,
   ]);
   return {
     lastChunkAt: last[0]?.at ?? null,
@@ -428,5 +451,6 @@ export async function captureStatus(sql: Sql): Promise<CaptureStatus> {
     byStatus7d: Object.fromEntries(counts.map((c) => [c.status, c.n])),
     failed: failed.map((f) => ({ id: f.id, startedAt: f.started_at, error: f.error ?? "", attempts: f.attempts })),
     recentChunks: recent.map((c) => ({ startedAt: c.started_at, durationMs: c.duration_ms, voicedMs: c.voiced_ms, p10: c.level_p10, p50: c.level_p50, p90: c.level_p90 })),
+    gaps: gapRows.map((g) => ({ from: g.chunk_end, to: g.next_start, gapMs: g.gap_ms })),
   };
 }

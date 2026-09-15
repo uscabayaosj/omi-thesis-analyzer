@@ -8,6 +8,12 @@ import { ArrowLeftIcon, RefreshIcon } from "@/components/icons";
 import { BUTTON_GHOST, BUTTON_SECONDARY } from "@/lib/ui";
 import { describeClose } from "@/components/CaptureBanner";
 
+interface RecordingGap {
+  from: string;
+  to: string;
+  gapMs: number;
+}
+
 interface Status {
   configured: boolean;
   /** Deployment self-checks: the WASM Opus decoder and the native
@@ -22,6 +28,7 @@ interface Status {
   /** Newest chunks with their level percentiles — the VAD tuning readout the
    *  route has always returned and this page never showed. */
   recentChunks?: { startedAt: string; durationMs: number; voicedMs: number; p10: number | null; p50: number | null; p90: number | null }[];
+  gaps?: RecordingGap[];
   error?: string;
 }
 
@@ -34,6 +41,12 @@ interface Outcome {
 const dbfs = (v: number | null) => (v == null ? "—" : `${Math.round(v)} dB`);
 
 const minutes = (ms: number) => `${Math.round(ms / 60_000)} min`;
+
+const humanGap = (ms: number) => {
+  const h = Math.floor(ms / 3_600_000);
+  const m = Math.round((ms % 3_600_000) / 60_000);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+};
 
 /** Plain words for session states — the raw status values are system vocabulary. */
 const STATUS_LABEL: Record<string, string> = {
@@ -194,6 +207,26 @@ export default function CapturePage() {
               {Object.keys(status.byStatus7d ?? {}).length === 0 && <li>Nothing captured yet.</li>}
             </ul>
           </div>
+
+          {(status.gaps ?? []).length > 0 && (
+            <div className="card p-4 border-amber-500/30">
+              <p className="text-amber-300/90 mb-1">Recording gaps</p>
+              <p className="text-xs text-slate-400 mb-2">
+                Periods longer than 5 minutes with no audio chunks received. These are times
+                the pendant was likely disconnected, the phone was out of range, or the app was not running.
+              </p>
+              <ul className="text-sm text-slate-400 space-y-1 font-mono">
+                {status.gaps!.map((g, i) => (
+                  <li key={`gap-${i}`} className="flex flex-wrap gap-x-3">
+                    <span>{formatDateTime(g.from)}</span>
+                    <span className="text-slate-500">→</span>
+                    <span>{formatDateTime(g.to)}</span>
+                    <span className="text-amber-400/80">{humanGap(g.gapMs)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {(status.failed ?? []).length > 0 && (
             <div className="card p-4 border-amber-500/30">
