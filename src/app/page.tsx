@@ -1567,7 +1567,7 @@ function HomeInner() {
         <div className="card p-8 text-center">
           <MicIcon className="w-10 h-10 mx-auto mb-4 text-slate-500 survey-listen" />
           <p className="text-slate-300">No conversations found.</p>
-          <p className="text-slate-400 text-sm mt-2">Wear your pendant and have a conversation, then come back.</p>
+          <p className="text-slate-400 text-sm mt-2">Have a conversation with Omi, then come back.</p>
         </div>
       )}
 
@@ -1849,7 +1849,7 @@ function HomeInner() {
             </ul>
           </div>
           <p className="text-xs text-slate-400 pt-2">
-            This tool analyzes conversations captured by the Omi DK2 wearable device
+            This tool analyzes conversations from the Omi wearable
             and runs them through an AI model grounded in the thesis&apos;s full theoretical framework.
           </p>
         </div>

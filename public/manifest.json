@@ -1,7 +1,7 @@
 {
   "name": "TRACE — Personal & Research Assistant",
   "short_name": "TRACE",
-  "description": "Turns Omi wearable conversations into thesis evidence and daily executive-function structure.",
+  "description": "Syncs conversations from the Omi app and turns them into thesis evidence and daily executive-function structure.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0b110e",

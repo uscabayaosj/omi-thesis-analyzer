@@ -31,14 +31,6 @@ export interface Person {
   meetings: Meeting[];
   createdAt: string;
   timestamp: string; // last-write-wins key for sync merge
-  /** Voice-recognition fields — see 2026-09-05-speaker-identification-design.md.
-   *  Written server-side by POST /api/capture/enroll-voice, read server-side
-   *  by pipeline.ts's identifySpeakers. Plain JSON floats, not a binary
-   *  serialization, so they ride the same trace_store sync as everything
-   *  else in this file. */
-  voicePrint?: number[];
-  voicePrintSamples?: number;
-  voicePrintUpdatedAt?: string;
 }
 
 export interface PendingSuggestion {
@@ -361,40 +353,7 @@ export function addPending(s: Omit<PendingSuggestion, "id" | "timestamp">): void
 /** Meta record of every (conversationId, speakerId) a voice suggestion has
  *  ever been raised for — permanent, unlike the live pending queue itself.
  *  A text suggestion's dedup only checks *live* suggestions (ignoreName is
- *  the real "never again" signal for names), but a voice cluster has no
- *  name to re-match against later: once raised, it must never come back,
- *  resolved or not, or every page load would resurrect an already-confirmed
- *  or already-ignored card. */
-const VOICE_SUGGESTED_KEY = "__voiceSuggested";
-
-function voiceSuggestionKey(conversationId: string, speakerId: number): string {
-  return `${conversationId}:${speakerId}`;
-}
-
-export function addVoicePending(s: { conversationId: string; date: string; speakerId: number }): void {
-  const key = voiceSuggestionKey(s.conversationId, s.speakerId);
-  const raised = readMeta(VOICE_SUGGESTED_KEY);
-  if (raised.includes(key)) return;
-  const map = pruneTombstones(readMap<unknown>(PENDING_NS));
-  const live = Object.values(map).filter(isPendingRecord);
-  if (live.length >= MAX_PENDING) return;
-  const id = crypto.randomUUID();
-  map[id] = {
-    id,
-    kind: "voice",
-    conversationId: s.conversationId,
-    date: s.date,
-    speakerId: s.speakerId,
-    extractedName: "",
-    details: [],
-    timestamp: new Date().toISOString(),
-  } satisfies PendingSuggestion;
-  // Only record the permanent "never raise this speaker again" key if the card
-  // actually landed. If writeMap was dropped (quota), recording it anyway would
-  // make that speaker unenrollable forever, silently.
-  if (!writeMap(PENDING_NS, map)) return;
-  writeMeta(VOICE_SUGGESTED_KEY, [...raised, key].slice(-2000));
-}
+ *  the real "never again" signal for names). */
 
 /** Tombstoned, not removed: a resolved suggestion must stay resolved on every
  *  device, not reappear in the review queue after the next sync. */
@@ -403,31 +362,6 @@ export function removePending(id: string): void {
   if (!(id in map)) return;
   map[id] = { deleted: true, timestamp: new Date().toISOString() } satisfies Tombstone;
   writeMap(PENDING_NS, map);
-}
-
-/** One write for the whole batch. Grouping assigns a value to every voice card
- *  at once, and this namespace re-serializes wholesale on every write and
- *  schedules a push — 44 individual writes would be 44 of both.
- *
- *  Returns false only when a write was attempted and dropped (writeMap's
- *  quota guard) — true when nothing needed changing. A minutes-long backfill
- *  ending in "Voices grouped." while the queue never moved, because the
- *  write silently lost to a full quota, is exactly the silent data loss
- *  writeMap's own doc comment warns callers not to swallow; the caller
- *  (runVoiceGrouping) surfaces this and stops rather than looping on writes
- *  that can never land. */
-export function setVoiceGroups(entries: { id: string; groupId: string }[]): boolean {
-  if (entries.length === 0) return true;
-  const map = pruneTombstones(readMap<PendingSuggestion | Tombstone>(PENDING_NS));
-  let changed = false;
-  for (const { id, groupId } of entries) {
-    const cur = map[id];
-    if (!isPendingRecord(cur)) continue;
-    if (cur.voiceGroupId === groupId) continue;
-    map[id] = { ...cur, voiceGroupId: groupId, timestamp: new Date().toISOString() };
-    changed = true;
-  }
-  return changed ? writeMap(PENDING_NS, map) : true;
 }
 
 /**

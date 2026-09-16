@@ -1,13 +1,13 @@
 # TRACE — Personal & Research Assistant
 
-Turns conversations captured by an Omi DK2 pendant — through TRACE's own iOS relay app, with no Omi app or cloud involved — into two things: thesis evidence for PhD research on Pioneer Sovereignty, and a daily executive-function plan. TRACE ingests the pendant's audio, transcribes it with Deepgram, and runs analysis through the configured AI provider (GPT-5.6-luna by default).
+Syncs conversations from the Omi wearable app and turns them into two things: thesis evidence for PhD research on Pioneer Sovereignty, and a daily executive-function plan. Analysis runs through the configured AI provider (GPT-5.6-luna by default).
 
 ## Setup
 
 1. Copy `.env.example` to `.env.local`
 2. Add your AI provider's API key
-3. On Vercel: `DEEPGRAM_API_KEY`, `CAPTURE_INGEST_TOKEN` (any long random string), a private Blob store, and the Neon integration
-4. Build `ios/TraceCapture` onto your iPhone (see `docs/superpowers/specs/2026-09-05-trace-capture-design.md`), enter the same URL + token in its Settings, pair the pendant
+3. Add your `OMI_API_KEY` (Settings → Developer → Create Key in the Omi app)
+4. On Vercel: the Neon integration for cross-device sync
 5. `npm run dev` or deploy to Vercel. Local dev has no store, so the conversation screens are empty; `npm run dev:fixtures` serves a fixed set of sample conversations instead (see `src/lib/dev-fixtures.ts`)
 
 ## Thesis lens
@@ -51,13 +51,12 @@ The browser is the working copy: everything is written to `localStorage` first, 
 
 ## Deploy to Vercel
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/uscabayaosj/omi-thesis-analyzer&env=OPENAI_API_KEY,DEEPGRAM_API_KEY,CAPTURE_INGEST_TOKEN)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/uscabayaosj/omi-thesis-analyzer&env=OPENAI_API_KEY,OMI_API_KEY)
 
 ## Tech Stack
 
 - Next.js 16 (App Router), React 19
 - Tailwind CSS 4
 - OpenAI GPT-5.6-luna by default; Anthropic, Google and OpenRouter selectable via `AI_PROVIDER`
-- Deepgram nova-3 (speech-to-text), Vercel Blob (audio archive), Neon (store), WavLM (speaker identification)
-- TRACE Capture: a SwiftUI/CoreBluetooth relay app in `ios/`
+- Omi wearable API (conversations), Neon Postgres (sync store)
 - PWA (installable on mobile)

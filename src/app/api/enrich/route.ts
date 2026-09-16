@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
           junk: true,
           junk_reason:
             wordCount === 0
-              ? "No transcript was captured"
+              ? "No transcript available"
               : `Only ${wordCount} ${wordCount === 1 ? "word" : "words"} were caught`,
           title: "",
           overview: "",

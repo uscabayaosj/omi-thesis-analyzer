@@ -231,7 +231,7 @@ export function toAdhdAnalysis(raw: Record<string, unknown>): AdhdAnalysis {
 // Prompts — the cognitive-prosthetic pass, JSON output
 // ─────────────────────────────────────────────────────────────────
 
-const ADHD_SYSTEM_PROMPT = `You are a cognitive prosthetic for a person with ADHD. You process the transcript of a conversation they just had, captured by a wearable microphone. Your job is to do the cognitive work their brain deprioritizes: holding commitments, tracking time, remembering people, and converting vague intentions into concrete plans. Assume anything you don't capture is lost forever — the user will not re-read the transcript.
+const ADHD_SYSTEM_PROMPT = `You are a cognitive prosthetic for a person with ADHD. You process the transcript of a conversation they just had, recorded by a wearable device. Your job is to do the cognitive work their brain deprioritizes: holding commitments, tracking time, remembering people, and converting vague intentions into concrete plans. Assume anything you don't extract is lost forever — the user will not re-read the transcript.
 
 The transcript comes from speech-to-text and may have errors, missing punctuation, and imperfect speaker labels. "SPEAKER_0" or the primary voice is usually the user. Infer speakers from context when labels are unreliable. Never invent content to fill gaps; mark uncertainty instead.
 

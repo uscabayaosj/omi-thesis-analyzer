@@ -11,7 +11,7 @@ import { ENRICH_CLAMP_CHARS, toEnrichment, type Enrichment } from "./enrich-core
 export { JUNK_WORD_FLOOR, ENRICH_CLAMP_CHARS, countTranscriptWords, toEnrichment } from "./enrich-core";
 export type { Enrichment } from "./enrich-core";
 
-const ENRICH_SYSTEM_PROMPT = `You name conversations captured by a wearable microphone. The transcript comes from speech-to-text and may have errors and imperfect speaker labels.
+const ENRICH_SYSTEM_PROMPT = `You name conversations recorded by a wearable device. The transcript comes from speech-to-text and may have errors and imperfect speaker labels.
 
 You MUST respond with valid JSON matching this exact schema:
 {
