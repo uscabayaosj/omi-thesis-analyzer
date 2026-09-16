@@ -13,23 +13,23 @@ export function friendlyError(err: unknown): FriendlyError {
 
   const raw = err instanceof Error ? err.message : String(err);
 
-  if (raw.includes("store not configured")) {
-    return { error: "TRACE's store isn't configured here, so conversations can't be loaded.", status: 503 };
+  if (raw.includes("OMI_API_KEY not set")) {
+    return { error: "The OMI API key isn't configured. Add your OMI_API_KEY and reload.", status: 500 };
   }
-  if (raw.includes("conversation not found in TRACE")) {
-    return { error: "That conversation isn't in TRACE's store.", status: 404 };
+  if (raw.includes("Omi API 401") || raw.includes("Omi API 403")) {
+    return { error: "OMI authentication failed. Check your OMI_API_KEY.", status: 502 };
+  }
+  if (raw.includes("Omi API")) {
+    return { error: "Could not reach the Omi service. Try again in a moment.", status: 502 };
+  }
+  if (raw.includes("conversation not found")) {
+    return { error: "That conversation wasn't found.", status: 404 };
   }
   if (raw.includes("API key not set")) {
     return { error: "Your AI analysis key isn't set up yet. Add your provider's API key and reload.", status: 500 };
   }
   if (raw.includes("Unknown AI_PROVIDER")) {
     return { error: "The AI provider setting isn't recognized. Use one of: OpenAI, Anthropic, Google, or OpenRouter.", status: 500 };
-  }
-  if (raw.includes("DEEPGRAM_API_KEY")) {
-    return { error: "Transcription isn't set up yet. Add the Deepgram API key and redeploy.", status: 500 };
-  }
-  if (raw.includes("Deepgram API")) {
-    return { error: "The transcription service failed. The session will be retried.", status: 502 };
   }
   if (raw.includes("API 401") || raw.includes("API 403")) {
     return { error: "AI service authentication failed. Check your API key.", status: 502 };

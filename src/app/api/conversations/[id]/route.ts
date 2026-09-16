@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { loadConversation } from "@/lib/conversations";
 import { friendlyError } from "@/lib/api-error";
 
-/** TRACE's own store first; Omi only while its key remains (see lib/conversations.ts). */
+/** DB cache first, then the Omi API (see lib/conversations.ts). */
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

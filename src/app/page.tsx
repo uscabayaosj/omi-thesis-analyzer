@@ -18,7 +18,6 @@ import {
 } from "@/components/icons";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { useUndoOffer } from "@/components/UndoProvider";
-import { CaptureBanner } from "@/components/CaptureBanner";
 import { pullAndMerge } from "@/lib/sync";
 import { useRovingRadioGroup } from "@/lib/roving";
 import { exportAllData } from "@/lib/export";
@@ -1188,10 +1187,6 @@ function HomeInner() {
           </div>
         </div>
 
-        {/* What the pendant is capturing right now — otherwise the three-minute
-            wait before a conversation appears reads as "nothing is happening". */}
-        <CaptureBanner onEnded={() => loadConversations("refresh")} />
-
         {/* Search — bypasses day-scoping entirely; the fast path when you know the topic, not the date */}
         {conversations.length > 0 && (
           <div className="relative mt-4">
@@ -1748,10 +1743,6 @@ function HomeInner() {
           <Link href="/usage" className={BUTTON_GHOST}>
             <TrendingUpIcon className="w-4 h-4 flex-shrink-0" />
             Usage
-          </Link>
-          <Link href="/capture" className={BUTTON_GHOST}>
-            <MicIcon className="w-4 h-4 flex-shrink-0" />
-            Capture
           </Link>
         </div>
       </nav>

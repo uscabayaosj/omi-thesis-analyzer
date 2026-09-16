@@ -15,7 +15,6 @@ import {
   ignoreName,
   removePending,
   restorePending,
-  setVoiceGroups,
   unignoreName,
   type Meeting,
   type PendingSuggestion,
@@ -27,9 +26,8 @@ import { useUndoOffer } from "@/components/UndoProvider";
 import { usePersistedPreference } from "@/lib/use-persisted-preference";
 import { getAnalyzedIds, getAnalysisAge } from "@/lib/storage";
 import { getAdhdAnalyzedIds } from "@/lib/adhd-storage";
-import { pullAndMerge, flushPush } from "@/lib/sync";
+import { pullAndMerge } from "@/lib/sync";
 import { getPlaces, createPlace, type Place } from "@/lib/places";
-import { fetchJson } from "@/lib/fetch-json";
 // Same treatment as MeetingMap: `leaflet/dist/leaflet.css` is imported at this
 // component's module scope, so a static import pulls the stylesheet into the
 // route bundle whether or not a picker is ever opened.
@@ -45,7 +43,6 @@ import { type MapMarker } from "@/components/MeetingMap";
 // lazily moves both into a chunk that only arrives when a map actually renders.
 const MeetingMap = dynamic(() => import("@/components/MeetingMap"), { ssr: false });
 import RelationshipGraph from "@/components/RelationshipGraph";
-import VoicePendingCard from "@/components/VoicePendingCard";
 import {
   ArrowLeftIcon,
   ChevronRightIcon,
@@ -140,15 +137,7 @@ export default function PeoplePage() {
   const [addError, setAddError] = useState<string | null>(null);
   const [reassigning, setReassigning] = useState<string | null>(null); // pending suggestion id
   const [acceptErrorId, setAcceptErrorId] = useState<string | null>(null); // pending suggestion id
-  // Why the voice enrollment failed, when the route said. Text cards keep the
-  // generic message; voice enrollment has several distinct, actionable failure
-  // modes (store not configured, person not found, an enrollment already
-  // running) that the user needs to see to act on rather than just retry.
-  const [acceptErrorMsg, setAcceptErrorMsg] = useState<string | null>(null);
-  const [voiceNameDraft, setVoiceNameDraft] = useState<Record<string, string>>({});
   const [batchResult, setBatchResult] = useState<string | null>(null);
-  const [groupingBusy, setGroupingBusy] = useState(false);
-  const [groupingNote, setGroupingNote] = useState<string | null>(null);
   const { offerUndo } = useUndoOffer();
   // Collapsed by default so the directory, search, and view toggle aren't
   // buried under the full review queue on first paint — the count banner keeps
@@ -163,11 +152,6 @@ export default function PeoplePage() {
   // nothing left to scan — a tap with no response reads as a broken button.
   const [backfillNote, setBackfillNote] = useState<string | null>(null);
   const cancelBackfillRef = useRef(false);
-  // Same cancellation shape as the text-extraction backfill above: a ref
-  // checked at the top of each loop iteration, set by a "Stop" affordance.
-  // Safe to cancel anywhere — progress lives in voice_clusters rows
-  // server-side, so a stopped run just leaves work for the next press.
-  const cancelGroupingRef = useRef(false);
 
   const refresh = () => {
     setPeople(getPeople());
@@ -367,164 +351,6 @@ export default function PeoplePage() {
     });
   };
 
-  const acceptVoiceInto = async (s: PendingSuggestion, personId: string): Promise<boolean> => {
-    try {
-      await fetchJson("/api/capture/enroll-voice", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId: s.conversationId, speakerId: s.speakerId, personId }),
-      });
-    } catch (e) {
-      setAcceptErrorId(s.id);
-      setAcceptErrorMsg(e instanceof Error ? e.message : null);
-      refresh();
-      return false;
-    }
-    // The voiceprint was written server-side, into a namespace this browser
-    // also holds a copy of. PUT /api/store replaces the whole `omi-people`
-    // namespace (per-record last-write-wins only happens on pull), so the very
-    // next local write to it — e.g. addVoicePending → writeMeta on the next
-    // conversation with an unmatched speaker — would push the local map back
-    // and silently drop the voiceprint. Force-pull first so localStorage has
-    // it; the route stamps a fresh timestamp, so the merge favours the server.
-    // Keep this ahead of anything touching omi-people.
-    //
-    // Scope of this fix: it protects *this tab*. Another tab or device that
-    // loaded before the enrollment still holds the old map, pulls only once
-    // per page load, and would drop the voiceprint on its next write to this
-    // namespace. That is the store's wholesale-replace design, not something
-    // this call can close — a single-user app that keeps one tab open is the
-    // case it covers, and the next enrollment or reload self-heals the rest.
-    await pullAndMerge(true);
-    setAcceptErrorId((cur) => (cur === s.id ? null : cur));
-    setAcceptErrorMsg(null);
-    removePending(s.id);
-    refresh();
-    return true;
-  };
-
-  const acceptVoiceAsNew = async (s: PendingSuggestion, name: string) => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    // The enroll route needs a Person that already exists in the store to
-    // enroll against, so the Person has to be created first — which means
-    // cleaning it up if the enroll fails, or a retry would make a duplicate.
-    const p = createPerson({ name: trimmed });
-    if (!p) {
-      setAcceptErrorId(s.id);
-      setAcceptErrorMsg("Couldn’t save the new person — storage may be full.");
-      refresh();
-      return;
-    }
-    // /api/capture/enroll-voice resolves personId against the server's copy
-    // of the omi-people namespace, but createPerson only queued a debounced
-    // (1200ms) push. A user who confirms a name and clicks Add faster than
-    // that — the normal case — would hit the route before the new Person
-    // exists there, get a 404, and have the Person they just typed deleted
-    // out from under them. Flush synchronously so the server has it first —
-    // scoped to omi-people, so an unrelated namespace failing in the same
-    // batch cannot fail this action.
-    try {
-      await flushPush("omi-people");
-    } catch {
-      setAcceptErrorId(s.id);
-      setAcceptErrorMsg("Couldn’t sync the new person to the server — check your connection and try again.");
-      deletePerson(p.id);
-      refresh();
-      return;
-    }
-    const ok = await acceptVoiceInto(s, p.id);
-    if (!ok) {
-      deletePerson(p.id);
-      refresh();
-    }
-  };
-
-  /** Enrolls once, from the most recent member. Enrolling from all N would mean
-   *  N audio assemblies for one tap; picking the *longest* sample instead would
-   *  mean fetching every member's transcript just to measure it, which is work
-   *  on a path that must stay free. Most-recent is known for nothing, is the
-   *  sample the user is most likely to have just heard, and averageEmbeddings
-   *  strengthens the print on every later conversation anyway.
-   *
-   *  `getPending` sorts newest-first and the buckets preserve that order, so
-   *  members[0] is the most recent. Nothing is removed unless the enrollment
-   *  actually succeeded. */
-  const acceptVoiceGroupInto = async (members: PendingSuggestion[], personId: string) => {
-    const lead = members[0];
-    const ok = await acceptVoiceInto(lead, personId);
-    if (!ok) return;
-    for (const m of members) if (m.id !== lead.id) removePending(m.id);
-    await sweepMatchedVoices();
-    refresh();
-  };
-
-  const acceptVoiceGroupAsNew = async (members: PendingSuggestion[], name: string) => {
-    const lead = members[0];
-    const before = new Set(getPending().map((p) => p.id));
-    await acceptVoiceAsNew(lead, name);
-    // acceptVoiceAsNew removes its own suggestion only on success; if it is gone
-    // the enrollment landed and the rest of the group is the same voice.
-    if (getPending().some((p) => p.id === lead.id)) return;
-    for (const m of members) if (before.has(m.id) && m.id !== lead.id) removePending(m.id);
-    await sweepMatchedVoices();
-    refresh();
-  };
-
-  const ignoreVoiceGroup = (members: PendingSuggestion[]) => {
-    for (const m of members) removePending(m.id);
-    offerUndo(
-      members.length === 1 ? "Voice ignored." : `${members.length} cards ignored.`,
-      () => {
-        for (const m of members) restorePending(m);
-        refresh();
-      }
-    );
-    refresh();
-  };
-
-  /** Cards that are now recognizable because of the enrollment that just landed.
-   *  Removed with an undo, matching how acceptAllConfident handles bulk
-   *  resolution — a sweep that silently clears cards the user never saw resolved
-   *  needs a way back. A failure here is silent: the cards simply stay, which is
-   *  the state the app was already in. */
-  const sweepMatchedVoices = async () => {
-    const voices = getPending()
-      .filter((s) => s.kind === "voice" && typeof s.speakerId === "number")
-      .map((s) => ({ conversationId: s.conversationId, speakerId: s.speakerId!, id: s.id, record: s }));
-    if (voices.length === 0) return;
-
-    let matched: { conversationId: string; speakerId: number }[] = [];
-    try {
-      const res = await fetchJson<{ matched: { conversationId: string; speakerId: number }[] }>(
-        "/api/capture/rematch-voices",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ voices: voices.map(({ conversationId, speakerId }) => ({ conversationId, speakerId })) }),
-        }
-      );
-      matched = res.matched;
-    } catch {
-      return;
-    }
-
-    const keys = new Set(matched.map((m) => `${m.conversationId}:${m.speakerId}`));
-    const cleared = voices.filter((v) => keys.has(`${v.conversationId}:${v.speakerId}`));
-    if (cleared.length === 0) return;
-
-    for (const c of cleared) removePending(c.id);
-    setBatchResult(
-      `Also cleared ${cleared.length} ${cleared.length === 1 ? "card" : "cards"} that were the same voice.`
-    );
-    offerUndo(`Cleared ${cleared.length} matching ${cleared.length === 1 ? "card" : "cards"}.`, () => {
-      for (const c of cleared) restorePending(c.record);
-      setBatchResult(null);
-      refresh();
-    });
-    refresh();
-  };
-
   /* A 43-item queue with only per-item buttons is a queue that does not get
      cleared: every accept re-renders the list and slides the next card under
      the thumb, and there is no way to dispatch the easy ones in one go. The
@@ -571,109 +397,6 @@ export default function PeoplePage() {
       });
     }
     refresh();
-  };
-
-  const ungroupedVoices = pending.filter((s) => s.kind === "voice" && !s.voiceGroupId);
-
-  /** One card per voice, not per conversation. An ungrouped card is its own
-   *  bucket, so this is a no-op until grouping has run. The representative is
-   *  the most recent member, so the evidence shown is the freshest sample. */
-  const voiceGroups = useMemo(() => {
-    const buckets = new Map<string, PendingSuggestion[]>();
-    for (const s of pending) {
-      if (s.kind !== "voice") continue;
-      const key = s.voiceGroupId ?? s.id;
-      buckets.set(key, [...(buckets.get(key) ?? []), s]);
-    }
-    return buckets;
-  }, [pending]);
-
-  const reviewRows = useMemo(() => {
-    const seen = new Set<string>();
-    const rows: { key: string; suggestion: PendingSuggestion; members: PendingSuggestion[] }[] = [];
-    for (const s of pending) {
-      if (s.kind !== "voice") {
-        rows.push({ key: s.id, suggestion: s, members: [s] });
-        continue;
-      }
-      const key = s.voiceGroupId ?? s.id;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const members = voiceGroups.get(key) ?? [s];
-      rows.push({ key, suggestion: members[0], members });
-    }
-    return rows;
-  }, [pending, voiceGroups]);
-
-  /** Walks the backfill route until it reports nothing left. Deliberately manual:
-   *  one audio assembly per conversation plus one inference per speaker is the
-   *  most expensive thing in this app, and it must never start on its own.
-   *
-   *  A ~31-conversation backfill is ~16 sequential POSTs, each with a 300s
-   *  ceiling — potentially tens of minutes with the disabled button as the
-   *  only control. cancelGroupingRef (checked at the top of every iteration,
-   *  same pattern as cancelBackfillRef above) makes it abortable; a stop
-   *  mid-run is safe because progress already lives in voice_clusters rows
-   *  server-side, not in this loop's state. */
-  const runVoiceGrouping = async () => {
-    const voices = pending
-      .filter((s) => s.kind === "voice" && typeof s.speakerId === "number")
-      .map((s) => ({ conversationId: s.conversationId, speakerId: s.speakerId!, id: s.id }));
-    if (voices.length === 0) return;
-
-    cancelGroupingRef.current = false;
-    setGroupingBusy(true);
-    setGroupingNote("Grouping voices…");
-    const byKey = new Map(voices.map((v) => [`${v.conversationId}:${v.speakerId}`, v.id]));
-    let total = 0;
-
-    try {
-      let completed = false;
-      for (;;) {
-        if (cancelGroupingRef.current) {
-          setGroupingNote(null);
-          break;
-        }
-        const res = await fetchJson<{ processed: number; remaining: number; groups: Record<string, string> }>(
-          "/api/capture/cluster-voices",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ voices: voices.map(({ conversationId, speakerId }) => ({ conversationId, speakerId })) }),
-          }
-        );
-
-        // A dropped write here (quota) must not be swallowed: the queue would
-        // silently stay ungrouped while the loop keeps announcing progress.
-        const saved = setVoiceGroups(
-          Object.entries(res.groups)
-            .map(([key, groupId]) => ({ id: byKey.get(key), groupId }))
-            .filter((e): e is { id: string; groupId: string } => !!e.id)
-        );
-        refresh();
-        if (!saved) {
-          setGroupingNote("Grouped, but the result couldn’t be saved — storage may be full.");
-          break;
-        }
-
-        total += res.processed;
-        if (res.remaining === 0) {
-          completed = true;
-          break;
-        }
-        setGroupingNote(`Grouping voices — ${total} of ${total + res.remaining} conversations…`);
-      }
-      if (completed) setGroupingNote("Voices grouped.");
-    } catch (e) {
-      setGroupingNote(e instanceof Error ? e.message : "Couldn’t finish grouping — try again.");
-    } finally {
-      setGroupingBusy(false);
-      cancelGroupingRef.current = false;
-    }
-  };
-
-  const cancelVoiceGrouping = () => {
-    cancelGroupingRef.current = true;
   };
 
   // ── add person ──
@@ -808,52 +531,13 @@ export default function PeoplePage() {
                 </button>
               </div>
             )}
-            {(groupingBusy || ungroupedVoices.length > 1) && (
-              <div className="card p-4 mb-3 flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm text-slate-200">
-                  <strong className="font-semibold">{ungroupedVoices.length}</strong> unrecognized voices.
-                  Group them and the same person across conversations becomes one card.
-                </p>
-                {groupingBusy ? (
-                  <div className="flex items-center gap-2 text-sm text-slate-400 flex-shrink-0" role="status" aria-live="polite">
-                    <RefreshIcon className="w-4 h-4 animate-spin" />
-                    Grouping…
-                    <button onClick={cancelVoiceGrouping} className="text-slate-400 hover:text-white underline">
-                      Stop
-                    </button>
-                  </div>
-                ) : (
-                  <button onClick={runVoiceGrouping} className={`${BUTTON_PRIMARY} py-2 px-4`}>
-                    Group similar voices
-                  </button>
-                )}
-              </div>
-            )}
-            {groupingNote && (
-              <p role="status" className="text-sm text-slate-300 mb-3">{groupingNote}</p>
-            )}
             {batchResult && (
               <p role="status" className="text-sm text-slate-300 mb-3">{batchResult}</p>
             )}
             <div className="space-y-3">
-              {reviewRows.map(({ key, suggestion: s, members }) =>
-                s.kind === "voice" ? (
-                  <VoicePendingCard
-                    key={key}
-                    suggestion={s}
-                    members={members}
-                    people={people}
-                    showError={acceptErrorId === s.id}
-                    errorMessage={acceptErrorId === s.id ? acceptErrorMsg : null}
-                    newName={voiceNameDraft[s.id] ?? ""}
-                    onNewNameChange={(v) => setVoiceNameDraft((cur) => ({ ...cur, [s.id]: v }))}
-                    onAcceptExisting={(id) => acceptVoiceGroupInto(members, id)}
-                    onAcceptNew={(name) => acceptVoiceGroupAsNew(members, name)}
-                    onIgnore={() => ignoreVoiceGroup(members)}
-                  />
-                ) : (
+              {pending.filter((s) => s.kind !== "voice").map((s) => (
                   <PendingCard
-                    key={key}
+                    key={s.id}
                     suggestion={s}
                     people={people}
                     showError={acceptErrorId === s.id}
@@ -866,8 +550,7 @@ export default function PeoplePage() {
                     onAcceptNew={() => acceptAsNew(s)}
                     onIgnore={() => doIgnore(s)}
                   />
-                )
-              )}
+              ))}
             </div>
           </section>
         ) : (
