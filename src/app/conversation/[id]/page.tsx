@@ -91,29 +91,17 @@ interface Conversation {
   };
   transcript_segments?: TranscriptSegment[];
   geolocation?: ConversationGeolocation | null;
-  unmatched_speakers?: number[];
 }
 
 // ── Components ──
 
-/**
- * Who is speaking, once, above the transcript.
- *
- * A matched speaker's name is frozen into every segment, but nothing linked it
- * to the person it names, and an unmatched one was a bare "S2" with no hint
- * that the People queue was holding a "who is this?" card for it. The legend
- * is where both belong: one 44px chip per distinct voice, not a link squeezed
- * into every 20px transcript row.
- */
-function SpeakerLegend({ segments, unmatched }: { segments: TranscriptSegment[]; unmatched: number[] }) {
+function SpeakerLegend({ segments }: { segments: TranscriptSegment[] }) {
   const seen = new Map<number, TranscriptSegment>();
   for (const s of segments) {
     const id = s.speaker_id ?? 0;
     if (!seen.has(id)) seen.set(id, s);
   }
-  if (seen.size < 2 && !unmatched.length) return null;
-  const unmatchedSet = new Set(unmatched);
-  const unknown = [...seen.values()].filter((s) => !s.speaker_person_id && unmatchedSet.has(s.speaker_id ?? 0));
+  if (seen.size < 2) return null;
   return (
     <div className="mb-4">
       <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400 mb-1.5">Speakers</p>
@@ -132,21 +120,12 @@ function SpeakerLegend({ segments, unmatched }: { segments: TranscriptSegment[];
               ) : (
                 <span className="inline-flex items-center min-h-[44px] px-3 rounded-full bg-slate-800/60 border border-slate-700 font-mono text-sm text-slate-300">
                   {label}
-                  {unmatchedSet.has(s.speaker_id ?? 0) && <span className="ml-1.5 text-xs text-slate-400">· unrecognized</span>}
                 </span>
               )}
             </li>
           );
         })}
       </ul>
-      {unknown.length > 0 && (
-        <p className="text-xs text-slate-400 mt-2">
-          {unknown.length === 1 ? "One voice wasn't" : `${unknown.length} voices weren't`} matched to anyone when this was
-          transcribed. Naming {unknown.length === 1 ? "it" : "them"} in{" "}
-          <Link href="/people" className="text-cyan-400 hover:underline">People → Review</Link> teaches the app that
-          voice for future conversations. Labels here stay as they were transcribed.
-        </p>
-      )}
     </div>
   );
 }
@@ -1384,10 +1363,7 @@ export default function ConversationPage() {
                 Transcript ({conversation.transcript_segments.length} segments)
               </summary>
               <div className="px-5 pb-5">
-                <SpeakerLegend
-                  segments={conversation.transcript_segments}
-                  unmatched={conversation.unmatched_speakers ?? []}
-                />
+                <SpeakerLegend segments={conversation.transcript_segments} />
                 <TranscriptViewer segments={conversation.transcript_segments} />
               </div>
             </details>

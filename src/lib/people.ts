@@ -35,11 +35,7 @@ export interface Person {
 
 export interface PendingSuggestion {
   id: string;
-  /** "text" (default, and what every record predating this field is) comes
-   *  from LLM extraction with a guessed name; "voice" is an unrecognized
-   *  speaker cluster with no name to guess — the review card asks instead
-   *  of confirming a guess. */
-  kind: "text" | "voice";
+  kind: "text";
   conversationId: string;
   date: string;
   extractedName: string;
@@ -49,12 +45,6 @@ export interface PendingSuggestion {
   lng?: number;
   matchedPersonId?: string;
   candidateIds?: string[];
-  /** Set only for kind: "voice" — the diarized speaker_id this card is about. */
-  speakerId?: number;
-  /** Set only for kind: "voice", and only once grouping has run. Cards sharing
-   *  a value are the same voice and are reviewed as one. Absent means
-   *  ungrouped — which is every record predating this field. */
-  voiceGroupId?: string;
   timestamp: string;
 }
 
@@ -307,8 +297,7 @@ export function mergePeople(sourceId: string, targetId: string): Person | null {
 function isPendingRecord(v: unknown): v is PendingSuggestion {
   if (!v || typeof v !== "object" || isTombstone(v)) return false;
   const r = v as Record<string, unknown>;
-  if (r.kind === "voice") return typeof r.conversationId === "string" && typeof r.speakerId === "number";
-  return typeof r.extractedName === "string"; // "text" kind, and every record predating this field
+  return typeof r.extractedName === "string";
 }
 
 export function getPending(): PendingSuggestion[] {

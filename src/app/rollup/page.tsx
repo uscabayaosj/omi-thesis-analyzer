@@ -539,9 +539,9 @@ function RollupPageInner() {
     }
 
     // Titles travel with the request: the job names each analysis from the
-    // conversation's own title, which a TRACE-captured recording lacks, so it
-    // saved "Untitled Conversation" wherever the enrichment pass had already
-    // found a real name on this device.
+    // conversation's own title, which may be absent, so it saved "Untitled
+    // Conversation" wherever the enrichment pass had already found a real
+    // name on this device.
     const named = dayConvos.map((c) => {
       const title = conversationTitle(c, enrichments.get(c.id));
       return c.structured?.title?.trim() ? c : { ...c, structured: { ...c.structured, title } };

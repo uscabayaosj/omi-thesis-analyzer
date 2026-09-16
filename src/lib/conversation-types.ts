@@ -1,8 +1,6 @@
 /**
- * The conversation shape every part of TRACE reads. It is the shape the Omi
- * API served before TRACE took over capture (imported history keeps it
- * verbatim), and the shape TRACE-captured conversations are written in, so
- * nothing downstream ever had to change.
+ * The conversation shape every part of TRACE reads — matches the Omi API's
+ * response format so data flows through unchanged.
  */
 
 export interface TranscriptSegment {
@@ -31,10 +29,9 @@ export interface Structured {
   events?: unknown[];
 }
 
-// Coordinates attached to a conversation. Inherited from the Omi API's schema
-// (which TRACE imported once, 2026-09-05); TRACE-captured conversations carry
-// none yet. There is no human-readable place-name field — `location_type` is a
-// coarse category (e.g. "restaurant"), not a name; `address` is the closest.
+// Coordinates attached to a conversation from the Omi API. There is no
+// human-readable place-name field — `location_type` is a coarse category
+// (e.g. "restaurant"), not a name; `address` is the closest.
 export interface ConversationGeolocation {
   latitude?: number;
   longitude?: number;
@@ -55,7 +52,6 @@ export interface Conversation {
   folder_id?: string;
   folder_name?: string;
   geolocation?: ConversationGeolocation | null;
-  unmatched_speakers?: number[];
 }
 
 export interface Analysis {

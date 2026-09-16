@@ -9,10 +9,7 @@ export interface ConversationRow {
   transcript_segments: unknown;
   structured: unknown;
   geolocation: unknown;
-  session_id: string | null;
   word_count: number;
-  audio_refs: unknown;
-  unmatched_speakers: unknown;
 }
 
 async function ensureConversationsSchema(sql: Sql): Promise<void> {
@@ -51,7 +48,7 @@ export type ConversationLite = Omit<ConversationRow, "transcript_segments">;
 
 export async function listConversationsLite(sql: Sql, limit = 200): Promise<ConversationLite[]> {
   return (await withTimeout(sql`
-    SELECT id, source, created_at, started_at, finished_at, structured, geolocation, session_id, word_count, audio_refs, unmatched_speakers
+    SELECT id, source, created_at, started_at, finished_at, structured, geolocation, word_count
     FROM conversations ORDER BY created_at DESC LIMIT ${limit}`)) as ConversationLite[];
 }
 
@@ -62,13 +59,15 @@ export async function listConversationsLiteBetween(
   limit = 2000
 ): Promise<ConversationLite[]> {
   return (await withTimeout(sql`
-    SELECT id, source, created_at, started_at, finished_at, structured, geolocation, session_id, word_count, audio_refs, unmatched_speakers
+    SELECT id, source, created_at, started_at, finished_at, structured, geolocation, word_count
     FROM conversations WHERE created_at >= ${fromIso} AND created_at < ${toIso}
     ORDER BY created_at DESC LIMIT ${limit}`)) as ConversationLite[];
 }
 
 export async function getConversationRow(sql: Sql, id: string): Promise<ConversationRow | null> {
-  const rows = (await withTimeout(sql`SELECT * FROM conversations WHERE id = ${id}`)) as ConversationRow[];
+  const rows = (await withTimeout(sql`
+    SELECT id, source, created_at, started_at, finished_at, transcript_segments, structured, geolocation, word_count
+    FROM conversations WHERE id = ${id}`)) as ConversationRow[];
   return rows[0] ?? null;
 }
 

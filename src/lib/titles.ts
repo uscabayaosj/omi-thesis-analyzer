@@ -12,8 +12,7 @@ export interface TitleSource {
 /**
  * What to call a conversation, in one place.
  *
- * TRACE-captured conversations carry no `structured.title` at all (that was
- * Omi's post-processing), and Omi left most of its own empty. The enrichment
+ * Some conversations arrive without a `structured.title`. The enrichment
  * pass exists to name them, and the ADHD pass writes a one-line gist; the home
  * list used both, but every other screen — the promises ledger, search
  * results, the rollup coverage list, group chips — read only the raw field and

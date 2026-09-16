@@ -31,7 +31,7 @@ const FIXTURES: Conversation[] = [
   {
     id: "fx-fence-dale",
     created_at: at(0, 9, 12),
-    source: "trace",
+    source: "omi",
     structured: {
       title: "Fence repair plan with Dale",
       overview: "Dale agreed to bring the post driver Thursday; the east line needs six new posts before the lease cattle arrive.",
@@ -51,7 +51,7 @@ const FIXTURES: Conversation[] = [
   {
     id: "fx-untitled-morning",
     created_at: at(0, 11, 40),
-    source: "trace",
+    source: "omi",
     structured: { title: "", overview: "", category: "" },
     transcript_segments: [
       seg(0, "Did you get the water compact letter?"),
@@ -59,12 +59,11 @@ const FIXTURES: Conversation[] = [
       seg(0, "The point is the deadline is the thirtieth."),
       seg(2, "Then I'll open it on the twenty-ninth."),
     ],
-    unmatched_speakers: [2],
   },
   {
     id: "fx-noise-radio",
     created_at: at(0, 13, 5),
-    source: "trace",
+    source: "omi",
     structured: { title: "", overview: "", category: "" },
     transcript_segments: [seg(0, "...and that's the forecast for the valley, back after this.")],
   },

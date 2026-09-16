@@ -126,10 +126,10 @@ function saveGroupCustom(
 }
 
 /**
- * The route names each conversation from its own `structured.title`, which a
- * TRACE-captured recording lacks, so the chips (and the saved group, and
- * therefore search results) read "Untitled". The enrichment pass usually has
- * the name on this device; fill it in before display and before saving.
+ * The route names each conversation from its own `structured.title`, which
+ * may be absent, so the chips (and the saved group, and therefore search
+ * results) read "Untitled". The enrichment pass usually has the name on
+ * this device; fill it in before display and before saving.
  */
 function nameConversations(list: ConvoRef[]): ConvoRef[] {
   const enrichments = getEnrichments();

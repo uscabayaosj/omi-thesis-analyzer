@@ -358,8 +358,7 @@ export default function PeoplePage() {
      existing person — are exactly the subset that needs no judgment, so they
      get one action. Ambiguous ones are deliberately left for the per-card
      flow, because those are the ones where a wrong merge costs something. */
-  const textPending = pending.filter((s) => s.kind !== "voice");
-  const confidentMatches = textPending.filter((s) => s.matchedPersonId);
+  const confidentMatches = pending.filter((s) => s.matchedPersonId);
 
   const acceptAllConfident = () => {
     let failed = 0;
@@ -507,7 +506,7 @@ export default function PeoplePage() {
       {/* Review queue — collapsed to a count banner by default so the search,
           view toggle, and directory stay reachable without scrolling past every
           pending suggestion. Tap to expand; tap the header to collapse again. */}
-      {textPending.length > 0 && (
+      {pending.length > 0 && (
         reviewOpen ? (
           <section className="mb-8">
             <button
@@ -515,7 +514,7 @@ export default function PeoplePage() {
               aria-expanded={true}
               className="w-full flex items-center justify-between gap-2 mb-3 min-h-[44px] text-slate-300 hover:text-white transition-colors"
             >
-              <span className="text-sm font-semibold uppercase tracking-wide">Review ({textPending.length})</span>
+              <span className="text-sm font-semibold uppercase tracking-wide">Review ({pending.length})</span>
               <ChevronRightIcon className="w-4 h-4 -rotate-90 flex-shrink-0" />
             </button>
             {confidentMatches.length > 1 && (
@@ -536,7 +535,7 @@ export default function PeoplePage() {
               <p role="status" className="text-sm text-slate-300 mb-3">{batchResult}</p>
             )}
             <div className="space-y-3">
-              {textPending.map((s) => (
+              {pending.map((s) => (
                   <PendingCard
                     key={s.id}
                     suggestion={s}
@@ -561,8 +560,8 @@ export default function PeoplePage() {
             className="card w-full p-4 mb-6 flex items-center justify-between gap-2 min-h-[44px] hover:border-cyan-400/40 transition-colors"
           >
             <span className="text-sm text-slate-200">
-              <span className="font-semibold">{textPending.length}</span>{" "}
-              {textPending.length === 1 ? "suggestion" : "suggestions"} to review
+              <span className="font-semibold">{pending.length}</span>{" "}
+              {pending.length === 1 ? "suggestion" : "suggestions"} to review
             </span>
             <ChevronRightIcon className="w-4 h-4 text-cyan-400 flex-shrink-0" />
           </button>

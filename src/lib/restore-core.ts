@@ -3,7 +3,7 @@
  * merging it into this device would change. No storage, no network — the
  * client half (restore.ts) supplies the device's values and writes the
  * result. Imports carry `.ts` extensions so `node --test` can load this
- * module directly, the same convention as capture/identify.ts.
+ * module directly.
  *
  * A restore is a merge, never a replace: the file is treated as a pull from
  * another device. Newest record wins, done-state fields resolve on their own

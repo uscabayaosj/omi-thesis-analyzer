@@ -26,6 +26,34 @@ function monthWindow(month: string): { from: string; to: string } | null {
   };
 }
 
+async function fetchDbRows(window: { from: string; to: string } | null): Promise<Conversation[]> {
+  const sql = getStore();
+  if (!sql) return [];
+  await ensureConversationsSchemaOnce(sql);
+  const rows = window
+    ? await listConversationsLiteBetween(sql, window.from, window.to)
+    : await listConversationsLite(sql, 200);
+  return rows.map((r) => ({
+    id: r.id,
+    created_at: iso(r.created_at) ?? "",
+    started_at: iso(r.started_at),
+    finished_at: iso(r.finished_at),
+    source: r.source,
+    structured: (r.structured as Conversation["structured"]) ?? undefined,
+    geolocation: (r.geolocation as Conversation["geolocation"]) ?? null,
+  }));
+}
+
+async function fetchOmiRows(): Promise<Conversation[]> {
+  if (!process.env.OMI_API_KEY) return [];
+  try {
+    return await getOmiConversations(100);
+  } catch (err) {
+    console.error("Omi list failed:", err);
+    return [];
+  }
+}
+
 export async function GET(req: NextRequest) {
   try {
     const monthParam = req.nextUrl.searchParams.get("month");
@@ -34,38 +62,19 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Expected month=YYYY-MM." }, { status: 400 });
     }
 
+    const [dbRows, omiRows] = await Promise.all([
+      fetchDbRows(window),
+      window ? Promise.resolve([]) : fetchOmiRows(),
+    ]);
+
+    if (dbRows.length === 0 && omiRows.length === 0 && fixturesEnabled()) {
+      const list = fixtureConversations();
+      return NextResponse.json(list, { headers: { "Cache-Control": "no-store" } });
+    }
+
     const byId = new Map<string, Conversation>();
-    const sql = getStore();
-    if (sql) {
-      await ensureConversationsSchemaOnce(sql);
-      const rows = window
-        ? await listConversationsLiteBetween(sql, window.from, window.to)
-        : await listConversationsLite(sql, 200);
-      for (const r of rows) {
-        byId.set(r.id, {
-          id: r.id,
-          created_at: iso(r.created_at) ?? "",
-          started_at: iso(r.started_at),
-          finished_at: iso(r.finished_at),
-          source: r.source,
-          structured: (r.structured as Conversation["structured"]) ?? undefined,
-          geolocation: (r.geolocation as Conversation["geolocation"]) ?? null,
-        });
-      }
-    }
-
-    if (process.env.OMI_API_KEY && !window) {
-      try {
-        for (const c of await getOmiConversations(100)) if (!byId.has(c.id)) byId.set(c.id, c);
-      } catch (err) {
-        if (byId.size === 0) throw err;
-        console.error("Omi list failed; serving DB only:", err);
-      }
-    }
-
-    if (byId.size === 0 && fixturesEnabled()) {
-      for (const c of fixtureConversations()) byId.set(c.id, c);
-    }
+    for (const c of dbRows) byId.set(c.id, c);
+    for (const c of omiRows) if (!byId.has(c.id)) byId.set(c.id, c);
 
     const list = Array.from(byId.values()).sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
     return NextResponse.json(list, {
