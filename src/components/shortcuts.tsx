@@ -104,7 +104,7 @@ export default function GlobalShortcuts() {
         className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 card px-3 py-2 font-mono text-xs text-slate-300"
         role="status"
       >
-        g … <span className="text-slate-400">(h r w c p s u)</span>
+        g … <span className="text-slate-400">(h r w c p s a k t u)</span>
       </div>
     ) : null;
   }

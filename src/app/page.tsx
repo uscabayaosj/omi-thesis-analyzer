@@ -14,7 +14,7 @@ import { formatDateTime, dayOf, todayString } from "@/lib/format";
 import {
   TraceMark, SquareIcon, XIcon, CheckIcon, SparklesIcon, WarningIcon, MicIcon,
   FolderIcon, RefreshIcon, ClipboardIcon, CalendarIcon, ChevronRightIcon, SearchIcon, MapPinIcon,
-  UsersIcon, TrendingUpIcon, DownloadIcon, UploadIcon,
+  UsersIcon, TrendingUpIcon, DownloadIcon, UploadIcon, MessageIcon, BookIcon,
 } from "@/components/icons";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { useUndoOffer } from "@/components/UndoProvider";
@@ -1739,6 +1739,18 @@ function HomeInner() {
           <Link href="/search" className={BUTTON_GHOST}>
             <SearchIcon className="w-4 h-4 flex-shrink-0" />
             Search analyses
+          </Link>
+          <Link href="/ask" className={BUTTON_GHOST}>
+            <MessageIcon className="w-4 h-4 flex-shrink-0" />
+            Ask the corpus
+          </Link>
+          <Link href="/codebook" className={BUTTON_GHOST}>
+            <BookIcon className="w-4 h-4 flex-shrink-0" />
+            Codebook
+          </Link>
+          <Link href="/patterns" className={BUTTON_GHOST}>
+            <TrendingUpIcon className="w-4 h-4 flex-shrink-0" />
+            Patterns
           </Link>
           <Link href="/usage" className={BUTTON_GHOST}>
             <TrendingUpIcon className="w-4 h-4 flex-shrink-0" />

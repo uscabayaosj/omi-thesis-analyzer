@@ -103,6 +103,26 @@ export default function HelpPage() {
           </p>
         </Answer>
 
+        <Answer q="What do Ask, Codebook and Patterns add?">
+          <p>
+            <Link href="/ask" className="text-cyan-400 hover:underline">Ask the corpus</Link> answers a research
+            question across every stored thesis and group analysis. It picks the passages that share vocabulary
+            with your question, sends only those, and cites each claim back to the conversation it came from.
+            Answers are kept, so asking the same thing again shows the stored answer instead of paying twice.
+          </p>
+          <p>
+            <Link href="/codebook" className="text-cyan-400 hover:underline">Codebook</Link> is qualitative coding:
+            named codes you own, each with verbatim excerpts from the analyses. The model can suggest excerpts
+            for a conversation and propose new codes, but nothing enters the codebook until you tick it. Every
+            suggested excerpt is checked to be an exact quote of the analysis before it reaches you.
+          </p>
+          <p>
+            <Link href="/patterns" className="text-cyan-400 hover:underline">Patterns</Link> reads the ADHD lens
+            back over eight weeks — days closed, promises kept, who is owed, loops that keep reappearing, plan
+            steps ticked. It is computed on this device from what is already stored and never calls the model.
+          </p>
+        </Answer>
+
         <Answer q="There are two search boxes. Which is which?">
           <p>
             The box on the conversations list filters <em>that list</em> — titles and overviews of your

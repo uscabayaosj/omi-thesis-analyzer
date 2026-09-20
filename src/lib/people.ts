@@ -451,7 +451,9 @@ function editDistance(a: string, b: string): number {
 }
 
 function namesOf(p: Person): string[] {
-  return [p.name, ...p.aliases].map(normalize);
+  // Records written before aliases existed, and dev fixtures, may lack the
+  // array; a missing list is an empty one, not a crash.
+  return [p.name, ...(p.aliases ?? [])].map(normalize);
 }
 
 /**

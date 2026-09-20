@@ -1098,6 +1098,13 @@ export default function ConversationPage() {
                 </div>
               </div>
               {analysis && <ThesisResults analysis={analysis} animate={animateThesis} />}
+              {analysis && !viewingVersion && (
+                <p className="mt-3 text-sm">
+                  <Link href={`/codebook?suggest=${encodeURIComponent(id)}`} className="text-cyan-400 hover:underline inline-flex items-center min-h-[44px]">
+                    Code this conversation in the codebook
+                  </Link>
+                </p>
+              )}
 
               {/* Version history */}
               {!viewingVersion && (

@@ -211,6 +211,10 @@ export function getRollup(day: string): StoredRollup | null {
   return map[day] ?? null;
 }
 
+export function getAllRollups(): StoredRollup[] {
+  return Object.values(readMap<StoredRollup>(ROLLUPS_KEY)).filter((r) => typeof r.day === "string" && !!r.rollup);
+}
+
 export function getRollupDays(): string[] {
   return Object.keys(readMap<StoredRollup>(ROLLUPS_KEY)).sort().reverse();
 }
