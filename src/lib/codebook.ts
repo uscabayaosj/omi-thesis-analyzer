@@ -171,6 +171,10 @@ export function weeklyCounts(
   addDays: (day: string, n: number) => string,
   today: string,
   weeks = 8,
+  /** ISO timestamp → local YYYY-MM-DD. Defaults to the UTC date only for
+   *  callers that pass none; the page passes the app's local-day helper so
+   *  a late-evening excerpt lands in the week it was accepted, not the next. */
+  dayOf: (iso: string) => string = (iso) => iso.slice(0, 10),
 ): { week: string; count: number }[] {
   const start = mondayOf(today);
   const buckets = new Map<string, number>();
@@ -183,7 +187,7 @@ export function weeklyCounts(
   for (const e of evidence) {
     const stamp = e.createdAt ?? e.timestamp;
     if (typeof stamp !== "string") continue;
-    const day = stamp.slice(0, 10);
+    const day = dayOf(stamp);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
     const w = mondayOf(day);
     if (buckets.has(w)) buckets.set(w, (buckets.get(w) ?? 0) + 1);

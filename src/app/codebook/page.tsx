@@ -38,7 +38,7 @@ const LABEL = "font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400"
 /** Eight weekly bars, one hue, height by count. A code still gaining
  *  excerpts is not saturated — that is the whole reading. */
 function SaturationStrip({ evidence }: { evidence: CodeEvidence[] }) {
-  const weeks = useMemo(() => weeklyCounts(evidence, mondayOf, addDays, todayString()), [evidence]);
+  const weeks = useMemo(() => weeklyCounts(evidence, mondayOf, addDays, todayString(), 8, dayOf), [evidence]);
   const max = Math.max(1, ...weeks.map((w) => w.count));
   const total = weeks.reduce((s, w) => s + w.count, 0);
   return (

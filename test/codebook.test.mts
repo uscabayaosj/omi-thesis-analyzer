@@ -99,3 +99,12 @@ test("weeklyCounts reads createdAt over the merge clock, and skips bad stamps", 
   );
   assert.equal(rows.reduce((s, r) => s + r.count, 0), 1);
 });
+
+test("weeklyCounts buckets by the caller's local day, not the UTC date", () => {
+  // 23:30 on Sunday the 20th in a UTC-6 zone is 05:30 UTC on Monday the 21st.
+  const localDayOf = (iso: string) => (iso === "2026-09-21T05:30:00Z" ? "2026-09-20" : iso.slice(0, 10));
+  const rows = weeklyCounts([{ timestamp: "2026-09-21T05:30:00Z" }], mondayOf, addDays, "2026-09-22", 2, localDayOf);
+  assert.deepEqual(rows.map((r) => r.count), [1, 0]);
+  const utcRows = weeklyCounts([{ timestamp: "2026-09-21T05:30:00Z" }], mondayOf, addDays, "2026-09-22", 2);
+  assert.deepEqual(utcRows.map((r) => r.count), [0, 1]);
+});
