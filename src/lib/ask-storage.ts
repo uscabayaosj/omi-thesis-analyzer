@@ -7,7 +7,10 @@ import type { AskSource } from "./ask";
  *  is a record, not a transient — and so re-asking costs nothing. */
 export interface StoredInquiry {
   id: string;
+  /** Merge clock — rewritten by delete/restore. */
   timestamp: string;
+  /** When the question was asked. What the list shows and sorts by. */
+  askedAt?: string;
   question: string;
   answer: string;
   sources: AskSource[];
@@ -19,13 +22,15 @@ const KEY = "omi-thesis-inquiries";
 
 export function getInquiries(): StoredInquiry[] {
   return Object.values(readMap<StoredInquiry>(KEY))
-    .filter((i) => !i.deleted && typeof i.question === "string")
-    .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+    .filter((i) => !i.deleted && typeof i.question === "string" && typeof i.answer === "string")
+    .map((i) => ({ ...i, sources: Array.isArray(i.sources) ? i.sources : [] }))
+    .sort((a, b) => (b.askedAt ?? b.timestamp).localeCompare(a.askedAt ?? a.timestamp));
 }
 
 export function saveInquiry(rec: Omit<StoredInquiry, "id" | "timestamp">): StoredInquiry {
   const map = readMap<StoredInquiry>(KEY);
-  const stored: StoredInquiry = { ...rec, id: `inq-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`, timestamp: new Date().toISOString() };
+  const t = new Date().toISOString();
+  const stored: StoredInquiry = { ...rec, id: `inq-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`, timestamp: t, askedAt: t };
   map[stored.id] = stored;
   writeMap(KEY, map);
   return stored;

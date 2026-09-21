@@ -18,13 +18,30 @@ function now(): string {
 
 export function getCodes(): Code[] {
   return Object.values(readMap<Code>(CODES_KEY))
-    .filter((c) => !c.deleted && typeof c.name === "string")
+    .filter((c) => !c.deleted && typeof c.name === "string" && c.name.trim().length > 0)
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** Case- and whitespace-insensitive lookup, so a proposed code that already
+ *  exists under a slightly different spelling reuses it instead of forking. */
+export function findCodeByName(name: string): Code | null {
+  const n = name.trim().toLowerCase().replace(/\s+/g, " ");
+  if (!n) return null;
+  return getCodes().find((c) => c.name.trim().toLowerCase().replace(/\s+/g, " ") === n) ?? null;
+}
+
+const MAX_CODE_NAME = 80;
+const MAX_CODE_DESC = 400;
+const MAX_EXCERPT = 600;
+
 export function createCode(init: { name: string; description?: string }): Code {
   const map = readMap<Code>(CODES_KEY);
-  const code: Code = { id: newId("code"), name: init.name.trim(), description: (init.description ?? "").trim(), timestamp: now() };
+  const code: Code = {
+    id: newId("code"),
+    name: init.name.trim().slice(0, MAX_CODE_NAME),
+    description: (init.description ?? "").trim().slice(0, MAX_CODE_DESC),
+    timestamp: now(),
+  };
   map[code.id] = code;
   writeMap(CODES_KEY, map);
   return code;
@@ -36,8 +53,8 @@ export function updateCode(id: string, patch: { name?: string; description?: str
   if (!existing || existing.deleted) return null;
   const updated: Code = {
     ...existing,
-    name: patch.name !== undefined ? patch.name.trim() : existing.name,
-    description: patch.description !== undefined ? patch.description.trim() : existing.description,
+    name: patch.name !== undefined && patch.name.trim() ? patch.name.trim().slice(0, MAX_CODE_NAME) : existing.name,
+    description: patch.description !== undefined ? patch.description.trim().slice(0, MAX_CODE_DESC) : existing.description,
     timestamp: now(),
   };
   map[id] = updated;
@@ -81,9 +98,12 @@ export function restoreCode(code: Code, evidence: CodeEvidence[]): void {
 // ── evidence ──
 
 export function getEvidence(): CodeEvidence[] {
+  // Excerpts whose code has been deleted are hidden rather than shown as
+  // orphans; they come back with the code if the deletion is undone.
+  const live = new Set(getCodes().map((c) => c.id));
   return Object.values(readMap<CodeEvidence>(EVIDENCE_KEY))
-    .filter((e) => !e.deleted && typeof e.excerpt === "string" && typeof e.codeId === "string")
-    .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+    .filter((e) => !e.deleted && typeof e.excerpt === "string" && typeof e.codeId === "string" && live.has(e.codeId))
+    .sort((a, b) => (b.createdAt ?? b.timestamp).localeCompare(a.createdAt ?? a.timestamp));
 }
 
 export function addEvidence(items: Omit<CodeEvidence, "id" | "timestamp">[]): CodeEvidence[] {
@@ -94,13 +114,19 @@ export function addEvidence(items: Omit<CodeEvidence, "id" | "timestamp">[]): Co
   const existing = new Set(
     Object.values(map).filter((e) => !e.deleted).map((e) => `${e.codeId}|${e.conversationId}|${e.excerpt}`),
   );
+  const live = new Set(getCodes().map((c) => c.id));
   const added: CodeEvidence[] = [];
   const t = now();
-  for (const it of items) {
+  for (const raw of items) {
+    const excerpt = raw.excerpt.replace(/\s+/g, " ").trim().slice(0, MAX_EXCERPT);
+    // A suggestion can outlive the code it was made against (deleted in
+    // another tab, or between Suggest and Accept); drop rather than orphan.
+    if (!excerpt || !live.has(raw.codeId) || !raw.conversationId) continue;
+    const it = { ...raw, excerpt };
     const k = `${it.codeId}|${it.conversationId}|${it.excerpt}`;
     if (existing.has(k)) continue;
     existing.add(k);
-    const rec: CodeEvidence = { ...it, id: newId("ev"), timestamp: t };
+    const rec: CodeEvidence = { ...it, id: newId("ev"), timestamp: t, createdAt: t };
     map[rec.id] = rec;
     added.push(rec);
   }

@@ -21,7 +21,7 @@ import {
   type Code, type CodeEvidence, type Suggestion,
 } from "@/lib/codebook";
 import {
-  getCodes, createCode, updateCode, deleteCode, restoreCode,
+  getCodes, createCode, findCodeByName, updateCode, deleteCode, restoreCode,
   getEvidence, addEvidence, deleteEvidence, restoreEvidence,
 } from "@/lib/codebook-storage";
 import { pullAndMerge } from "@/lib/sync";
@@ -152,6 +152,7 @@ function CodebookPageInner() {
   // ── new code ──
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
+  const [dupName, setDupName] = useState<string | null>(null);
 
   // ── suggest ──
   const [suggestId, setSuggestId] = useState(params.get("suggest") ?? "");
@@ -213,12 +214,17 @@ function CodebookPageInner() {
     const date = suggestTarget.date ? dayOf(suggestTarget.date) : undefined;
     const base = { conversationId: suggestTarget.conversationId, conversationTitle: suggestTarget.title, date, source: "suggested" as const };
     const items: Omit<CodeEvidence, "id" | "timestamp">[] = [];
+    // Codes can change between Suggest and Accept (deleted here, or on
+    // another device and pulled in). Re-read rather than trust the render.
+    const live = new Set(getCodes().map((c) => c.id));
     suggestion.applications.forEach((a, i) => {
-      if (ticked.has(`a${i}`)) items.push({ ...base, codeId: a.codeId, field: a.field, excerpt: a.excerpt });
+      if (ticked.has(`a${i}`) && live.has(a.codeId)) items.push({ ...base, codeId: a.codeId, field: a.field, excerpt: a.excerpt });
     });
     suggestion.proposed.forEach((p, i) => {
       if (!ticked.has(`p${i}`)) return;
-      const code = createCode({ name: p.name, description: p.description });
+      // A proposal that already exists as a code (the model re-proposing
+      // one it was given, or two proposals with the same name) reuses it.
+      const code = findCodeByName(p.name) ?? createCode({ name: p.name, description: p.description });
       items.push({ ...base, codeId: code.id, field: p.field, excerpt: p.excerpt });
     });
     addEvidence(items);
@@ -367,12 +373,20 @@ function CodebookPageInner() {
       {/* New code + manual excerpt */}
       <div className="grid sm:grid-cols-2 gap-4 mb-6">
         <form
-          onSubmit={(e) => { e.preventDefault(); if (!newName.trim()) return; createCode({ name: newName, description: newDesc }); setNewName(""); setNewDesc(""); reload(); }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!newName.trim()) return;
+            if (findCodeByName(newName)) { setDupName(newName.trim()); return; }
+            setDupName(null);
+            createCode({ name: newName, description: newDesc });
+            setNewName(""); setNewDesc(""); reload();
+          }}
           className="card p-4 space-y-2"
         >
           <h2 className="text-slate-200">New code</h2>
           <input aria-label="New code name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Name" className={INPUT} />
           <input aria-label="New code description" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} placeholder="What counts as this code" className={INPUT} />
+          {dupName && <p role="alert" className="text-sm text-amber-400">A code named &ldquo;{dupName}&rdquo; already exists.</p>}
           <button type="submit" disabled={!newName.trim()} className={`${BUTTON_SECONDARY} justify-center w-full`}>Add code</button>
         </form>
 
@@ -407,7 +421,9 @@ function CodebookPageInner() {
           <ul className="space-y-3 list-none">
             {codes.map((c) => (
               <CodeCard
-                key={c.id}
+                // Timestamp in the key: a sync pull that changes a code's
+                // name must reset the card's edit form, not leave stale text.
+                key={`${c.id}:${c.timestamp}`}
                 code={c}
                 evidence={byCode.get(c.id) ?? []}
                 onEdit={(patch) => { updateCode(c.id, patch); reload(); }}

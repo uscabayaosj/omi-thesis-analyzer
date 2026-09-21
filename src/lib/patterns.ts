@@ -97,7 +97,7 @@ export function computePatterns(
   // ── coverage & streak ──
   const activeDays = new Set<string>();
   for (const a of analyses) activeDays.add(h.dayOf(a.date ?? a.timestamp));
-  const rollupDays = new Set(rollups.map((r) => r.day));
+  const rollupDays = new Set(rollups.map((r) => r.day).filter((d) => typeof d === "string"));
   const coverage: CoverageWeek[] = weekKeys.map((week) => {
     let active = 0;
     let rolled = 0;
@@ -145,8 +145,9 @@ export function computePatterns(
     const row = weekSet.has(week) ? weeks.get(week) : undefined;
     const done = new Set(a.doneKeys ?? []);
     const letGo = new Set(a.letGoKeys ?? []);
-    for (const c of a.analysis.commitments) {
-      const who = c.who.trim() || "Unattributed";
+    for (const c of a.analysis?.commitments ?? []) {
+      if (!c || typeof c.key !== "string") continue;
+      const who = (typeof c.who === "string" ? c.who : "").trim() || "Unattributed";
       const p = people.get(who) ?? { who, open: 0, oldestOpenDays: 0, done: 0 };
       if (row) row.created++;
       if (done.has(c.key)) {
@@ -174,7 +175,8 @@ export function computePatterns(
   const loops = new Map<string, RecurringLoop>();
   for (const a of analyses) {
     const seenHere = new Set<string>();
-    for (const text of a.analysis.open_loops ?? []) {
+    for (const text of a.analysis?.open_loops ?? []) {
+      if (typeof text !== "string") continue;
       const k = loopKey(text);
       if (!k || seenHere.has(k)) continue;
       seenHere.add(k);
@@ -190,7 +192,7 @@ export function computePatterns(
   let planDone = 0;
   let planTotal = 0;
   for (const r of [...rollups].sort((x, y) => x.day.localeCompare(y.day))) {
-    const steps = r.rollup.plan_steps ?? [];
+    const steps = (r.rollup?.plan_steps ?? []).filter((s) => s && typeof s.key === "string");
     if (steps.length === 0) continue;
     const keys = new Set(steps.map((s) => s.key));
     const done = (r.planDoneKeys ?? []).filter((k) => keys.has(k)).length;

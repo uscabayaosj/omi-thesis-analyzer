@@ -30,7 +30,12 @@ export interface CodeEvidence {
   field: string;
   excerpt: string;
   source: "suggested" | "manual";
+  /** Merge clock — rewritten by delete/restore so the write wins a sync. */
   timestamp: string;
+  /** When the excerpt was first accepted. The saturation strip reads this,
+   *  not `timestamp`, so an undo does not make old evidence look new.
+   *  Optional for records written before the two clocks were separated. */
+  createdAt?: string;
   deleted?: boolean;
 }
 
@@ -161,7 +166,7 @@ export function validateSuggestion(
  *  oldest first. Reads as a saturation strip: a code still gaining evidence
  *  is not saturated. */
 export function weeklyCounts(
-  evidence: Pick<CodeEvidence, "timestamp">[],
+  evidence: Pick<CodeEvidence, "timestamp" | "createdAt">[],
   mondayOf: (day: string) => string,
   addDays: (day: string, n: number) => string,
   today: string,
@@ -176,8 +181,10 @@ export function weeklyCounts(
     order.push(w);
   }
   for (const e of evidence) {
-    const day = e.timestamp.slice(0, 10);
-    if (day.length !== 10) continue;
+    const stamp = e.createdAt ?? e.timestamp;
+    if (typeof stamp !== "string") continue;
+    const day = stamp.slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
     const w = mondayOf(day);
     if (buckets.has(w)) buckets.set(w, (buckets.get(w) ?? 0) + 1);
   }
@@ -187,7 +194,7 @@ export function weeklyCounts(
 export function buildCodebookMarkdown(codes: Code[], evidence: CodeEvidence[]): { markdown: string; filename: string } {
   const lines: string[] = ["# Codebook", "", `Exported ${new Date().toISOString().slice(0, 10)} · ${codes.length} codes · ${evidence.length} excerpts`, ""];
   for (const c of codes) {
-    const ev = evidence.filter((e) => e.codeId === c.id).sort((a, b) => (a.date ?? a.timestamp).localeCompare(b.date ?? b.timestamp));
+    const ev = evidence.filter((e) => e.codeId === c.id && !e.deleted).sort((a, b) => (a.date ?? a.timestamp).localeCompare(b.date ?? b.timestamp));
     lines.push(`## ${c.name}`, "");
     if (c.description) lines.push(c.description, "");
     lines.push(`${ev.length} excerpt${ev.length === 1 ? "" : "s"}`, "");

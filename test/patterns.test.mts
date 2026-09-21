@@ -97,3 +97,15 @@ test("coverage counts active days and how many were closed", () => {
   const wk = p.coverage.find((c) => c.week === "2026-09-14")!;
   assert.deepEqual({ a: wk.activeDays, r: wk.rolledDays }, { a: 2, r: 1 });
 });
+
+test("malformed records are skipped rather than crashing", () => {
+  const bad = [
+    { conversationId: "x", timestamp: "2026-09-15T12:00:00", title: "X", doneKeys: [], analysis: undefined },
+    { conversationId: "y", timestamp: "2026-09-15T12:00:00", title: "Y", doneKeys: [], analysis: { commitments: [null, { key: 1, who: "Ann" }, { key: "k", who: undefined }], open_loops: [null, 5, "ok"] } },
+  ] as unknown as Parameters<typeof computePatterns>[0];
+  const rollups = [{ day: undefined, timestamp: "", conversationIds: [], rollup: undefined }, rollup("2026-09-15", ["s1"], ["s1"])] as unknown as Parameters<typeof computePatterns>[1];
+  const p = computePatterns(bad, rollups, h);
+  assert.equal(p.openCount, 1);
+  assert.deepEqual(p.people.map((x) => x.who), ["Unattributed"]);
+  assert.equal(p.planRate, 1);
+});

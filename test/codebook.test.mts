@@ -86,3 +86,16 @@ test("buildSuggestPrompt lists codes and skips empty dimensions", () => {
   assert.ok(p.includes("### rq1_documentary_record"));
   assert.ok(!p.includes("### rq3_cskt_intersection"));
 });
+
+test("weeklyCounts reads createdAt over the merge clock, and skips bad stamps", () => {
+  const rows = weeklyCounts(
+    [
+      { timestamp: "2026-09-19T10:00:00Z", createdAt: "2026-07-01T10:00:00Z" },
+      { timestamp: "2026-09-19T10:00:00Z" },
+      { timestamp: "garbage" },
+      { timestamp: 12 as unknown as string },
+    ],
+    mondayOf, addDays, "2026-09-20", 4,
+  );
+  assert.equal(rows.reduce((s, r) => s + r.count, 0), 1);
+});

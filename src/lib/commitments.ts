@@ -65,7 +65,8 @@ export function getAllCommitments(includeResolved = false): OpenCommitment[] {
     const done = new Set(a.doneKeys ?? []);
     const letGo = new Set(a.letGoKeys ?? []);
     const date = dayOf(a);
-    for (const c of a.analysis.commitments) {
+    for (const c of Array.isArray(a?.analysis?.commitments) ? a.analysis.commitments : []) {
+      if (!c || typeof c.key !== "string") continue;
       const isDone = done.has(c.key);
       const isLetGo = letGo.has(c.key);
       if ((isDone || isLetGo) && !includeResolved) continue;

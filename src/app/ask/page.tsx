@@ -224,7 +224,7 @@ export default function AskPage() {
                   >
                     <span className="text-slate-100 font-serif font-semibold">{inq.question}</span>
                     <span className="font-mono text-xs text-slate-400 flex-shrink-0">
-                      {formatDateTime(inq.timestamp, { month: "short", day: "numeric" })}
+                      {formatDateTime(inq.askedAt ?? inq.timestamp, { month: "short", day: "numeric" })}
                     </span>
                   </button>
                   {open && (

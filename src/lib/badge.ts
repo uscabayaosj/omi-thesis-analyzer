@@ -19,7 +19,10 @@ function countUnacknowledged(analyses: StoredAdhdAnalysis[]): number {
     // is actually outstanding — which is how it reached 58 and stopped meaning
     // anything.
     const resolved = new Set([...(a.doneKeys ?? []), ...(a.letGoKeys ?? [])]);
-    return sum + a.analysis.commitments.filter((c) => !resolved.has(c.key)).length;
+    // One malformed record must not take down every route: this runs from
+    // the root layout, so a throw here is the whole app failing to load.
+    const commitments = Array.isArray(a?.analysis?.commitments) ? a.analysis.commitments : [];
+    return sum + commitments.filter((c) => c && typeof c.key === "string" && !resolved.has(c.key)).length;
   }, 0);
 }
 

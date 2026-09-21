@@ -12,7 +12,7 @@ import { CODEBOOK_SYSTEM_PROMPT, THESIS_FIELDS, buildSuggestPrompt, validateSugg
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const title = typeof body?.title === "string" ? body.title : "Untitled";
+    const title = (typeof body?.title === "string" ? body.title : "Untitled").slice(0, 200);
     const rawAnalysis = body?.analysis && typeof body.analysis === "object" ? (body.analysis as Record<string, unknown>) : null;
     if (!rawAnalysis) {
       return NextResponse.json({ error: "Select an analyzed conversation to code." }, { status: 400 });
@@ -25,7 +25,12 @@ export async function POST(req: NextRequest) {
 
     const codes = (Array.isArray(body?.codes) ? (body.codes as Record<string, unknown>[]) : [])
       .filter((c) => typeof c?.id === "string" && typeof c?.name === "string")
-      .map((c) => ({ id: c.id as string, name: c.name as string, description: typeof c.description === "string" ? c.description : "" }))
+      .map((c) => ({
+        id: (c.id as string).slice(0, 64),
+        name: (c.name as string).slice(0, 80),
+        description: typeof c.description === "string" ? c.description.slice(0, 400) : "",
+      }))
+      .filter((c) => c.id && c.name.trim())
       .slice(0, 60);
 
     const content = await chatCompletion(

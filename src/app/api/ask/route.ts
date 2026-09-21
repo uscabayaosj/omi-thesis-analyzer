@@ -50,6 +50,9 @@ export async function POST(req: NextRequest) {
       "thesis-ask",
     );
 
+    if (!answer.trim()) {
+      return NextResponse.json({ error: "The AI returned an empty answer. Ask again." }, { status: 502 });
+    }
     return NextResponse.json({ answer: answer.trim(), sources: toSources(passages), passageCount: passages.length });
   } catch (err) {
     console.error("ask failed:", err);
