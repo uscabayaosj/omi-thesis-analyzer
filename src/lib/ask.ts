@@ -119,6 +119,7 @@ export function buildPassages(analysesData: unknown, groupsData: unknown): Passa
   const out: Passage[] = [];
 
   for (const rec of toList(analysesData)) {
+    if (!rec || typeof rec !== "object") continue;
     const current = (rec.current ?? rec) as Record<string, unknown>;
     if (!current || typeof current !== "object") continue;
     const conversationId = str(rec.conversationId) || str(current.conversationId);
@@ -129,8 +130,8 @@ export function buildPassages(analysesData: unknown, groupsData: unknown): Passa
       const text = str(current[field]).trim();
       if (text) out.push({ tag: "", kind: "conversation", conversationId, title, date, field, label, text });
     }
-    const custom = current.custom as { prompt?: string; result?: string } | undefined;
-    if (custom?.result) {
+    const custom = current.custom as { prompt?: unknown; result?: unknown } | undefined;
+    if (custom && typeof custom.result === "string" && custom.result.trim()) {
       out.push({
         tag: "", kind: "conversation", conversationId, title, date,
         field: "custom.result", label: `Custom: ${str(custom.prompt).slice(0, 60)}`, text: custom.result,
@@ -139,7 +140,9 @@ export function buildPassages(analysesData: unknown, groupsData: unknown): Passa
   }
 
   for (const rec of toList(groupsData)) {
+    if (!rec || typeof rec !== "object") continue;
     const analysis = rec.analysis as Record<string, unknown> | undefined;
+    if (!analysis || typeof analysis !== "object") continue;
     const ids = Array.isArray(rec.conversationIds) ? (rec.conversationIds as unknown[]).filter((x): x is string => typeof x === "string") : [];
     if (!analysis || ids.length === 0) continue;
     const convos = Array.isArray(rec.conversations) ? (rec.conversations as { title?: string }[]) : [];

@@ -73,3 +73,12 @@ test("buildAskPrompt carries tags, titles, and the question", () => {
   assert.ok(prompt.includes("[C1] Conversation \"Branding day\""));
   assert.ok(prompt.endsWith("Question: water compact"));
 });
+
+test("buildPassages skips null entries and non-string custom results", () => {
+  const p = buildPassages(
+    { list: [null, 5, { conversationId: "c", current: { conversationId: "c", title: "T", rq1_documentary_record: "water", custom: { prompt: "q", result: { nope: true } } } }] },
+    { list: [null, { conversationIds: ["a"], analysis: "not an object" }] },
+  );
+  assert.equal(p.length, 1);
+  assert.equal(p[0].field, "rq1_documentary_record");
+});

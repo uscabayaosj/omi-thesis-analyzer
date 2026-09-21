@@ -101,7 +101,10 @@ function CodeCard({
             </form>
           ) : (
             <div className="flex flex-wrap gap-1 mb-3 -ml-3">
-              <button type="button" onClick={() => setEditing(true)} className={BUTTON_GHOST}>Edit</button>
+              {/* The form reads the code's current values when editing
+                  starts, so a sync pull that renamed the code between
+                  renders is not overwritten by stale initial state. */}
+              <button type="button" onClick={() => { setName(code.name); setDesc(code.description); setEditing(true); }} className={BUTTON_GHOST}>Edit</button>
               <button type="button" onClick={onDelete} className={BUTTON_GHOST}><TrashIcon className="w-4 h-4" /> Delete code</button>
             </div>
           )}
@@ -421,9 +424,7 @@ function CodebookPageInner() {
           <ul className="space-y-3 list-none">
             {codes.map((c) => (
               <CodeCard
-                // Timestamp in the key: a sync pull that changes a code's
-                // name must reset the card's edit form, not leave stale text.
-                key={`${c.id}:${c.timestamp}`}
+                key={c.id}
                 code={c}
                 evidence={byCode.get(c.id) ?? []}
                 onEdit={(patch) => { updateCode(c.id, patch); reload(); }}
