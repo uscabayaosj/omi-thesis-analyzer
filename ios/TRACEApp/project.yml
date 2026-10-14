@@ -1,0 +1,85 @@
+name: TRACE
+options:
+  bundleIdPrefix: com.uscabayaosj
+  deploymentTarget:
+    iOS: "18.0"
+packages:
+  swift-opus:
+    url: https://github.com/alta/swift-opus
+    from: 0.0.2
+  TRACECore:
+    path: ../TRACECore
+targets:
+  TRACE:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+      - path: Resources/Map
+        type: folder
+    dependencies:
+      - package: TRACECore
+      - package: swift-opus
+        product: Opus
+    info:
+      path: Configuration/Info.plist
+      properties:
+        CFBundleDisplayName: TRACE
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "35"
+        ITSAppUsesNonExemptEncryption: false
+        NSBluetoothAlwaysUsageDescription: TRACE connects to your Omi DevKit2 to capture audio for your personal research and planning workspace.
+        NSMicrophoneUsageDescription: TRACE records a short voice reference only when you choose Record my voice, to help suggest who spoke in future conversations.
+        NSLocationWhenInUseUsageDescription: TRACE optionally attaches the place where your conversation was recorded. Location is collected only while recording.
+        UIBackgroundModes:
+          - bluetooth-central
+          - location
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.uscabayaosj.trace
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: XU3LCVCLZC
+  TRACEFeatureTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - UnitTests
+    dependencies:
+      - target: TRACE
+      - package: TRACECore
+      - package: swift-opus
+        product: Opus
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.0"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: XU3LCVCLZC
+  TRACEDeviceUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - UITests
+    dependencies:
+      - target: TRACE
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.uscabayaosj.trace.device-tests
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.0"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: XU3LCVCLZC
+schemes:
+  TRACE:
+    build:
+      targets:
+        TRACE: all
+    test:
+      targets:
+        - TRACEDeviceUITests
+        - TRACEFeatureTests

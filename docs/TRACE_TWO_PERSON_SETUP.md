@@ -42,3 +42,17 @@ Two-person personal distribution only. No public release, TestFlight invitation,
 Provisioning/build/release evidence is retained under `/tmp/trace-companion-setup`; final deployment metadata is recorded separately. Installed/enrolled friend-phone evidence remains pending until that phone is connected.
 
 Production deployment: `dpl_2kw2nXByfNVZbd8jPTD2o1ijUNAM`, Ready at `https://trace-companion.vercel.app`. Scoped TypeScript checking and production build succeeded; the database was independently confirmed distinct and initialized with zero installations.
+
+
+## Friend-phone installation — 14 October 2026
+
+TRACE 1.0 (35) was signed for and installed on Anna Tsing (iPhone 16 Pro). Apple Developer Mode was enabled by the operator after the device initially rejected the developer disk image. Before installation, successful app inventory confirmed no existing TRACE bundle; the existing Omi app was retained.
+
+The operator enrolled a fresh installation against the companion backend using its private bootstrap credential on the Mac. Build 35 imports a short-lived `Library/Application Support/TRACE/installation-setup.json` only when no installation is already enrolled. It deletes the temporary file before network work, validates its expiry and UUID/token format, verifies the server-returned installation ID, and stores the installation token in this iPhone's Keychain. It never transfers provider API keys or the administrator enrollment secret and never replaces an enrolled workspace.
+
+Evidence: distribution profile includes the exact friend's device, `get-task-allow=false`, strict signature verification passed, app inventory shows build 35, launch succeeded, and the phone's Settings visually shows `https://trace-companion.vercel.app`, `Connected to TRACE`, and `Anna Tsing’s iPhone`. Capture is paused; upload queue defaults to empty and server-session list is empty. Independent app-container inspection confirmed the temporary setup file is absent. The blank conversation screen was visually observed. The original phone was not installed, launched, or re-enrolled.
+
+Package SHA-256: `f99c579bf85539d7ca28d4c10c6452cd4768b7c83073e7941cd06508e6e5b9b8`.
+Distribution profile expires 30 September 2027, 19:09:32 UTC; re-sign/reinstall before expiry without uninstalling.
+
+Evidence directory: `/tmp/trace-friend-install`. No live recording, provider transcription, summary, or export test was performed for this installation request. DevKit pairing and fresh capture remain separate acceptance steps.
