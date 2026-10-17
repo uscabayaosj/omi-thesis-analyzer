@@ -1,0 +1,129 @@
+--- a/omi/firmware/devkit/src/main.c
++++ b/omi/firmware/devkit/src/main.c
+@@ -97,35 +97,11 @@
+ 
+ void set_led_state()
+ {
+-    // Recording and connected state - BLUE
+-
+-    if (usb_charge) {
+-        is_charging = !is_charging;
+-        if (is_charging) {
+-            set_led_green(true);
+-        } else {
+-            set_led_green(false);
+-        }
+-    } else {
+-        set_led_green(false);
+-    }
+-    if (is_off) {
+-        set_led_red(false);
+-        set_led_blue(false);
+-        return;
+-    }
+-    if (is_connected) {
+-        set_led_blue(true);
+-        set_led_red(false);
+-        return;
+-    }
+-
+-    // Recording but lost connection - RED
+-    if (!is_connected) {
+-        set_led_red(true);
+-        set_led_blue(false);
+-        return;
+-    }
++    // All channels are assigned each update, including shutdown.
++    bool paused = is_connected && !trace_capture_is_active();
++    set_led_red(!is_off && (!is_connected || paused));
++    set_led_green(!is_off && paused);
++    set_led_blue(!is_off && is_connected && !paused);
+ }
+ 
+ int main(void)
+--- a/omi/firmware/devkit/src/transport.c
++++ b/omi/firmware/devkit/src/transport.c
+@@ -118,6 +118,40 @@
+ 
+ static struct bt_gatt_service audio_service = BT_GATT_SERVICE(audio_service_attr);
+ 
++// TRACE capture indicator protocol v1. Separate service appended after existing
++// registrations preserves existing audio/battery attribute handles.
++static atomic_t trace_capture_active;
++bool trace_capture_is_active(void) { return atomic_get(&trace_capture_active) != 0; }
++static ssize_t trace_capture_read(struct bt_conn *conn, const struct bt_gatt_attr *attr,
++                                 void *buf, uint16_t len, uint16_t offset)
++{
++    uint8_t value = trace_capture_is_active() ? 1 : 0;
++    return bt_gatt_attr_read(conn, attr, buf, len, offset, &value, sizeof(value));
++}
++static ssize_t trace_capture_write(struct bt_conn *conn, const struct bt_gatt_attr *attr,
++                                  const void *buf, uint16_t len, uint16_t offset, uint8_t flags)
++{
++    if (offset) return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
++    if (len != 1) return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
++    uint8_t value = ((const uint8_t *)buf)[0];
++    if (value > 1 || (flags & BT_GATT_WRITE_FLAG_PREPARE))
++        return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
++    atomic_set(&trace_capture_active, value);
++    LOG_INF("TRACE capture indicator: %s", value ? "active blue" : "paused amber");
++    return len;
++}
++static struct bt_uuid_128 trace_control_uuid =
++    BT_UUID_INIT_128(BT_UUID_128_ENCODE(0xA71C0000, 0x6B8D, 0x4E75, 0xA1B2, 0x7D0E6F545243));
++static struct bt_uuid_128 trace_capture_uuid =
++    BT_UUID_INIT_128(BT_UUID_128_ENCODE(0xA71C0001, 0x6B8D, 0x4E75, 0xA1B2, 0x7D0E6F545243));
++static struct bt_gatt_attr trace_control_attrs[] = {
++    BT_GATT_PRIMARY_SERVICE(&trace_control_uuid),
++    BT_GATT_CHARACTERISTIC(&trace_capture_uuid.uuid, BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,
++                           BT_GATT_PERM_READ | BT_GATT_PERM_WRITE,
++                           trace_capture_read, trace_capture_write, NULL),
++};
++static struct bt_gatt_service trace_control_service = BT_GATT_SERVICE(trace_control_attrs);
++
+ // Nordic Legacy DFU service with UUID 00001530-1212-EFDE-1523-785FEABCD123
+ // exposes following characteristics:
+ // - Control point (UUID 00001531-1212-EFDE-1523-785FEABCD123) to start the OTA update process (write/notify)
+@@ -439,6 +473,7 @@
+             info.le.data_len->rx_max_len,
+             info.le.data_len->rx_max_time);
+ 
++    atomic_clear(&trace_capture_active);
+     is_connected = true;
+     k_work_reschedule_for_queue(&battery_work_queue, &battery_work, K_MSEC(100));
+     atomic_inc(&connection_generation);
+@@ -447,6 +482,7 @@
+ 
+ static void _transport_disconnected(struct bt_conn *conn, uint8_t err)
+ {
++    atomic_clear(&trace_capture_active);
+     is_connected = false;
+     storage_is_on = false;
+ 
+@@ -814,6 +850,7 @@
+     mic_off();
+ 
+     // Ensure all Bluetooth resources are cleaned up
++    atomic_clear(&trace_capture_active);
+     is_connected = false;
+     storage_is_on = false;
+     current_mtu = 0;
+@@ -885,6 +922,8 @@
+     bt_gatt_service_register(&storage_service);
+     bt_gatt_service_register(&audio_service);
+     bt_gatt_service_register(&dfu_service);
++    err = bt_gatt_service_register(&trace_control_service);
++    if (err) return err;
+     err = bt_le_adv_start(BT_LE_ADV_CONN, bt_ad, ARRAY_SIZE(bt_ad), bt_sd, ARRAY_SIZE(bt_sd));
+     if (err) {
+         LOG_ERR("Transport advertising failed to start (err %d)", err);
+--- a/omi/firmware/devkit/src/transport.h
++++ b/omi/firmware/devkit/src/transport.h
+@@ -1,5 +1,7 @@
+ #ifndef TRANSPORT_H
+ #define TRANSPORT_H
++#include <stdbool.h>
++bool trace_capture_is_active(void);
+ 
+ #include <zephyr/drivers/sensor.h>
+ typedef struct sensors {

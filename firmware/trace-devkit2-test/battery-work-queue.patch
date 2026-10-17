@@ -1,0 +1,68 @@
+--- a/omi/firmware/devkit/src/transport.c
++++ b/omi/firmware/devkit/src/transport.c
+@@ -375,9 +375,16 @@
+ void broadcast_battery_level(struct k_work *work_item);
+ 
+ K_WORK_DELAYABLE_DEFINE(battery_work, broadcast_battery_level);
++// Bluetooth intentionally forbids buffer-allocation waits on syswq. Audio can
++// fill its transmit pool, so battery notifications need their own waiting context.
++K_THREAD_STACK_DEFINE(battery_work_stack, 1536);
++static struct k_work_q battery_work_queue;
+ 
+ void broadcast_battery_level(struct k_work *work_item)
+ {
++    if (!is_connected) {
++        return;
++    }
+     uint16_t battery_millivolt;
+     uint8_t battery_percentage;
+     if (battery_get_millivolt(&battery_millivolt) == 0 &&
+@@ -394,7 +401,10 @@
+         LOG_ERR("Failed to read battery level");
+     }
+ 
+-    k_work_reschedule(&battery_work, K_MSEC(BATTERY_REFRESH_INTERVAL));
++    if (is_connected) {
++        k_work_reschedule_for_queue(&battery_work_queue, &battery_work,
++                                    K_MSEC(BATTERY_REFRESH_INTERVAL));
++    }
+ }
+ 
+ //
+@@ -429,9 +439,8 @@
+             info.le.data_len->rx_max_len,
+             info.le.data_len->rx_max_time);
+ 
+-    k_work_schedule(&battery_work, K_MSEC(100)); // run immediately
+-
+     is_connected = true;
++    k_work_reschedule_for_queue(&battery_work_queue, &battery_work, K_MSEC(100));
+     atomic_inc(&connection_generation);
+     k_sem_give(&pusher_wake_sem);
+ }
+@@ -441,6 +450,7 @@
+     is_connected = false;
+     storage_is_on = false;
+ 
++    k_work_cancel_delayable(&battery_work);
+     LOG_INF("Transport disconnected");
+ 
+     if (current_connection != NULL) {
+@@ -777,6 +787,7 @@
+ //
+ int bt_off()
+ {
++    k_work_cancel_delayable(&battery_work);
+     // First disconnect any active connections
+     if (current_connection != NULL) {
+         bt_conn_disconnect(current_connection, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+@@ -826,6 +837,9 @@
+ int transport_start()
+ {
+     k_mutex_init(&write_sdcard_mutex);
++    k_work_queue_start(&battery_work_queue, battery_work_stack,
++                       K_THREAD_STACK_SIZEOF(battery_work_stack),
++                       K_PRIO_PREEMPT(9), NULL);
+ 
+     // Configure callbacks
+     bt_conn_cb_register(&_callback_references);

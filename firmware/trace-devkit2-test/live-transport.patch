@@ -1,0 +1,121 @@
+diff --git a/omi/firmware/devkit/src/main.c b/omi/firmware/devkit/src/main.c
+index e8df45d..75b63be 100644
+--- a/omi/firmware/devkit/src/main.c
++++ b/omi/firmware/devkit/src/main.c
+@@ -22,10 +22,8 @@ LOG_MODULE_REGISTER(main, CONFIG_LOG_DEFAULT_LEVEL);
+ 
+ static void codec_handler(uint8_t *data, size_t len)
+ {
+-    int err = broadcast_audio_packets(data, len);
+-    if (err) {
+-        LOG_ERR("Failed to broadcast audio packets: %d", err);
+-    }
++    // Transport reports bounded queue warnings; do not log every audio frame.
++    (void)broadcast_audio_packets(data, len);
+ }
+ 
+ static void mic_handler(int16_t *buffer)
+@@ -228,16 +226,18 @@ int main(void)
+     err = mount_sd_card();
+     if (err) {
+         LOG_ERR("Failed to mount SD card (err %d)", err);
+-        return err;
+-    }
+-    k_msleep(500);
++        // Storage is optional for live BLE capture. Keep transport available
++        // when the DevKit2 SD interface/card cannot be mounted.
++    } else {
++        k_msleep(500);
+ 
+-    LOG_PRINTK("\n");
+-    LOG_INF("Initializing storage...\n");
++        LOG_PRINTK("\n");
++        LOG_INF("Initializing storage...\n");
+ 
+-    err = storage_init();
+-    if (err) {
+-        LOG_ERR("Failed to initialize storage (err %d)", err);
++        err = storage_init();
++        if (err) {
++            LOG_ERR("Failed to initialize storage (err %d)", err);
++        }
+     }
+ #endif
+ 
+diff --git a/omi/firmware/devkit/src/transport.c b/omi/firmware/devkit/src/transport.c
+index 0c3400d..f6dbd14 100644
+--- a/omi/firmware/devkit/src/transport.c
++++ b/omi/firmware/devkit/src/transport.c
+@@ -7,6 +7,7 @@
+ #include <zephyr/bluetooth/services/bas.h>
+ #include <zephyr/bluetooth/uuid.h>
+ #include <zephyr/drivers/gpio.h>
++#include <zephyr/drivers/hwinfo.h>
+ #include <zephyr/drivers/sensor.h>
+ #include <zephyr/kernel.h>
+ #include <zephyr/logging/log.h>
+@@ -513,6 +514,11 @@ static bool write_to_tx_queue(uint8_t *data, size_t size)
+         return false;
+     }
+ 
++    // Never write a partial fixed-size record when the live queue is full.
++    if (ring_buf_space_get(&ring_buf) < CODEC_OUTPUT_MAX_BYTES + RING_BUFFER_HEADER_SIZE) {
++        return false;
++    }
++
+     // Copy data (TODO: Avoid this copy)
+     tx_buffer_2[0] = size & 0xFF;
+     tx_buffer_2[1] = (size >> 8) & 0xFF;
+@@ -824,6 +830,25 @@ int transport_start()
+     // Configure callbacks
+     bt_conn_cb_register(&_callback_references);
+ 
++    // Stable, hardware-derived diagnostic identity epoch. Changing the GATT
++    // layout while reusing the factory identity can leave iOS with old handles.
++    // Keep this epoch stable across boots; this applies only to live test builds.
++#ifndef CONFIG_OMI_ENABLE_OFFLINE_STORAGE
++    bt_addr_le_t identity = { .type = BT_ADDR_LE_RANDOM };
++    ssize_t identity_bytes = hwinfo_get_device_id(identity.a.val, sizeof(identity.a.val));
++    if (identity_bytes != sizeof(identity.a.val)) {
++        LOG_ERR("Could not derive diagnostic Bluetooth identity");
++        return -EIO;
++    }
++    identity.a.val[0] ^= 0x42;
++    identity.a.val[5] |= 0xc0; // Bluetooth static random address bits.
++    int identity_id = bt_id_create(&identity, NULL);
++    if (identity_id != BT_ID_DEFAULT) {
++        LOG_ERR("Could not create default diagnostic identity (err %d)", identity_id);
++        return identity_id < 0 ? identity_id : -EINVAL;
++    }
++#endif
++
+     // Enable Bluetooth
+     int err = bt_enable(NULL);
+     if (err) {
+@@ -886,6 +911,12 @@ struct bt_conn *get_current_connection()
+ 
+ int broadcast_audio_packets(uint8_t *buffer, size_t size)
+ {
++#ifndef CONFIG_OMI_ENABLE_OFFLINE_STORAGE
++    // Live-only firmware has nowhere to retain audio without a receiver.
++    if (!is_connected) {
++        return 0;
++    }
++#endif
+     int retry_count = 0;
+     const int max_retries = 3;
+ 
+@@ -895,7 +926,12 @@ int broadcast_audio_packets(uint8_t *buffer, size_t size)
+     }
+ 
+     if (retry_count >= max_retries) {
+-        LOG_ERR("Failed to write to tx queue after %d retries", max_retries);
++        static int64_t last_queue_warning;
++        int64_t now = k_uptime_get();
++        if (now - last_queue_warning >= 1000) {
++            LOG_WRN("Audio queue full; dropping frame");
++            last_queue_warning = now;
++        }
+         return -1;
+     }
+ 

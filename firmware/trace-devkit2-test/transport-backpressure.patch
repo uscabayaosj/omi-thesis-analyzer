@@ -1,0 +1,100 @@
+--- a/src/transport.c
++++ b/src/transport.c
+@@ -568,6 +568,8 @@
+ 
+ #define NET_BUFFER_HEADER_SIZE 3
+ #define RING_BUFFER_HEADER_SIZE 2
++// Producer waits for real consumer progress instead of three timed retries.
++K_SEM_DEFINE(tx_space_available, 0, 1);
+ static uint8_t tx_queue[NETWORK_RING_BUF_SIZE * (CODEC_OUTPUT_MAX_BYTES + RING_BUFFER_HEADER_SIZE)];
+ static uint8_t tx_buffer[CODEC_OUTPUT_MAX_BYTES + RING_BUFFER_HEADER_SIZE];
+ static uint8_t tx_buffer_2[CODEC_OUTPUT_MAX_BYTES + RING_BUFFER_HEADER_SIZE];
+@@ -621,6 +623,7 @@
+         return false;
+     }
+ 
++    k_sem_give(&tx_space_available);
+     tx_buffer_size = tx_buffer[0] + (tx_buffer[1] << 8);
+     tx_frame_pending = true;
+     tx_gatt_offset = 0;
+@@ -656,7 +659,7 @@
+     const int max_retries = 3;
+ 
+     while (tx_gatt_offset < tx_buffer_size) {
+-        uint32_t id = packet_next_index++;
++        uint32_t id = packet_next_index;
+         uint32_t packet_size = MIN(current_mtu - NET_BUFFER_HEADER_SIZE, tx_buffer_size - tx_gatt_offset);
+         pusher_temp_data[0] = id & 0xFF;
+         pusher_temp_data[1] = (id >> 8) & 0xFF;
+@@ -685,6 +688,8 @@
+             return false;
+         }
+ 
++        // Failed notifications must not reserve sequence numbers.
++        packet_next_index++;
+         tx_gatt_offset += packet_size;
+         tx_gatt_index++;
+     }
+@@ -835,6 +840,12 @@
+             }
+ 
+             if (!progressed) {
++                if (valid) {
++                    // Retain the pending frame/fragment and retry even if the
++                    // producer is paused or blocked waiting for queue space.
++                    k_msleep(5);
++                    k_sem_give(&pusher_wake_sem);
++                }
+                 break;
+             }
+ 
+@@ -976,7 +987,8 @@
+                     NULL,
+                     NULL,
+                     NULL,
+-                    K_PRIO_PREEMPT(7),
++                    // Match encoder priority so its per-frame yield can drain BLE.
++                    K_PRIO_PREEMPT(4),
+                     0,
+                     K_NO_WAIT);
+ 
+@@ -996,23 +1008,23 @@
+         return 0;
+     }
+ #endif
+-    int retry_count = 0;
+-    const int max_retries = 3;
+-
+-    while (retry_count < max_retries && !write_to_tx_queue(buffer, size)) {
+-        k_sleep(K_MSEC(1));
+-        retry_count++;
+-    }
+-
+-    if (retry_count >= max_retries) {
+-        trace_stat_add(TRACE_TX_DROPPED_FRAMES, 1);
+-        static int64_t last_queue_warning;
+-        int64_t now = k_uptime_get();
+-        if (now - last_queue_warning >= 1000) {
+-            LOG_WRN("Audio queue full; dropping frame");
+-            last_queue_warning = now;
++    // A short receiver stall should apply bounded backpressure to the
++    // encoder, while leaving its one-second PCM ring available to the ISR.
++    // An indefinite outage still drops explicitly; this is not offline storage.
++    const int64_t deadline = k_uptime_get() + 50;
++    while (!write_to_tx_queue(buffer, size)) {
++        int64_t remaining = deadline - k_uptime_get();
++        if (remaining <= 0 ||
++            k_sem_take(&tx_space_available, K_MSEC(remaining)) != 0) {
++            trace_stat_add(TRACE_TX_DROPPED_FRAMES, 1);
++            static int64_t last_queue_warning;
++            int64_t now = k_uptime_get();
++            if (now - last_queue_warning >= 1000) {
++                LOG_WRN("Audio queue full after 50ms wait; dropping frame");
++                last_queue_warning = now;
++            }
++            return -1;
+         }
+-        return -1;
+     }
+ 
+     trace_stat_add(TRACE_TX_QUEUED_FRAMES, 1);

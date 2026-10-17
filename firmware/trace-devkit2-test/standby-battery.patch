@@ -1,0 +1,267 @@
+--- a/src/mic.c
++++ b/src/mic.c
+@@ -9,7 +9,8 @@
+ 
+ #include "config.h"
+ #include "led.h"
+-#include "nrfx_clock.h"
++#include <zephyr/drivers/clock_control/nrf_clock_control.h>
++#include <zephyr/sys/atomic.h>
+ #include "nrfx_pdm.h"
+ #include "utils.h"
+ 
+@@ -23,6 +24,14 @@
+ static int16_t _buffer_1[MIC_BUFFER_SAMPLES];
+ static volatile uint8_t _next_buffer_index = 0;
+ static volatile mix_handler _callback = NULL;
++static atomic_t capture_requested;
++static atomic_t power_allowed = ATOMIC_INIT(1);
++static atomic_t accepting_pcm;
++static bool initialized;
++static bool stopping;
++static bool clock_requested;
++static struct onoff_client clock_client;
++static struct onoff_manager *clock_manager;
+ 
+ static void pdm_irq_handler(nrfx_pdm_evt_t const *event)
+ {
+@@ -46,7 +55,8 @@
+     }
+ 
+     // Release buffer
+-    if (event->buffer_released) {
++    if (event->buffer_released && atomic_get(&accepting_pcm) &&
++        atomic_get(&capture_requested) && atomic_get(&power_allowed)) {
+         trace_stat_add(TRACE_PDM_SAMPLES, MIC_BUFFER_SAMPLES);
+         LOG_DBG("Audio buffer requested");
+         if (_callback) {
+@@ -57,11 +67,6 @@
+ 
+ int mic_start()
+ {
+-
+-    // Start the high frequency clock
+-    if (!nrf_clock_hf_is_running(NRF_CLOCK, NRF_CLOCK_HFCLK_HIGH_ACCURACY)) {
+-        nrf_clock_task_trigger(NRF_CLOCK, NRF_CLOCK_TASK_HFCLKSTART);
+-    }
+ 
+     // Configure PDM
+     nrfx_pdm_config_t pdm_config = NRFX_PDM_DEFAULT_CONFIG(PDM_CLK_PIN, PDM_DIN_PIN);
+@@ -78,17 +83,15 @@
+         return -1;
+     }
+ 
+-    // Power on Mic
++    // Boot in standby. The main thread alone owns PDM/clock transitions.
+     nrfy_gpio_cfg_output(PDM_PWR_PIN);
+-    nrfy_gpio_pin_set(PDM_PWR_PIN);
+-
+-    // Start PDM
+-    if (nrfx_pdm_start() != NRFX_SUCCESS) {
+-        LOG_ERR("Audio unable to start PDM");
+-        return -1;
++    nrfy_gpio_pin_clear(PDM_PWR_PIN);
++    clock_manager = z_nrf_clock_control_get_onoff(CLOCK_CONTROL_NRF_SUBSYS_HF);
++    if (!clock_manager) {
++        return -ENODEV;
+     }
+-
+-    LOG_INF("Audio microphone started");
++    initialized = true;
++    LOG_INF("Audio microphone initialized in standby");
+     return 0;
+ }
+ 
+@@ -99,10 +102,86 @@
+ 
+ void mic_off()
+ {
+-    nrfy_gpio_pin_clear(PDM_PWR_PIN);
++    atomic_clear(&power_allowed);
+ }
+ 
+ void mic_on()
+ {
++    atomic_set(&power_allowed, 1);
++}
++
++void mic_set_capture_active(bool active)
++{
++    atomic_set(&capture_requested, active);
++}
++
++void mic_process_state(void)
++{
++    if (!initialized) {
++        return;
++    }
++    bool wanted = atomic_get(&capture_requested) && atomic_get(&power_allowed);
++
++    if (!wanted && atomic_get(&accepting_pcm)) {
++        // STOPPED returns partially filled buffers: never encode those as audio.
++        atomic_clear(&accepting_pcm);
++        nrfx_err_t err = nrfx_pdm_stop();
++        if (err != NRFX_SUCCESS) {
++            LOG_ERR("PDM stop failed: %d", err);
++            atomic_set(&accepting_pcm, 1); // Retry on the next main-loop pass.
++            return;
++        }
++        stopping = true;
++    }
++    if (stopping) {
++        // The driver's STOPPED interrupt clears buffers before disabling PDM.
++        // Do not restart or release our clock reference until it has completed.
++        if (NRF_PDM->ENABLE != 0) {
++            return;
++        }
++        stopping = false;
++        nrfy_gpio_pin_clear(PDM_PWR_PIN);
++        LOG_INF("Audio microphone stopped for standby");
++    }
++    if (!wanted) {
++        if (clock_requested) {
++            onoff_cancel_or_release(clock_manager, &clock_client);
++            clock_requested = false;
++        }
++        return;
++    }
++    if (atomic_get(&accepting_pcm)) {
++        return;
++    }
++    if (!clock_requested) {
++        sys_notify_init_spinwait(&clock_client.notify);
++        int err = onoff_request(clock_manager, &clock_client);
++        if (err < 0) {
++            LOG_ERR("PDM clock request failed: %d", err);
++            return;
++        }
++        clock_requested = true;
++    }
++    int clock_result;
++    if (sys_notify_fetch_result(&clock_client.notify, &clock_result) < 0) {
++        return; // Clock startup is asynchronous; keep Bluetooth responsive.
++    }
++    if (clock_result < 0) {
++        onoff_cancel_or_release(clock_manager, &clock_client);
++        clock_requested = false;
++        LOG_ERR("PDM clock startup failed: %d", clock_result);
++        return;
++    }
+     nrfy_gpio_pin_set(PDM_PWR_PIN);
++    k_msleep(1);
++    _next_buffer_index = 0;
++    atomic_set(&accepting_pcm, 1);
++    nrfx_err_t err = nrfx_pdm_start();
++    if (err != NRFX_SUCCESS) {
++        atomic_clear(&accepting_pcm);
++        nrfy_gpio_pin_clear(PDM_PWR_PIN);
++        LOG_ERR("PDM start failed: %d", err);
++        return;
++    }
++    LOG_INF("Audio microphone started for capture");
+ }
+--- a/src/mic.h
++++ b/src/mic.h
+@@ -18,4 +18,6 @@
+ 
+ void mic_off();
+ void mic_on();
++void mic_set_capture_active(bool active);
++void mic_process_state(void);
+ #endif
+--- a/src/main.c
++++ b/src/main.c
+@@ -333,6 +333,7 @@
+     while (1) {
+         watchdog_feed();
+ 
++        mic_process_state();
+         set_led_state();
+         k_msleep(500);
+     }
+--- a/src/transport.c
++++ b/src/transport.c
+@@ -155,6 +155,7 @@
+     if (value > 1 || (flags & BT_GATT_WRITE_FLAG_PREPARE))
+         return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
+     atomic_set(&trace_capture_active, value);
++    mic_set_capture_active(value != 0);
+     LOG_INF("TRACE capture indicator: %s", value ? "active blue" : "paused amber");
+     return len;
+ }
+@@ -494,6 +495,7 @@
+             info.le.data_len->rx_max_time);
+ 
+     atomic_clear(&trace_capture_active);
++    mic_set_capture_active(false);
+     is_connected = true;
+     k_work_reschedule_for_queue(&battery_work_queue, &battery_work, K_MSEC(100));
+     atomic_inc(&connection_generation);
+@@ -503,6 +505,7 @@
+ static void _transport_disconnected(struct bt_conn *conn, uint8_t err)
+ {
+     atomic_clear(&trace_capture_active);
++    mic_set_capture_active(false);
+     is_connected = false;
+     storage_is_on = false;
+ 
+@@ -873,6 +876,7 @@
+ 
+     // Ensure all Bluetooth resources are cleaned up
+     atomic_clear(&trace_capture_active);
++    mic_set_capture_active(false);
+     is_connected = false;
+     storage_is_on = false;
+     current_mtu = 0;
+--- a/src/codec.c
++++ b/src/codec.c
+@@ -29,10 +29,14 @@
+ 
+ uint8_t codec_ring_buffer_data[AUDIO_BUFFER_SAMPLES * 2]; // 2 bytes per sample
+ struct ring_buf codec_ring_buf;
++K_SEM_DEFINE(codec_pcm_ready, 0, 1);
+ int codec_receive_pcm(int16_t *data, size_t len) // this gets called after mic data is finished
+ {
+ 
+     int written = ring_buf_put(&codec_ring_buf, (uint8_t *) data, len * 2);
++    if (written > 0) {
++        k_sem_give(&codec_pcm_ready);
++    }
+     trace_stat_add(TRACE_PCM_ACCEPTED_SAMPLES, written / 2);
+     trace_stat_add(TRACE_PCM_DROPPED_SAMPLES, len - written / 2);
+     if (written != len * 2) {
+@@ -74,7 +78,7 @@
+         // Check if we have enough data
+         if (ring_buf_size_get(&codec_ring_buf) < CODEC_PACKAGE_SAMPLES * 2) {
+             // LOG_PRINTK("waiting on data....\n");
+-            k_sleep(K_MSEC(10));
++            k_sem_take(&codec_pcm_ready, K_FOREVER);
+             continue;
+         }
+         // Read package
+--- a/src/lib/battery/battery.c
++++ b/src/lib/battery/battery.c
+@@ -157,6 +157,8 @@
+ 
+     if (ret) {
+         LOG_WRN("ADC read failed (error %d)", ret);
++        k_mutex_unlock(&battery_mut);
++        return ret;
+     }
+ 
+     // Get average sample value.
+@@ -168,8 +170,12 @@
+     // Convert ADC value to millivolts
+     ret |= adc_raw_to_millivolts(adc_vref, ADC_GAIN, ADC_RESOLUTION, &adc_mv);
+ 
+-    // Calculate battery voltage.
+-    *battery_millivolt = adc_mv * ((R1 + R2) / R2);
++    if (ret || adc_mv < 0) {
++        k_mutex_unlock(&battery_mut);
++        return ret ? ret : -ERANGE;
++    }
++    // Multiply before dividing; integer (R1 + R2) / R2 loses precision.
++    *battery_millivolt = ((uint32_t)adc_mv * (R1 + R2) + R2 / 2) / R2;
+     k_mutex_unlock(&battery_mut);
+ 
+     LOG_DBG("%d mV", *battery_millivolt);

@@ -1,0 +1,135 @@
+--- a/omi/firmware/devkit/src/transport.c
++++ b/omi/firmware/devkit/src/transport.c
+@@ -1,3 +1,5 @@
++#include <zephyr/sys/byteorder.h>
++#include "trace_stats.h"
+ #include "transport.h"
+ 
+ #include <zephyr/bluetooth/bluetooth.h>
+@@ -118,6 +120,22 @@
+ 
+ static struct bt_gatt_service audio_service = BT_GATT_SERVICE(audio_service_attr);
+ 
++atomic_t trace_stats[TRACE_STAT_COUNT];
++// v1: little-endian uint32 version, uptime-ms, then ten cumulative counters.
++// Snapshot fields are atomic individually, not one globally frozen instant.
++static ssize_t trace_stats_read(struct bt_conn *conn, const struct bt_gatt_attr *attr,
++                               void *buf, uint16_t len, uint16_t offset)
++{
++    uint8_t value[(2 + TRACE_STAT_COUNT) * 4];
++    sys_put_le32(1, value);
++    sys_put_le32(k_uptime_get_32(), value + 4);
++    for (int i = 0; i < TRACE_STAT_COUNT; i++)
++        sys_put_le32((uint32_t)atomic_get(&trace_stats[i]), value + 8 + i * 4);
++    return bt_gatt_attr_read(conn, attr, buf, len, offset, value, sizeof(value));
++}
++static struct bt_uuid_128 trace_stats_uuid =
++    BT_UUID_INIT_128(BT_UUID_128_ENCODE(0xA71C0002, 0x6B8D, 0x4E75, 0xA1B2, 0x7D0E6F545243));
++
+ // TRACE capture indicator protocol v1. Separate service appended after existing
+ // registrations preserves existing audio/battery attribute handles.
+ static atomic_t trace_capture_active;
+@@ -149,6 +167,8 @@
+     BT_GATT_CHARACTERISTIC(&trace_capture_uuid.uuid, BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,
+                            BT_GATT_PERM_READ | BT_GATT_PERM_WRITE,
+                            trace_capture_read, trace_capture_write, NULL),
++    BT_GATT_CHARACTERISTIC(&trace_stats_uuid.uuid, BT_GATT_CHRC_READ,
++                           BT_GATT_PERM_READ, trace_stats_read, NULL, NULL),
+ };
+ static struct bt_gatt_service trace_control_service = BT_GATT_SERVICE(trace_control_attrs);
+ 
+@@ -646,6 +666,7 @@
+                 bt_gatt_notify(conn, &audio_service.attrs[1], pusher_temp_data, packet_size + NET_BUFFER_HEADER_SIZE);
+ 
+             if (err) {
++                trace_stat_add(TRACE_BLE_NOTIFY_FAILURES, 1);
+                 LOG_DBG("bt_gatt_notify failed (err %d)", err);
+                 LOG_DBG("MTU: %d, packet_size: %d", current_mtu, packet_size + NET_BUFFER_HEADER_SIZE);
+                 k_sleep(K_MSEC(1));
+@@ -666,6 +687,7 @@
+     }
+ 
+     consume_tx_frame();
++    trace_stat_add(TRACE_BLE_SENT_FRAMES, 1);
+     return true;
+ }
+ #define OPUS_PREFIX_LENGTH 1
+@@ -979,6 +1001,7 @@
+     }
+ 
+     if (retry_count >= max_retries) {
++        trace_stat_add(TRACE_TX_DROPPED_FRAMES, 1);
+         static int64_t last_queue_warning;
+         int64_t now = k_uptime_get();
+         if (now - last_queue_warning >= 1000) {
+@@ -988,6 +1011,7 @@
+         return -1;
+     }
+ 
++    trace_stat_add(TRACE_TX_QUEUED_FRAMES, 1);
+     return 0;
+ }
+ 
+--- a/omi/firmware/devkit/src/mic.c
++++ b/omi/firmware/devkit/src/mic.c
+@@ -1,3 +1,4 @@
++#include "trace_stats.h"
+ #include "mic.h"
+ 
+ #include <haly/nrfy_gpio.h>
+@@ -27,6 +28,7 @@
+ {
+     // Ignore error (how to handle?)
+     if (event->error) {
++        trace_stat_add(TRACE_PDM_ERRORS, 1);
+         LOG_ERR("PDM error: %d", event->error);
+         return;
+     }
+@@ -45,6 +47,7 @@
+ 
+     // Release buffer
+     if (event->buffer_released) {
++        trace_stat_add(TRACE_PDM_SAMPLES, MIC_BUFFER_SAMPLES);
+         LOG_DBG("Audio buffer requested");
+         if (_callback) {
+             _callback(event->buffer_released);
+--- a/omi/firmware/devkit/src/codec.c
++++ b/omi/firmware/devkit/src/codec.c
+@@ -1,3 +1,4 @@
++#include "trace_stats.h"
+ #include "codec.h"
+ 
+ #include <zephyr/logging/log.h>
+@@ -32,6 +33,8 @@
+ {
+ 
+     int written = ring_buf_put(&codec_ring_buf, (uint8_t *) data, len * 2);
++    trace_stat_add(TRACE_PCM_ACCEPTED_SAMPLES, written / 2);
++    trace_stat_add(TRACE_PCM_DROPPED_SAMPLES, len - written / 2);
+     if (written != len * 2) {
+         LOG_ERR("Failed to write %d bytes to codec ring buffer", len * 2);
+         return -1;
+@@ -79,6 +82,7 @@
+ 
+         // Run Codec
+         output_size = execute_codec();
++        trace_stat_add(output_size ? TRACE_ENCODED_FRAMES : TRACE_ENCODER_FAILURES, 1);
+ 
+         // Notify
+         if (_callback) {
+--- /dev/null
++++ b/omi/firmware/devkit/src/trace_stats.h
+@@ -0,0 +1,13 @@
++#ifndef TRACE_STATS_H
++#define TRACE_STATS_H
++#include <zephyr/sys/atomic.h>
++enum trace_stat {
++ TRACE_PDM_SAMPLES, TRACE_PDM_ERRORS, TRACE_PCM_ACCEPTED_SAMPLES,
++ TRACE_PCM_DROPPED_SAMPLES, TRACE_ENCODED_FRAMES, TRACE_ENCODER_FAILURES,
++ TRACE_TX_QUEUED_FRAMES, TRACE_TX_DROPPED_FRAMES, TRACE_BLE_SENT_FRAMES,
++ TRACE_BLE_NOTIFY_FAILURES, TRACE_STAT_COUNT
++};
++extern atomic_t trace_stats[TRACE_STAT_COUNT];
++static inline void trace_stat_add(enum trace_stat counter, uint32_t amount)
++{ atomic_add(&trace_stats[counter], amount); }
++#endif

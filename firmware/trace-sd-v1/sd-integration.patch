@@ -1,0 +1,135 @@
+--- a/src/main.c
++++ b/src/main.c
+@@ -11,6 +11,7 @@
+ #include "speaker.h"
+ #include "storage.h"
+ #include "transport.h"
++#include "trace_sd.h"
+ #include "usb.h"
+ #include "utils.h"
+ #include "wdog_facade.h"
+@@ -23,6 +24,7 @@
+ static void codec_handler(uint8_t *data, size_t len)
+ {
+     // Transport reports bounded queue warnings; do not log every audio frame.
++    if (trace_sd_recording()) { trace_sd_frame(data, len); return; }
+     (void)broadcast_audio_packets(data, len);
+ }
+ 
+@@ -98,10 +100,11 @@
+ void set_led_state()
+ {
+     // All channels are assigned each update, including shutdown.
++    bool offline = trace_sd_recording();
+     bool paused = is_connected && !trace_capture_is_active();
+-    set_led_red(!is_off && (!is_connected || paused));
++    set_led_red(!is_off && (!is_connected && !offline) || (!is_off && paused));
+     set_led_green(!is_off && paused);
+-    set_led_blue(!is_off && is_connected && !paused);
++    set_led_blue(!is_off && ((is_connected && !paused) || offline));
+ }
+ 
+ int main(void)
+--- a/src/transport.c
++++ b/src/transport.c
+@@ -1,6 +1,7 @@
+ #include <zephyr/sys/byteorder.h>
+ #include "trace_stats.h"
+ #include "transport.h"
++#include "trace_sd.h"
+ 
+ #include <zephyr/bluetooth/bluetooth.h>
+ #include <zephyr/bluetooth/gatt.h>
+@@ -155,6 +156,7 @@
+     if (value > 1 || (flags & BT_GATT_WRITE_FLAG_PREPARE))
+         return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
+     atomic_set(&trace_capture_active, value);
++    trace_sd_pause(value == 0);
+     mic_set_capture_active(value != 0);
+     LOG_INF("TRACE capture indicator: %s", value ? "active blue" : "paused amber");
+     return len;
+@@ -470,6 +472,7 @@
+ {
+     struct bt_conn_info info = {0};
+     storage_is_on = true;
++    trace_sd_link(true);
+ 
+     err = bt_conn_get_info(conn, &info);
+     if (err) {
+@@ -505,7 +508,8 @@
+ static void _transport_disconnected(struct bt_conn *conn, uint8_t err)
+ {
+     atomic_clear(&trace_capture_active);
+-    mic_set_capture_active(false);
++    trace_sd_link(false);
++    mic_set_capture_active(trace_sd_recording());
+     is_connected = false;
+     storage_is_on = false;
+ 
+@@ -887,7 +891,8 @@
+ 
+     // Ensure all Bluetooth resources are cleaned up
+     atomic_clear(&trace_capture_active);
+-    mic_set_capture_active(false);
++    trace_sd_link(false);
++    mic_set_capture_active(trace_sd_recording());
+     is_connected = false;
+     storage_is_on = false;
+     current_mtu = 0;
+@@ -961,6 +966,9 @@
+     bt_gatt_service_register(&dfu_service);
+     err = bt_gatt_service_register(&trace_control_service);
+     if (err) return err;
++    /* Publish the complete GATT database before any client can connect. */
++    err = trace_sd_start();
++    if (err) LOG_ERR("TRACE SD service unavailable: %d", err);
+     err = bt_le_adv_start(BT_LE_ADV_CONN, bt_ad, ARRAY_SIZE(bt_ad), bt_sd, ARRAY_SIZE(bt_sd));
+     if (err) {
+         LOG_ERR("Transport advertising failed to start (err %d)", err);
+@@ -1034,4 +1042,4 @@
+ void accel_off()
+ {
+     gpio_pin_set_dt(&accel_gpio_pin, 0);
+-}
+\ No newline at end of file
++}
+--- a/src/button.c
++++ b/src/button.c
+@@ -12,6 +12,7 @@
+ 
+ #include "led.h"
+ #include "mic.h"
++#include "trace_sd.h"
+ #include "sdcard.h"
+ #include "speaker.h"
+ #include "transport.h"
+@@ -513,6 +514,7 @@
+ void turnoff_all()
+ {
+ 
++    trace_sd_shutdown();
+     mic_off();
+     sd_off();
+     speaker_off();
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,11 +1,12 @@
+ # SPDX-License-Identifier: Apache-2.0
+-set(BOARD seeed_xiao_nrf52840_sense)
++set(BOARD xiao_ble/nrf52840/sense)
+ cmake_minimum_required(VERSION 3.20.0)
+ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+ project(nrf52840_nordic)
+ enable_language(C ASM)
+ 
+ target_sources(app PRIVATE
++    ../src/trace_sd.c
+     src/main.c
+     src/transport.c
+     src/mic.c
+@@ -170,3 +171,5 @@
+ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsingle-precision-constant") # A lot of constants are written as doubles
+ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DHAVE_LRINT -DHAVE_LRINTF")
+ 
++
++target_include_directories(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src ${CMAKE_CURRENT_SOURCE_DIR}/src)

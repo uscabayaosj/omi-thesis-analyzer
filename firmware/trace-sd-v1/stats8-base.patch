@@ -1,0 +1,656 @@
+--- a/src/main.c
++++ b/src/main.c
+@@ -22,10 +22,8 @@
+ 
+ static void codec_handler(uint8_t *data, size_t len)
+ {
+-    int err = broadcast_audio_packets(data, len);
+-    if (err) {
+-        LOG_ERR("Failed to broadcast audio packets: %d", err);
+-    }
++    // Transport reports bounded queue warnings; do not log every audio frame.
++    (void)broadcast_audio_packets(data, len);
+ }
+ 
+ static void mic_handler(int16_t *buffer)
+@@ -99,35 +97,11 @@
+ 
+ void set_led_state()
+ {
+-    // Recording and connected state - BLUE
+-
+-    if (usb_charge) {
+-        is_charging = !is_charging;
+-        if (is_charging) {
+-            set_led_green(true);
+-        } else {
+-            set_led_green(false);
+-        }
+-    } else {
+-        set_led_green(false);
+-    }
+-    if (is_off) {
+-        set_led_red(false);
+-        set_led_blue(false);
+-        return;
+-    }
+-    if (is_connected) {
+-        set_led_blue(true);
+-        set_led_red(false);
+-        return;
+-    }
+-
+-    // Recording but lost connection - RED
+-    if (!is_connected) {
+-        set_led_red(true);
+-        set_led_blue(false);
+-        return;
+-    }
++    // All channels are assigned each update, including shutdown.
++    bool paused = is_connected && !trace_capture_is_active();
++    set_led_red(!is_off && (!is_connected || paused));
++    set_led_green(!is_off && paused);
++    set_led_blue(!is_off && is_connected && !paused);
+ }
+ 
+ int main(void)
+@@ -228,16 +202,18 @@
+     err = mount_sd_card();
+     if (err) {
+         LOG_ERR("Failed to mount SD card (err %d)", err);
+-        return err;
+-    }
+-    k_msleep(500);
+-
+-    LOG_PRINTK("\n");
+-    LOG_INF("Initializing storage...\n");
+-
+-    err = storage_init();
+-    if (err) {
+-        LOG_ERR("Failed to initialize storage (err %d)", err);
++        // Storage is optional for live BLE capture. Keep transport available
++        // when the DevKit2 SD interface/card cannot be mounted.
++    } else {
++        k_msleep(500);
++
++        LOG_PRINTK("\n");
++        LOG_INF("Initializing storage...\n");
++
++        err = storage_init();
++        if (err) {
++            LOG_ERR("Failed to initialize storage (err %d)", err);
++        }
+     }
+ #endif
+ 
+@@ -357,6 +333,7 @@
+     while (1) {
+         watchdog_feed();
+ 
++        mic_process_state();
+         set_led_state();
+         k_msleep(500);
+     }
+--- a/src/transport.c
++++ b/src/transport.c
+@@ -1,3 +1,5 @@
++#include <zephyr/sys/byteorder.h>
++#include "trace_stats.h"
+ #include "transport.h"
+ 
+ #include <zephyr/bluetooth/bluetooth.h>
+@@ -7,6 +9,7 @@
+ #include <zephyr/bluetooth/services/bas.h>
+ #include <zephyr/bluetooth/uuid.h>
+ #include <zephyr/drivers/gpio.h>
++#include <zephyr/drivers/hwinfo.h>
+ #include <zephyr/drivers/sensor.h>
+ #include <zephyr/kernel.h>
+ #include <zephyr/logging/log.h>
+@@ -117,6 +120,59 @@
+ 
+ static struct bt_gatt_service audio_service = BT_GATT_SERVICE(audio_service_attr);
+ 
++atomic_t trace_stats[TRACE_STAT_COUNT];
++// v1: little-endian uint32 version, uptime-ms, then ten cumulative counters.
++// Snapshot fields are atomic individually, not one globally frozen instant.
++static ssize_t trace_stats_read(struct bt_conn *conn, const struct bt_gatt_attr *attr,
++                               void *buf, uint16_t len, uint16_t offset)
++{
++    uint8_t value[(2 + TRACE_STAT_COUNT) * 4];
++    sys_put_le32(1, value);
++    sys_put_le32(k_uptime_get_32(), value + 4);
++    for (int i = 0; i < TRACE_STAT_COUNT; i++)
++        sys_put_le32((uint32_t)atomic_get(&trace_stats[i]), value + 8 + i * 4);
++    return bt_gatt_attr_read(conn, attr, buf, len, offset, value, sizeof(value));
++}
++static struct bt_uuid_128 trace_stats_uuid =
++    BT_UUID_INIT_128(BT_UUID_128_ENCODE(0xA71C0002, 0x6B8D, 0x4E75, 0xA1B2, 0x7D0E6F545243));
++
++// TRACE capture indicator protocol v1. Separate service appended after existing
++// registrations preserves existing audio/battery attribute handles.
++static atomic_t trace_capture_active;
++bool trace_capture_is_active(void) { return atomic_get(&trace_capture_active) != 0; }
++static ssize_t trace_capture_read(struct bt_conn *conn, const struct bt_gatt_attr *attr,
++                                 void *buf, uint16_t len, uint16_t offset)
++{
++    uint8_t value = trace_capture_is_active() ? 1 : 0;
++    return bt_gatt_attr_read(conn, attr, buf, len, offset, &value, sizeof(value));
++}
++static ssize_t trace_capture_write(struct bt_conn *conn, const struct bt_gatt_attr *attr,
++                                  const void *buf, uint16_t len, uint16_t offset, uint8_t flags)
++{
++    if (offset) return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
++    if (len != 1) return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
++    uint8_t value = ((const uint8_t *)buf)[0];
++    if (value > 1 || (flags & BT_GATT_WRITE_FLAG_PREPARE))
++        return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
++    atomic_set(&trace_capture_active, value);
++    mic_set_capture_active(value != 0);
++    LOG_INF("TRACE capture indicator: %s", value ? "active blue" : "paused amber");
++    return len;
++}
++static struct bt_uuid_128 trace_control_uuid =
++    BT_UUID_INIT_128(BT_UUID_128_ENCODE(0xA71C0000, 0x6B8D, 0x4E75, 0xA1B2, 0x7D0E6F545243));
++static struct bt_uuid_128 trace_capture_uuid =
++    BT_UUID_INIT_128(BT_UUID_128_ENCODE(0xA71C0001, 0x6B8D, 0x4E75, 0xA1B2, 0x7D0E6F545243));
++static struct bt_gatt_attr trace_control_attrs[] = {
++    BT_GATT_PRIMARY_SERVICE(&trace_control_uuid),
++    BT_GATT_CHARACTERISTIC(&trace_capture_uuid.uuid, BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,
++                           BT_GATT_PERM_READ | BT_GATT_PERM_WRITE,
++                           trace_capture_read, trace_capture_write, NULL),
++    BT_GATT_CHARACTERISTIC(&trace_stats_uuid.uuid, BT_GATT_CHRC_READ,
++                           BT_GATT_PERM_READ, trace_stats_read, NULL, NULL),
++};
++static struct bt_gatt_service trace_control_service = BT_GATT_SERVICE(trace_control_attrs);
++
+ // Nordic Legacy DFU service with UUID 00001530-1212-EFDE-1523-785FEABCD123
+ // exposes following characteristics:
+ // - Control point (UUID 00001531-1212-EFDE-1523-785FEABCD123) to start the OTA update process (write/notify)
+@@ -374,9 +430,16 @@
+ void broadcast_battery_level(struct k_work *work_item);
+ 
+ K_WORK_DELAYABLE_DEFINE(battery_work, broadcast_battery_level);
++// Bluetooth intentionally forbids buffer-allocation waits on syswq. Audio can
++// fill its transmit pool, so battery notifications need their own waiting context.
++K_THREAD_STACK_DEFINE(battery_work_stack, 1536);
++static struct k_work_q battery_work_queue;
+ 
+ void broadcast_battery_level(struct k_work *work_item)
+ {
++    if (!is_connected) {
++        return;
++    }
+     uint16_t battery_millivolt;
+     uint8_t battery_percentage;
+     if (battery_get_millivolt(&battery_millivolt) == 0 &&
+@@ -393,7 +456,10 @@
+         LOG_ERR("Failed to read battery level");
+     }
+ 
+-    k_work_reschedule(&battery_work, K_MSEC(BATTERY_REFRESH_INTERVAL));
++    if (is_connected) {
++        k_work_reschedule_for_queue(&battery_work_queue, &battery_work,
++                                    K_MSEC(BATTERY_REFRESH_INTERVAL));
++    }
+ }
+ 
+ //
+@@ -428,18 +494,22 @@
+             info.le.data_len->rx_max_len,
+             info.le.data_len->rx_max_time);
+ 
+-    k_work_schedule(&battery_work, K_MSEC(100)); // run immediately
+-
++    atomic_clear(&trace_capture_active);
++    mic_set_capture_active(false);
+     is_connected = true;
++    k_work_reschedule_for_queue(&battery_work_queue, &battery_work, K_MSEC(100));
+     atomic_inc(&connection_generation);
+     k_sem_give(&pusher_wake_sem);
+ }
+ 
+ static void _transport_disconnected(struct bt_conn *conn, uint8_t err)
+ {
++    atomic_clear(&trace_capture_active);
++    mic_set_capture_active(false);
+     is_connected = false;
+     storage_is_on = false;
+ 
++    k_work_cancel_delayable(&battery_work);
+     LOG_INF("Transport disconnected");
+ 
+     if (current_connection != NULL) {
+@@ -498,6 +568,8 @@
+ 
+ #define NET_BUFFER_HEADER_SIZE 3
+ #define RING_BUFFER_HEADER_SIZE 2
++// Producer waits for real consumer progress instead of three timed retries.
++K_SEM_DEFINE(tx_space_available, 0, 1);
+ static uint8_t tx_queue[NETWORK_RING_BUF_SIZE * (CODEC_OUTPUT_MAX_BYTES + RING_BUFFER_HEADER_SIZE)];
+ static uint8_t tx_buffer[CODEC_OUTPUT_MAX_BYTES + RING_BUFFER_HEADER_SIZE];
+ static uint8_t tx_buffer_2[CODEC_OUTPUT_MAX_BYTES + RING_BUFFER_HEADER_SIZE];
+@@ -510,6 +582,11 @@
+ static bool write_to_tx_queue(uint8_t *data, size_t size)
+ {
+     if (size > CODEC_OUTPUT_MAX_BYTES) {
++        return false;
++    }
++
++    // Never write a partial fixed-size record when the live queue is full.
++    if (ring_buf_space_get(&ring_buf) < CODEC_OUTPUT_MAX_BYTES + RING_BUFFER_HEADER_SIZE) {
+         return false;
+     }
+ 
+@@ -546,6 +623,7 @@
+         return false;
+     }
+ 
++    k_sem_give(&tx_space_available);
+     tx_buffer_size = tx_buffer[0] + (tx_buffer[1] << 8);
+     tx_frame_pending = true;
+     tx_gatt_offset = 0;
+@@ -581,7 +659,7 @@
+     const int max_retries = 3;
+ 
+     while (tx_gatt_offset < tx_buffer_size) {
+-        uint32_t id = packet_next_index++;
++        uint32_t id = packet_next_index;
+         uint32_t packet_size = MIN(current_mtu - NET_BUFFER_HEADER_SIZE, tx_buffer_size - tx_gatt_offset);
+         pusher_temp_data[0] = id & 0xFF;
+         pusher_temp_data[1] = (id >> 8) & 0xFF;
+@@ -594,6 +672,7 @@
+                 bt_gatt_notify(conn, &audio_service.attrs[1], pusher_temp_data, packet_size + NET_BUFFER_HEADER_SIZE);
+ 
+             if (err) {
++                trace_stat_add(TRACE_BLE_NOTIFY_FAILURES, 1);
+                 LOG_DBG("bt_gatt_notify failed (err %d)", err);
+                 LOG_DBG("MTU: %d, packet_size: %d", current_mtu, packet_size + NET_BUFFER_HEADER_SIZE);
+                 k_sleep(K_MSEC(1));
+@@ -609,11 +688,14 @@
+             return false;
+         }
+ 
++        // Failed notifications must not reserve sequence numbers.
++        packet_next_index++;
+         tx_gatt_offset += packet_size;
+         tx_gatt_index++;
+     }
+ 
+     consume_tx_frame();
++    trace_stat_add(TRACE_BLE_SENT_FRAMES, 1);
+     return true;
+ }
+ #define OPUS_PREFIX_LENGTH 1
+@@ -758,6 +840,12 @@
+             }
+ 
+             if (!progressed) {
++                if (valid) {
++                    // Retain the pending frame/fragment and retry even if the
++                    // producer is paused or blocked waiting for queue space.
++                    k_msleep(5);
++                    k_sem_give(&pusher_wake_sem);
++                }
+                 break;
+             }
+ 
+@@ -771,6 +859,7 @@
+ //
+ int bt_off()
+ {
++    k_work_cancel_delayable(&battery_work);
+     // First disconnect any active connections
+     if (current_connection != NULL) {
+         bt_conn_disconnect(current_connection, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+@@ -797,6 +886,8 @@
+     mic_off();
+ 
+     // Ensure all Bluetooth resources are cleaned up
++    atomic_clear(&trace_capture_active);
++    mic_set_capture_active(false);
+     is_connected = false;
+     storage_is_on = false;
+     current_mtu = 0;
+@@ -820,9 +911,31 @@
+ int transport_start()
+ {
+     k_mutex_init(&write_sdcard_mutex);
++    k_work_queue_start(&battery_work_queue, battery_work_stack,
++                       K_THREAD_STACK_SIZEOF(battery_work_stack),
++                       K_PRIO_PREEMPT(9), NULL);
+ 
+     // Configure callbacks
+     bt_conn_cb_register(&_callback_references);
++
++    // Stable, hardware-derived diagnostic identity epoch. Changing the GATT
++    // layout while reusing the factory identity can leave iOS with old handles.
++    // Keep this epoch stable across boots; this applies only to live test builds.
++#ifndef CONFIG_OMI_ENABLE_OFFLINE_STORAGE
++    bt_addr_le_t identity = { .type = BT_ADDR_LE_RANDOM };
++    ssize_t identity_bytes = hwinfo_get_device_id(identity.a.val, sizeof(identity.a.val));
++    if (identity_bytes != sizeof(identity.a.val)) {
++        LOG_ERR("Could not derive diagnostic Bluetooth identity");
++        return -EIO;
++    }
++    identity.a.val[0] ^= 0x42;
++    identity.a.val[5] |= 0xc0; // Bluetooth static random address bits.
++    int identity_id = bt_id_create(&identity, NULL);
++    if (identity_id != BT_ID_DEFAULT) {
++        LOG_ERR("Could not create default diagnostic identity (err %d)", identity_id);
++        return identity_id < 0 ? identity_id : -EINVAL;
++    }
++#endif
+ 
+     // Enable Bluetooth
+     int err = bt_enable(NULL);
+@@ -846,6 +959,8 @@
+     bt_gatt_service_register(&storage_service);
+     bt_gatt_service_register(&audio_service);
+     bt_gatt_service_register(&dfu_service);
++    err = bt_gatt_service_register(&trace_control_service);
++    if (err) return err;
+     err = bt_le_adv_start(BT_LE_ADV_CONN, bt_ad, ARRAY_SIZE(bt_ad), bt_sd, ARRAY_SIZE(bt_sd));
+     if (err) {
+         LOG_ERR("Transport advertising failed to start (err %d)", err);
+@@ -872,7 +987,8 @@
+                     NULL,
+                     NULL,
+                     NULL,
+-                    K_PRIO_PREEMPT(7),
++                    // Match encoder priority so its per-frame yield can drain BLE.
++                    K_PRIO_PREEMPT(4),
+                     0,
+                     K_NO_WAIT);
+ 
+@@ -886,19 +1002,32 @@
+ 
+ int broadcast_audio_packets(uint8_t *buffer, size_t size)
+ {
+-    int retry_count = 0;
+-    const int max_retries = 3;
+-
+-    while (retry_count < max_retries && !write_to_tx_queue(buffer, size)) {
+-        k_sleep(K_MSEC(1));
+-        retry_count++;
+-    }
+-
+-    if (retry_count >= max_retries) {
+-        LOG_ERR("Failed to write to tx queue after %d retries", max_retries);
+-        return -1;
+-    }
+-
++#ifndef CONFIG_OMI_ENABLE_OFFLINE_STORAGE
++    // Live-only firmware has nowhere to retain audio without a receiver.
++    if (!is_connected) {
++        return 0;
++    }
++#endif
++    // A short receiver stall should apply bounded backpressure to the
++    // encoder, while leaving its one-second PCM ring available to the ISR.
++    // An indefinite outage still drops explicitly; this is not offline storage.
++    const int64_t deadline = k_uptime_get() + 50;
++    while (!write_to_tx_queue(buffer, size)) {
++        int64_t remaining = deadline - k_uptime_get();
++        if (remaining <= 0 ||
++            k_sem_take(&tx_space_available, K_MSEC(remaining)) != 0) {
++            trace_stat_add(TRACE_TX_DROPPED_FRAMES, 1);
++            static int64_t last_queue_warning;
++            int64_t now = k_uptime_get();
++            if (now - last_queue_warning >= 1000) {
++                LOG_WRN("Audio queue full after 50ms wait; dropping frame");
++                last_queue_warning = now;
++            }
++            return -1;
++        }
++    }
++
++    trace_stat_add(TRACE_TX_QUEUED_FRAMES, 1);
+     return 0;
+ }
+ 
+--- a/src/transport.h
++++ b/src/transport.h
+@@ -1,5 +1,7 @@
+ #ifndef TRANSPORT_H
+ #define TRANSPORT_H
++#include <stdbool.h>
++bool trace_capture_is_active(void);
+ 
+ #include <zephyr/drivers/sensor.h>
+ typedef struct sensors {
+--- a/src/mic.c
++++ b/src/mic.c
+@@ -1,3 +1,4 @@
++#include "trace_stats.h"
+ #include "mic.h"
+ 
+ #include <haly/nrfy_gpio.h>
+@@ -8,7 +9,8 @@
+ 
+ #include "config.h"
+ #include "led.h"
+-#include "nrfx_clock.h"
++#include <zephyr/drivers/clock_control/nrf_clock_control.h>
++#include <zephyr/sys/atomic.h>
+ #include "nrfx_pdm.h"
+ #include "utils.h"
+ 
+@@ -22,11 +24,20 @@
+ static int16_t _buffer_1[MIC_BUFFER_SAMPLES];
+ static volatile uint8_t _next_buffer_index = 0;
+ static volatile mix_handler _callback = NULL;
++static atomic_t capture_requested;
++static atomic_t power_allowed = ATOMIC_INIT(1);
++static atomic_t accepting_pcm;
++static bool initialized;
++static bool stopping;
++static bool clock_requested;
++static struct onoff_client clock_client;
++static struct onoff_manager *clock_manager;
+ 
+ static void pdm_irq_handler(nrfx_pdm_evt_t const *event)
+ {
+     // Ignore error (how to handle?)
+     if (event->error) {
++        trace_stat_add(TRACE_PDM_ERRORS, 1);
+         LOG_ERR("PDM error: %d", event->error);
+         return;
+     }
+@@ -44,7 +55,9 @@
+     }
+ 
+     // Release buffer
+-    if (event->buffer_released) {
++    if (event->buffer_released && atomic_get(&accepting_pcm) &&
++        atomic_get(&capture_requested) && atomic_get(&power_allowed)) {
++        trace_stat_add(TRACE_PDM_SAMPLES, MIC_BUFFER_SAMPLES);
+         LOG_DBG("Audio buffer requested");
+         if (_callback) {
+             _callback(event->buffer_released);
+@@ -54,11 +67,6 @@
+ 
+ int mic_start()
+ {
+-
+-    // Start the high frequency clock
+-    if (!nrf_clock_hf_is_running(NRF_CLOCK, NRF_CLOCK_HFCLK_HIGH_ACCURACY)) {
+-        nrf_clock_task_trigger(NRF_CLOCK, NRF_CLOCK_TASK_HFCLKSTART);
+-    }
+ 
+     // Configure PDM
+     nrfx_pdm_config_t pdm_config = NRFX_PDM_DEFAULT_CONFIG(PDM_CLK_PIN, PDM_DIN_PIN);
+@@ -75,17 +83,15 @@
+         return -1;
+     }
+ 
+-    // Power on Mic
++    // Boot in standby. The main thread alone owns PDM/clock transitions.
+     nrfy_gpio_cfg_output(PDM_PWR_PIN);
+-    nrfy_gpio_pin_set(PDM_PWR_PIN);
+-
+-    // Start PDM
+-    if (nrfx_pdm_start() != NRFX_SUCCESS) {
+-        LOG_ERR("Audio unable to start PDM");
+-        return -1;
++    nrfy_gpio_pin_clear(PDM_PWR_PIN);
++    clock_manager = z_nrf_clock_control_get_onoff(CLOCK_CONTROL_NRF_SUBSYS_HF);
++    if (!clock_manager) {
++        return -ENODEV;
+     }
+-
+-    LOG_INF("Audio microphone started");
++    initialized = true;
++    LOG_INF("Audio microphone initialized in standby");
+     return 0;
+ }
+ 
+@@ -96,10 +102,86 @@
+ 
+ void mic_off()
+ {
+-    nrfy_gpio_pin_clear(PDM_PWR_PIN);
++    atomic_clear(&power_allowed);
+ }
+ 
+ void mic_on()
+ {
++    atomic_set(&power_allowed, 1);
++}
++
++void mic_set_capture_active(bool active)
++{
++    atomic_set(&capture_requested, active);
++}
++
++void mic_process_state(void)
++{
++    if (!initialized) {
++        return;
++    }
++    bool wanted = atomic_get(&capture_requested) && atomic_get(&power_allowed);
++
++    if (!wanted && atomic_get(&accepting_pcm)) {
++        // STOPPED returns partially filled buffers: never encode those as audio.
++        atomic_clear(&accepting_pcm);
++        nrfx_err_t err = nrfx_pdm_stop();
++        if (err != NRFX_SUCCESS) {
++            LOG_ERR("PDM stop failed: %d", err);
++            atomic_set(&accepting_pcm, 1); // Retry on the next main-loop pass.
++            return;
++        }
++        stopping = true;
++    }
++    if (stopping) {
++        // The driver's STOPPED interrupt clears buffers before disabling PDM.
++        // Do not restart or release our clock reference until it has completed.
++        if (NRF_PDM->ENABLE != 0) {
++            return;
++        }
++        stopping = false;
++        nrfy_gpio_pin_clear(PDM_PWR_PIN);
++        LOG_INF("Audio microphone stopped for standby");
++    }
++    if (!wanted) {
++        if (clock_requested) {
++            onoff_cancel_or_release(clock_manager, &clock_client);
++            clock_requested = false;
++        }
++        return;
++    }
++    if (atomic_get(&accepting_pcm)) {
++        return;
++    }
++    if (!clock_requested) {
++        sys_notify_init_spinwait(&clock_client.notify);
++        int err = onoff_request(clock_manager, &clock_client);
++        if (err < 0) {
++            LOG_ERR("PDM clock request failed: %d", err);
++            return;
++        }
++        clock_requested = true;
++    }
++    int clock_result;
++    if (sys_notify_fetch_result(&clock_client.notify, &clock_result) < 0) {
++        return; // Clock startup is asynchronous; keep Bluetooth responsive.
++    }
++    if (clock_result < 0) {
++        onoff_cancel_or_release(clock_manager, &clock_client);
++        clock_requested = false;
++        LOG_ERR("PDM clock startup failed: %d", clock_result);
++        return;
++    }
+     nrfy_gpio_pin_set(PDM_PWR_PIN);
++    k_msleep(1);
++    _next_buffer_index = 0;
++    atomic_set(&accepting_pcm, 1);
++    nrfx_err_t err = nrfx_pdm_start();
++    if (err != NRFX_SUCCESS) {
++        atomic_clear(&accepting_pcm);
++        nrfy_gpio_pin_clear(PDM_PWR_PIN);
++        LOG_ERR("PDM start failed: %d", err);
++        return;
++    }
++    LOG_INF("Audio microphone started for capture");
+ }
+--- a/src/mic.h
++++ b/src/mic.h
+@@ -18,4 +18,6 @@
+ 
+ void mic_off();
+ void mic_on();
++void mic_set_capture_active(bool active);
++void mic_process_state(void);
+ #endif
+--- a/src/codec.c
++++ b/src/codec.c
+@@ -1,3 +1,4 @@
++#include "trace_stats.h"
+ #include "codec.h"
+ 
+ #include <zephyr/logging/log.h>
+@@ -28,10 +29,16 @@
+ 
+ uint8_t codec_ring_buffer_data[AUDIO_BUFFER_SAMPLES * 2]; // 2 bytes per sample
+ struct ring_buf codec_ring_buf;
++K_SEM_DEFINE(codec_pcm_ready, 0, 1);
+ int codec_receive_pcm(int16_t *data, size_t len) // this gets called after mic data is finished
+ {
+ 
+     int written = ring_buf_put(&codec_ring_buf, (uint8_t *) data, len * 2);
++    if (written > 0) {
++        k_sem_give(&codec_pcm_ready);
++    }
++    trace_stat_add(TRACE_PCM_ACCEPTED_SAMPLES, written / 2);
++    trace_stat_add(TRACE_PCM_DROPPED_SAMPLES, len - written / 2);
+     if (written != len * 2) {
+         LOG_ERR("Failed to write %d bytes to codec ring buffer", len * 2);
+         return -1;
+@@ -71,7 +78,7 @@
+         // Check if we have enough data
+         if (ring_buf_size_get(&codec_ring_buf) < CODEC_PACKAGE_SAMPLES * 2) {
+             // LOG_PRINTK("waiting on data....\n");
+-            k_sleep(K_MSEC(10));
++            k_sem_take(&codec_pcm_ready, K_FOREVER);
+             continue;
+         }
+         // Read package
+@@ -79,6 +86,7 @@
+ 
+         // Run Codec
+         output_size = execute_codec();
++        trace_stat_add(output_size ? TRACE_ENCODED_FRAMES : TRACE_ENCODER_FAILURES, 1);
+ 
+         // Notify
+         if (_callback) {
+--- a/src/config.h
++++ b/src/config.h
+@@ -5,7 +5,7 @@
+ #define MIC_IRC_PRIORITY 7
+ #define MIC_BUFFER_SAMPLES 1600    // 100ms
+ #define AUDIO_BUFFER_SAMPLES 16000 // 1s
+-#define NETWORK_RING_BUF_SIZE 32   // number of frames * CODEC_OUTPUT_MAX_BYTES
++#define NETWORK_RING_BUF_SIZE 128  // 1.28 seconds at 10ms/frame; bounded BLE stall cushion
+ #define MINIMAL_PACKET_SIZE 100    // Less than that doesn't make sence to send anything at all
+ 
+ // PIN definitions

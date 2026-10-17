@@ -1,0 +1,16 @@
+# Generated upstream copies, SDK output, local install evidence and binaries.
+**/upstream/
+**/build/
+**/artifacts/
+**/__pycache__/
+*.pyc
+*.log
+*.uf2
+*.hex
+*.elf
+*.bin
+*-install*.json
+build-provenance*.json
+*-build.json
+.env*
+README.local.md

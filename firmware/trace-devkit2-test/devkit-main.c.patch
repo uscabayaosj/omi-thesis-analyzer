@@ -1,0 +1,31 @@
+diff --git a/omi/firmware/devkit/src/main.c b/omi/firmware/devkit/src/main.c
+index e8df45d..92d7480 100644
+--- a/omi/firmware/devkit/src/main.c
++++ b/omi/firmware/devkit/src/main.c
+@@ -228,16 +228,18 @@ int main(void)
+     err = mount_sd_card();
+     if (err) {
+         LOG_ERR("Failed to mount SD card (err %d)", err);
+-        return err;
+-    }
+-    k_msleep(500);
++        // Storage is optional for live BLE capture. Keep transport available
++        // when the DevKit2 SD interface/card cannot be mounted.
++    } else {
++        k_msleep(500);
+ 
+-    LOG_PRINTK("\n");
+-    LOG_INF("Initializing storage...\n");
++        LOG_PRINTK("\n");
++        LOG_INF("Initializing storage...\n");
+ 
+-    err = storage_init();
+-    if (err) {
+-        LOG_ERR("Failed to initialize storage (err %d)", err);
++        err = storage_init();
++        if (err) {
++            LOG_ERR("Failed to initialize storage (err %d)", err);
++        }
+     }
+ #endif
+ 

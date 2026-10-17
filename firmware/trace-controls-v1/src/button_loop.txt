@@ -1,0 +1,27 @@
+void check_button_level(struct k_work *work_item)
+{
+    static bool raw_pressed, stable_pressed, long_sent;
+    static int64_t raw_since, pressed_at, first_tap;
+    int64_t now=k_uptime_get();
+    int level=gpio_pin_get_raw(d5_pin_input.port,d5_pin_input.pin);
+    if(level<0) goto schedule;
+    bool down=level==0;
+    if(down!=raw_pressed) {raw_pressed=down;raw_since=now;}
+    if(down!=stable_pressed && now-raw_since>=40) {
+        stable_pressed=down;
+        if(down) {pressed_at=now;long_sent=false;notify_press();}
+        else {
+            notify_unpress();
+            if(!long_sent && now-pressed_at<600) {
+                if(first_tap && now-first_tap<=600) {first_tap=0;notify_double_tap();}
+                else {first_tap=now;}
+            } else {first_tap=0;}
+        }
+    }
+    if(stable_pressed && !long_sent && now-pressed_at>=3000) {
+        long_sent=true;first_tap=0;is_off=true;bt_off();turnoff_all();
+    }
+    if(!stable_pressed && first_tap && now-first_tap>600) {first_tap=0;notify_tap();}
+ schedule:
+    k_work_reschedule(&button_work,K_MSEC(BUTTON_CHECK_INTERVAL));
+}
