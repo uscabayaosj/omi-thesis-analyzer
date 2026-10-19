@@ -142,7 +142,7 @@ int speaker_init(void)
     if (err) return err;
     struct i2s_config config = {
         .word_size = 16, .channels = 2,
-        .format = I2S_FMT_DATA_FORMAT_LEFT_JUSTIFIED,
+        .format = I2S_FMT_DATA_FORMAT_I2S, /* MAX98357A (Adafruit Audio BFF) */
         .options = I2S_OPT_FRAME_CLK_MASTER | I2S_OPT_BIT_CLK_MASTER,
         .frame_clk_freq = RATE, .mem_slab = &tx_slab,
         .block_size = BLOCK_BYTES, .timeout = 200,

@@ -47,7 +47,7 @@ should remain until the actual speaker is checked.
 
 For the explicitly attended speaker check, append `speaker-diagnostic.conf` to
 `EXTRA_CONF_FILE` after `trace-controls.conf`, separated by a semicolon. The
-result advertises `trace-speaker-d1`. About 15 seconds after transport startup it
+result advertises `trace-speaker-d2`. About 15 seconds after transport startup it
 plays a 240 ms quiet 400 Hz tone, waits 800 ms, then plays the locally synthesized
 phrase “TRACE speaker test.” once per boot. Diagnostic audio is stored in flash
 and excluded from the normal build. A listener must confirm audible output;
@@ -65,3 +65,20 @@ The checks exercise the exact production ingress function with mocked RTOS
 primitives, including exact 400-byte completion, four-byte data, unaligned
 headers, maximum/oversized inputs, timeout, busy and unavailable paths. They do
 not validate I2S hardware, RTOS scheduling, Bluetooth delivery or sound quality.
+
+### Hardware check status
+
+The first attended diagnostic (`trace-speaker-d1`) booted, initialized I2S at
+8 kHz and completed both DMA playbacks with zero driver return codes. The human
+listener reported **no sound**. Those logs do not establish working audio output.
+
+The inherited left-justified format does not match the MAX98357A specified for
+the reference Adafruit Audio BFF. The second diagnostic (`trace-speaker-d2`)
+uses standard I2S at the same low amplitude. This format correction still needs
+a listening check on the actual device. Production DevKit board revisions may
+differ from the published reference assembly; neither a working I2S peripheral
+nor generic product documentation proves a speaker is installed or connected.
+
+Hardware references:
+- [Adafruit Audio BFF pins](https://learn.adafruit.com/adafruit-audio-bff/pinouts)
+- [MAX98357A vs MAX98357B audio formats](https://www.analog.com/en/products/max98357a.html)
