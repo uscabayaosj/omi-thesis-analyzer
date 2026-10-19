@@ -23,4 +23,14 @@ s=(r.parent/'trace-sd-v1/src/trace_sd.c').read_text().replace('#include "trace_s
 (u/'src/trace_sd_controls.c').write_text(s)
 replace('CMakeLists.txt','../../trace-sd-v1/src/trace_sd.c','src/trace_sd_controls.c')
 for name in ['trace_sd.h']:(u/'src'/name).write_bytes((r.parent/'trace-sd-v1/src'/name).read_bytes())
-p=r/'trace-controls.conf';s=p.read_text().replace('trace-sd-v3','trace-controls-v2');p.write_text(s)
+# Poll the hardware VBUS bit without enabling the USB data stack.
+replace('CMakeLists.txt','../src/trace_controls.c','../src/trace_controls.c\n    ../src/trace_status_leds.c')
+replace('src/main.c','#include "trace_controls.h"','#include "trace_controls.h"\n#include "trace_status_leds.h"')
+p=u/'src/main.c';s=p.read_text();start=s.index('void set_led_state()\n{');end=s.index('\nint main(void)',start)
+s=s[:start]+"""void set_led_state()
+{
+    trace_status_leds_update(is_off, is_connected, trace_capture_is_active(), trace_sd_recording());
+}
+"""+s[end:];p.write_text(s)
+p=r/'trace-controls.conf';s=p.read_text().replace('trace-sd-v3','trace-controls-v3').replace('trace-controls-v2','trace-controls-v3');p.write_text(s)
+

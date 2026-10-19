@@ -1,4 +1,4 @@
-# TRACE button controls — trace-controls-v2
+# TRACE button controls — trace-controls-v3
 
 This historical folder name contains the current button-only controls integration.
 Start with the [firmware build guide](../README.md).
@@ -16,6 +16,9 @@ layout when building.
 
 `src/trace_controls.c` implements the custom BLE control service and feedback
 worker; `src/button_loop.txt` replaces the legacy polling button state machine.
-`trace-controls.conf` declares the `trace-controls-v2` revision.
+`trace-controls.conf` declares the `trace-controls-v3` revision.
+`src/trace_status_leds.c` provides the recording/paused/disconnected colours and a
+500 ms green USB-power pulse every three seconds. It reads hardware VBUS presence,
+not battery charge current or completion. See the shared guide for the colour table.
 
 Build logs, provenance files and per-device installation evidence are local-only.
