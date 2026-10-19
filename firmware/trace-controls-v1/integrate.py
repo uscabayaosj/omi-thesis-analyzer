@@ -34,3 +34,17 @@ s=s[:start]+"""void set_led_state()
 """+s[end:];p.write_text(s)
 p=r/'trace-controls.conf';s=p.read_text().replace('trace-sd-v3','trace-controls-v3').replace('trace-controls-v2','trace-controls-v3');p.write_text(s)
 
+
+# Speaker replacement: all playback runs on its own bounded worker.
+(u/'src/speaker.c').write_bytes((r/'src/trace_speaker.c').read_bytes())
+(u/'src/speaker.h').write_bytes((r/'src/trace_speaker.h').read_bytes())
+with (u/'Kconfig').open('a') as f:
+ f.write('\nconfig TRACE_SPEAKER_SELF_TEST\n    bool "One quiet tone and phrase after boot (diagnostic only)"\n    depends on OMI_ENABLE_SPEAKER\n    default n\n')
+replace('src/main.c', '        LOG_ERR("Speaker failed to start");\n        return err;', '        LOG_ERR("Optional speaker unavailable: %d; continuing capture startup", err);')
+start=(u/'src/transport.c').read_text().index('    uint16_t amount = 400;')
+p=u/'src/transport.c';s=p.read_text();end=s.index('\n}',start)
+s=s[:start]+"""    if (offset || (flags & BT_GATT_WRITE_FLAG_PREPARE))
+        return BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED);
+    int result = speak(len, buf);
+    if (result < 0) return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
+    return result;"""+s[end:];p.write_text(s)

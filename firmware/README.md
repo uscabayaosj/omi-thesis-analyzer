@@ -6,7 +6,7 @@ Firmware sources and integration patches for the TRACE iPhone app and Omi DevKit
 
 | Directory | Purpose |
 | --- | --- |
-| [trace-controls-v1](trace-controls-v1/) | Current button-only firmware, advertised as `trace-controls-v3`. Includes SD recording and vibration feedback. The folder name is historical. |
+| [trace-controls-v1](trace-controls-v1/) | Current button-only firmware, advertised as `trace-controls-v4`. Includes SD recording and vibration feedback. The folder name is historical. |
 | [trace-sd-v1](trace-sd-v1/) | SD recording base, advertised as `trace-sd-v3`. Includes the project-local SD synchronization correction. |
 | [trace-devkit2-test](trace-devkit2-test/) | Earlier BLE audio, standby, battery, LED, and backpressure patches/configurations. Historical building blocks; use the consolidated SD base for the current build. |
 
@@ -84,3 +84,13 @@ OMI source is pinned to [`bc5d7a34a33f34112eba95902ba26294e60f8d2a`](https://git
 stack. The previous button-only implementation is retained. This is a source and
 build candidate until explicitly installed and checked on a device; publishing the
 README does not update an already-flashed DevKit.
+
+## Speaker revision
+
+`trace-controls-v4` replaces the legacy speaker driver with bounded asynchronous
+playback, optional initialization, checked ingress and correct I2S buffer ownership.
+It retains the button controls, SD path and green USB-power indicator. Normal
+builds have no startup sound. The separate `trace-speaker-d1` configuration plays
+one quiet tone and phrase after boot for an attended hardware check; see the
+[controls speaker notes](trace-controls-v1/README.md#speaker-correction-and-diagnostic).
+Speaker presence/output still requires an acoustic check on the actual device.
