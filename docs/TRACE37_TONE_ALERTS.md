@@ -47,3 +47,14 @@ Private recordings and prior endurance evidence are retained. No card is
 formatted and no new provider service is required.
 
 Candidate UF2 SHA-256: `c49cfacb6ba17359ee4c616aa38cb0bd4f9c3a9c3bdf7e4e6f603baa42628f8c`.
+
+## Transcript readback limit
+
+A read-only physical UI test also passed after capture. The saved transcript
+retained the four marker passages, but several leading marker words were absent;
+only one complete marker name matched exactly. This is not an exact-recognition
+pass, and the test does not establish whether those omissions came from acoustic
+overlap, recognition or speech-boundary selection. The source originals retained
+all frame counts. No correction or automatic removal of tones from audio/text
+is implemented. Transport continuity and the listener's tone confirmation are
+the qualified results; perfect transcription remains unqualified.
