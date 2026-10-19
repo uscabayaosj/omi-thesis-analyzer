@@ -6,7 +6,7 @@ Firmware sources and integration patches for the TRACE iPhone app and Omi DevKit
 
 | Directory | Purpose |
 | --- | --- |
-| [trace-controls-v1](trace-controls-v1/) | Current button-only firmware, advertised as `trace-controls-v5`. Includes SD recording, vibration feedback and spoken event prompts. The folder name is historical. |
+| [trace-controls-v1](trace-controls-v1/) | Current button-only firmware, advertised as `trace-controls-v6`. Includes SD recording, vibration feedback and wordless tone alerts. The folder name is historical. |
 | [trace-sd-v1](trace-sd-v1/) | SD recording base, advertised as `trace-sd-v3`. Includes the project-local SD synchronization correction. |
 | [trace-devkit2-test](trace-devkit2-test/) | Earlier BLE audio, standby, battery, LED, and backpressure patches/configurations. Historical building blocks; use the consolidated SD base for the current build. |
 
@@ -107,3 +107,14 @@ but there is no microphone muting or echo cancellation. The low-battery warning
 uses a capped voltage estimate, not calibrated remaining runtime. See the
 [trigger rules and BLE protocol](trace-controls-v1/README.md#spoken-event-prompts-v5--trace-build-36)
 and [build 36 validation](../docs/TRACE36_SPOKEN_PROMPTS.md).
+
+
+## Tone alerts revision
+
+`trace-controls-v6` / TRACE build 37 replaces the six spoken event clips with
+short, distinct tones at the user's requested **100% digital signal peak**.
+The event triggers and recording pipeline are unchanged. The longest clip is
+355 ms, with smooth attack/release. This setting does not measure acoustic
+loudness or change system volume. Tones can still be picked up by the mic.
+See the [pattern table](trace-controls-v1/README.md#tone-alerts-v6--trace-build-37)
+and [build 37 status](../docs/TRACE37_TONE_ALERTS.md).

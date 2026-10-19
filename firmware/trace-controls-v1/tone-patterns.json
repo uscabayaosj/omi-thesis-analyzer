@@ -1,0 +1,93 @@
+[
+  {
+    "id": 1,
+    "event": "Connected",
+    "pattern": "two rising notes",
+    "frequenciesHz": [
+      660,
+      990
+    ],
+    "noteMs": 70,
+    "gapMs": 30,
+    "durationMs": 170,
+    "sampleRate": 8000,
+    "peak": 32767,
+    "sha256": "d952a01bd6113706558d389909a1dcafce43cd1befb0e736450a1248cea19d1e"
+  },
+  {
+    "id": 2,
+    "event": "Disconnected",
+    "pattern": "two falling notes",
+    "frequenciesHz": [
+      990,
+      660
+    ],
+    "noteMs": 70,
+    "gapMs": 30,
+    "durationMs": 170,
+    "sampleRate": 8000,
+    "peak": 32767,
+    "sha256": "470c8aaa72fca6395c78b00f23f87dcc97cf8bbfa27f0f67ab71e3e64322f742"
+  },
+  {
+    "id": 3,
+    "event": "Recording started",
+    "pattern": "two high beeps",
+    "frequenciesHz": [
+      1100,
+      1100
+    ],
+    "noteMs": 80,
+    "gapMs": 55,
+    "durationMs": 215,
+    "sampleRate": 8000,
+    "peak": 32767,
+    "sha256": "1b2cfe35ea5cd695c7e6c34048f63337b76ba9d50f06eab5cf94484437b1f562"
+  },
+  {
+    "id": 4,
+    "event": "Paused",
+    "pattern": "one low beep",
+    "frequenciesHz": [
+      440
+    ],
+    "noteMs": 180,
+    "gapMs": 0,
+    "durationMs": 180,
+    "sampleRate": 8000,
+    "peak": 32767,
+    "sha256": "3f2bf315b9d19f823f9803a5ba7e2418c52e23edb4aa08389017b00e1be68399"
+  },
+  {
+    "id": 5,
+    "event": "Low battery",
+    "pattern": "three low beeps",
+    "frequenciesHz": [
+      330,
+      330,
+      330
+    ],
+    "noteMs": 75,
+    "gapMs": 65,
+    "durationMs": 355,
+    "sampleRate": 8000,
+    "peak": 32767,
+    "sha256": "79823238daeba0fc2fdea900ea9263230637a189b201a9057b9cbba9427969e0"
+  },
+  {
+    "id": 6,
+    "event": "Conversation summary completed",
+    "pattern": "three rising notes",
+    "frequenciesHz": [
+      523,
+      659,
+      784
+    ],
+    "noteMs": 65,
+    "gapMs": 25,
+    "durationMs": 245,
+    "sampleRate": 8000,
+    "peak": 32767,
+    "sha256": "91b169661b41a73be8fab5a913f81d7f4da064bbbc622cb540baf423a144b269"
+  }
+]

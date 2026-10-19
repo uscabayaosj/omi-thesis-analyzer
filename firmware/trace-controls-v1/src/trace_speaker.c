@@ -69,10 +69,10 @@ static int play_pcm(const uint8_t *pcm, size_t bytes)
         size_t frames = MIN((bytes - sent) / 2, FRAMES);
         int16_t *stereo = block;
         for (size_t i = 0; i < frames; ++i) {
-            /* Clamp all incoming audio to the diagnostic's conservative peak.
+            /* Clamp all incoming audio to the user-selected full digital peak.
              * This is a digital amplitude limit, not a calibrated sound level. */
             int16_t sample = (int16_t)sys_get_le16(pcm + sent + i * 2);
-            sample = CLAMP(sample, -29490, 29490);
+            sample = CLAMP(sample, -32767, 32767);
             stereo[i * 2] = sample;
             stereo[i * 2 + 1] = sample;
         }
@@ -177,7 +177,7 @@ int speaker_init(void)
     };
     err = i2s_configure(audio_speaker, I2S_DIR_TX, &config);
     initialized = !err;
-    LOG_INF("Speaker init result=%d; amplitude limit=29490", err);
+    LOG_INF("Speaker init result=%d; amplitude limit=32767", err);
     return err;
 #else
     return -ENOTSUP;
@@ -296,7 +296,7 @@ static void prompt_report(uint8_t id,uint8_t phase,bool preview,int result) {
 void register_speaker_service(void) {
 #ifdef CONFIG_OMI_ENABLE_SPEAKER
     int err=bt_gatt_service_register(&prompts_service);
-    LOG_INF("TRACE spoken prompt service=%d",err);
+    LOG_INF("TRACE audio alert service=%d",err);
 #endif
 }
 void trace_prompt_link(bool linked) {

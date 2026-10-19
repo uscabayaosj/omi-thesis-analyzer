@@ -1,4 +1,4 @@
-# TRACE button controls and spoken prompts — trace-controls-v5
+# TRACE button controls and tone alerts — trace-controls-v6
 
 This historical folder name contains the current button-only controls integration.
 Start with the [firmware build guide](../README.md).
@@ -16,7 +16,7 @@ layout when building.
 
 `src/trace_controls.c` implements the custom BLE control service and feedback
 worker; `src/button_loop.txt` replaces the legacy polling button state machine.
-`trace-controls.conf` declares the `trace-controls-v5` revision.
+`trace-controls.conf` declares the `trace-controls-v6` revision.
 `src/trace_status_leds.c` provides the recording/paused/disconnected colours and a
 500 ms green USB-power pulse every three seconds. It reads hardware VBUS presence,
 not battery charge current or completion. See the shared guide for the colour table.
@@ -32,9 +32,9 @@ Bluetooth ingress validates lengths and copies bounded audio; a separate worker
 owns playback. I2S owns each successfully queued slab until transmission finishes.
 The worker bounds waits and stops the amplifier after playback or failure.
 
-Normal `trace-controls-v5` enables the corrected speaker endpoint and fixed event
-prompts, with **no automatic startup diagnostic**. TRACE app build 36 configures
-the prompts after connecting. The legacy
+Normal `trace-controls-v6` enables the corrected speaker endpoint and wordless
+tone alerts, with **no automatic startup diagnostic**. TRACE app build 37
+configures alerts after connecting. The legacy
 endpoint accepts a four-byte little-endian byte count (even, 2–4000), then exactly
 that many bytes of 8 kHz signed 16-bit little-endian mono audio. Four-byte data
 packets remain data during an active transfer. Transfers time out after five
@@ -42,9 +42,10 @@ seconds without an accepted packet. Busy/invalid writes are rejected through ATT
 there is no playback-completion notification protocol. Each clip is at most
 250 ms; this is not a general continuous voice-streaming protocol.
 
-All PCM is clamped to +/-29490 (about 90% of full-scale amplitude). This limits
-the digital signal, not acoustic loudness or amplifier gain. The attended
-listening results below record how this level was selected.
+Current PCM is bounded at +/-32767 (100% of positive signed full scale), as
+requested for the tone revision. This is a digital peak, not calibrated acoustic
+loudness or amplifier gain. The earlier spoken diagnostic results below explain
+the previous 90% setting.
 
 For the explicitly attended speaker check, append `speaker-diagnostic.conf` to
 `EXTRA_CONF_FILE` after `trace-controls.conf`, separated by a semicolon. The
@@ -105,7 +106,7 @@ The listener confirmed "Clear and loud enough." The normal image retains this
 selected signal limit and disables the automatic tone/phrase sequence.
 
 
-## Spoken event prompts (v5 / TRACE build 36)
+## Spoken event prompts (v5 / TRACE build 36, historical)
 
 | Phrase | Trigger |
 | --- | --- |
@@ -163,3 +164,44 @@ clang -std=c11 -fsanitize=address,undefined \
 This exercises transition suppression, mute, reconnect epochs, stale events and
 low-battery hysteresis. Physical simultaneous-recording results are recorded in
 [the build 36 validation note](../../docs/TRACE36_SPOKEN_PROMPTS.md).
+
+
+## Tone alerts (v6 / TRACE build 37)
+
+At the user's request, all six normal event clips are **wordless tones**, at
+**100% digital peak (32767)**. No speech clip is selected for normal events.
+The optional historical speaker diagnostic still contains its separate spoken
+phrase and is not enabled in the normal build. The same event IDs, BLE layout,
+transition suppression, low-battery hysteresis, stale-job checks, summary
+expiry/deduplication and microphone-continuity behavior are retained.
+
+| Event | Pattern | Clip length |
+| --- | --- | ---: |
+| Connected | Two rising notes, 660 → 990 Hz | 170 ms |
+| Disconnected | Two falling notes, 990 → 660 Hz | 170 ms |
+| Recording started | Two high beeps, 1100 Hz | 215 ms |
+| Paused | One low beep, 440 Hz | 180 ms |
+| Low battery | Three low beeps, 330 Hz | 355 ms |
+| Summary completed | Three rising notes, 523 → 659 → 784 Hz | 245 ms |
+
+Each note has an 8 ms attack/release to avoid hard clicks. The full 100% peak
+is present in each generated clip; gaps and short ramps are intentional.
+This does not change the Mac/iPhone volume or physical amplifier gain.
+The app's switch is now **DevKit tone alerts**, with the pattern guide in
+Settings → DevKit controls. Existing preference and queue keys are retained.
+Build 37 still works with v5, but v5 boards retain speech until flashed to v6;
+the settings disclose that compatibility boundary.
+
+Regenerate and check the embedded assets without network services:
+
+```sh
+python3 firmware/trace-controls-v1/generate_tones.py
+python3 firmware/trace-controls-v1/tests/check_tones.py
+```
+
+The generated `tone-patterns.json` records exact timings, frequencies, peaks and
+PCM hashes. `src/trace_prompt_audio.h` contains the actual flash-resident PCM.
+These checks do not establish physical loudness. Tones greatly shorten the
+playback window but remain audible in recordings; no echo cancellation or
+perfect speech-recognition isolation is claimed. See
+[build 37 status](../../docs/TRACE37_TONE_ALERTS.md) for installation evidence.
