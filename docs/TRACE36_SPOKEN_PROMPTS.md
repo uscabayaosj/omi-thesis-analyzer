@@ -39,8 +39,8 @@ Firmware built with NCS 2.7.0 for the existing reference DevKit 2 target:
 
 Host policy tests with ASan/UBSan passed; legacy speaker packet regression tests
 passed. The simulator app unit suite passed 34 tests, and the dedicated core
-spoken-prompt tests passed four tests. The complete core suite was also rerun
-successfully. Those are software checks, not acoustic
+spoken-prompt tests passed four tests. The complete core suite also passed
+60 XCTest cases plus five Swift Testing cases. Those are software checks, not acoustic
 or physical transport evidence.
 
 Two physical recording passes were retained, with Mac-spoken continuity markers:
@@ -89,6 +89,26 @@ This is a short, connected, awake-phone recording check. It does not qualify
 locked-phone background completion, endurance, every board revision, acoustic
 echo removal, speech-recognition accuracy, battery runtime, or SD recovery.
 Private audio, transcript content, device identifiers and raw logs remain local.
+
+### Acoustic readback result
+
+A subsequent read-only physical UI test passed and inspected the latest saved
+conversation. Three Mac markers were transcribed correctly. The fourth marker,
+spoken while a DevKit preview overlapped it, was mistranscribed and propagated
+into the generated title. This proves a real acoustic/recognition limitation:
+zero lost frames does **not** establish interference-free speech recognition.
+The preview did not delete or interrupt the original audio. Fixed prompt audio
+can obscure simultaneous speech; users can disable spoken prompts when clean
+conversation audio is more important. Playback-window logging does not undo
+this overlap or automatically repair the transcript. This release is qualified
+for short-run transport continuity, not acoustic isolation.
+
+Both automatically assembled conversation M4A files were present, and independent
+local ffmpeg decoding completed without errors. Their conversation-selected
+ranges were shorter than the full raw captures; the frame agreement above is
+based on all original TRCH files, not on assuming M4A duration equals capture
+wall-clock time. No exact marker, summary-quality or acoustic-isolation pass is
+claimed.
 
 ## Source and rebuild
 
