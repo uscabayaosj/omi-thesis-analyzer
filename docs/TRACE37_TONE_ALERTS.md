@@ -21,10 +21,29 @@ recording test cannot be counted as a physical test of these new waveforms.
   peak, smooth endpoints, maximum 355 ms and matching hashes.
 - Firmware policy ASan/UBSan and legacy packet parser checks passed.
 - Native build 37 compiled for the connected physical iPhone.
-- Physical firmware installation and tone/capture test are pending bootloader
-  access. No claim of physical tone loudness or continuity is made yet.
+- v6 installed after the operator confirmed XIAO-SENSE. Previous firmware
+  backed up; fresh boot reports v6, speaker initialization success, alert
+  service success and amplitude limit 32767. Native build 37 installed.
+- Physical phone test passed. All six preview IDs played successfully during
+  active recording; real connected/disconnected, recording-start, Pause and
+  actual server-summary-completion paths also played with driver result zero.
+- The human listener confirmed: “Yes — tones are clear and loud enough,” in
+  response to whether the beeps were audible with no spoken words.
+- The 87.0-second recording retained 8,700 frames in three valid TRCH chunks,
+  each no longer than 30 seconds. Firmware encoded/queued/BLE-sent, phone
+  received/written and strict original-file frame totals agree exactly.
+- Every original was copied twice independently from the iPhone, with matching
+  SHA-256 hashes. No empty/truncated frames or sequence discontinuities.
+- No observed PDM errors, dropped PCM samples, encoder failures, dropped
+  transport frames, BLE notification failures, missing/duplicate notifications
+  or write failures. Final pending writes and upload/server queues were zero.
+- Largest observed receive gap: 0.0956 s; write delay: 0.1379 s; sampled pending
+  writes: one. Final state is paused. No calibrated acoustic SPL, endurance,
+  locked-phone or universal transcription-isolation claim is made.
 - Source changes retain the low-battery threshold/hysteresis, real-summary
   completion gating, queue expiry and existing recording path.
 
 Private recordings and prior endurance evidence are retained. No card is
 formatted and no new provider service is required.
+
+Candidate UF2 SHA-256: `c49cfacb6ba17359ee4c616aa38cb0bd4f9c3a9c3bdf7e4e6f603baa42628f8c`.
