@@ -3,6 +3,10 @@
 #define SPEAKER_H
 #include <zephyr/kernel.h>
 int speaker_init(void);
+/* Enqueue fixed phrases without waiting, allocating or changing capture. */
+void trace_prompt_link(bool linked);
+void trace_prompt_capture(bool active);
+void trace_prompt_battery(int percent);
 /* Legacy wire format: four-byte LE mono byte count (2..4000, even), then
  * that many signed 16-bit LE mono bytes in even packets. Four-byte data
  * packets are data while a transfer is in progress. 5 s timeout resets it.

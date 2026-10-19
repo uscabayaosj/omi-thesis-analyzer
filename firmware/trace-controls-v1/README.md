@@ -1,4 +1,4 @@
-# TRACE button controls — trace-controls-v4
+# TRACE button controls and spoken prompts — trace-controls-v5
 
 This historical folder name contains the current button-only controls integration.
 Start with the [firmware build guide](../README.md).
@@ -16,7 +16,7 @@ layout when building.
 
 `src/trace_controls.c` implements the custom BLE control service and feedback
 worker; `src/button_loop.txt` replaces the legacy polling button state machine.
-`trace-controls.conf` declares the `trace-controls-v4` revision.
+`trace-controls.conf` declares the `trace-controls-v5` revision.
 `src/trace_status_leds.c` provides the recording/paused/disconnected colours and a
 500 ms green USB-power pulse every three seconds. It reads hardware VBUS presence,
 not battery charge current or completion. See the shared guide for the colour table.
@@ -32,8 +32,9 @@ Bluetooth ingress validates lengths and copies bounded audio; a separate worker
 owns playback. I2S owns each successfully queued slab until transmission finishes.
 The worker bounds waits and stops the amplifier after playback or failure.
 
-Normal `trace-controls-v4` enables the corrected speaker endpoint but has **no
-startup sound**. The native TRACE app does not yet send voice prompts. The legacy
+Normal `trace-controls-v5` enables the corrected speaker endpoint and fixed event
+prompts, with **no automatic startup diagnostic**. TRACE app build 36 configures
+the prompts after connecting. The legacy
 endpoint accepts a four-byte little-endian byte count (even, 2–4000), then exactly
 that many bytes of 8 kHz signed 16-bit little-endian mono audio. Four-byte data
 packets remain data during an active transfer. Transfers time out after five
@@ -102,3 +103,63 @@ same factor to 22679. The short timing, I2S format and hardware gain are unchang
 The attended d5 diagnostic completed both playbacks with zero driver errors.
 The listener confirmed "Clear and loud enough." The normal image retains this
 selected signal limit and disables the automatic tone/phrase sequence.
+
+
+## Spoken event prompts (v5 / TRACE build 36)
+
+| Phrase | Trigger |
+| --- | --- |
+| Connected | TRACE subscribes and enables prompts for this Bluetooth connection. |
+| Disconnected | A previously configured connection ends. |
+| Recording started | The phone applies a transition to active capture. |
+| Paused | The phone applies a transition from active capture to paused. Initial/repeated Pause writes stay quiet. |
+| Low battery | A valid sampled DevKit estimate reaches 20% or below; one warning until it recovers to at least 25%. |
+| Conversation summary completed | The app observes an actual completed summary for its active workspace. Opening an old conversation alone does not trigger it. |
+
+Turn **Spoken prompts** on or off in TRACE Settings → DevKit controls. It defaults
+on in the app. Firmware waits for app configuration on each connection; a fresh
+boot without an app connection has not yet enabled offline warnings. A summary
+may wait for reconnection for up to five minutes, then expires. App persistence
+scopes pending/delivered summaries by installation and backend, and deduplicates
+repeated completion polls. A Bluetooth write acknowledgement means accepted,
+not proof of acoustic output. Playback events report start, finish and failure.
+
+All six fixed 8 kHz PCM clips live in flash. A low-priority speaker worker plays
+them through I2S at the listener-selected 90% digital peak limit. A bounded,
+nonblocking queue keeps playback out of microphone and Bluetooth callbacks.
+Repeated pending phrases coalesce; outdated link/capture events are skipped.
+No microphone muting, capture pause, SD rewrite or network TTS request is used
+for a prompt. Speech can therefore be picked up by the microphone and appear in
+recordings/transcripts. This implementation does not provide echo cancellation.
+The phone saves playback windows in local `Diagnostics/spoken-prompts.jsonl`;
+these are provenance markers, not removed audio or automatic transcript edits.
+
+### Fixed-phrase Bluetooth protocol
+
+The service is appended after existing services so their handles stay stable:
+
+- Service: `A71C0020-6B8D-4E75-A1B2-7D0E6F545243`
+- Write-with-response command: `A71C0021-6B8D-4E75-A1B2-7D0E6F545243`
+- Read/notify events: `A71C0022-6B8D-4E75-A1B2-7D0E6F545243`
+
+Commands are exactly two bytes: `[1, 0|1]` configures prompts; `[2, 6]` queues
+the real summary-completed event; `[3, 1...6]` requests an explicitly marked
+preview without changing connection, recording or battery state. IDs follow
+the table above. The 20-byte status is version (1), phase (0 initial, 1 start,
+2 finish, 3 failure), ID (0 initial), flags (bit 0 enabled, bit 1 preview),
+sequence u32 LE, device uptime milliseconds u64 LE, result i32 LE. Device uptime
+must not be treated as UTC. The app also records actual receipt UTC. Firmware
+can speak while disconnected, when the phone cannot receive event notifications;
+USB logs were used to verify that path in the attended check.
+
+Additional host policy regression check:
+
+```sh
+clang -std=c11 -fsanitize=address,undefined \
+  firmware/trace-controls-v1/tests/check_prompt_policy.c -o /tmp/trace-prompt-policy
+/tmp/trace-prompt-policy
+```
+
+This exercises transition suppression, mute, reconnect epochs, stale events and
+low-battery hysteresis. Physical simultaneous-recording results are recorded in
+[the build 36 validation note](../../docs/TRACE36_SPOKEN_PROMPTS.md).

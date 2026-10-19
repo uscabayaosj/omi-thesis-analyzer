@@ -48,3 +48,17 @@ s=s[:start]+"""    if (offset || (flags & BT_GATT_WRITE_FLAG_PREPARE))
     int result = speak(len, buf);
     if (result < 0) return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
     return result;"""+s[end:];p.write_text(s)
+
+# Local phrase hooks run after actual state changes. Never gate the microphone.
+replace('src/transport.c','    mic_set_capture_active(value != 0);','    mic_set_capture_active(value != 0);\n    trace_prompt_capture(value != 0);')
+replace('src/transport.c','    is_connected = true;','    is_connected = true;\n    trace_prompt_link(true);')
+replace('src/transport.c','    is_connected = false;','    is_connected = false;\n    trace_prompt_link(false);')
+replace('src/transport.c','        int err = bt_bas_set_battery_level(battery_percentage);','        trace_prompt_battery(battery_percentage);\n        int err = bt_bas_set_battery_level(battery_percentage);')
+# Append the new service after all existing handles and before advertising.
+replace('src/transport.c','#ifdef CONFIG_OMI_ENABLE_SPEAKER\n    register_speaker_service();\n#endif','')
+replace('src/transport.c','    err = bt_le_adv_start(BT_LE_ADV_CONN, bt_ad, ARRAY_SIZE(bt_ad), bt_sd, ARRAY_SIZE(bt_sd));','#ifdef CONFIG_OMI_ENABLE_SPEAKER\n    register_speaker_service();\n#endif\n    err = bt_le_adv_start(BT_LE_ADV_CONN, bt_ad, ARRAY_SIZE(bt_ad), bt_sd, ARRAY_SIZE(bt_sd));')
+# Keep the existing battery worker sampling after a disconnect, so a running
+# offline DevKit can warn once too. Power-off cancellation is preserved.
+p=u/'src/transport.c';s=p.read_text();a=s.index('void broadcast_battery_level(struct k_work *work_item)\n{');b=s.index('//\n// Connection Callbacks',a)
+part=s[a:b].replace('    if (!is_connected) {\n        return;\n    }\n','',1).replace('    if (is_connected) {\n        k_work_reschedule_for_queue(&battery_work_queue, &battery_work,\n                                    K_MSEC(BATTERY_REFRESH_INTERVAL));\n    }','    k_work_reschedule_for_queue(&battery_work_queue, &battery_work, K_MSEC(BATTERY_REFRESH_INTERVAL));')
+s=s[:a]+part+s[b:];a=s.index('static void _transport_disconnected');b=s.index('static bool _le_param_req',a);part=s[a:b].replace('    k_work_cancel_delayable(&battery_work);','    /* Battery worker continues for offline low-battery warnings. */');s=s[:a]+part+s[b:];p.write_text(s)

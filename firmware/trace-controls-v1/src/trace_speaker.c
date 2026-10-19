@@ -11,6 +11,8 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/atomic.h>
+#include <zephyr/bluetooth/gatt.h>
+#include "trace_prompt_policy.h"
 
 LOG_MODULE_REGISTER(speaker, CONFIG_LOG_DEFAULT_LEVEL);
 #define MAX_HAPTIC_DURATION 5000
@@ -36,6 +38,16 @@ static size_t expected, received;
 static int64_t last_packet;
 static bool initialized, queued;
 static atomic_t powered_off;
+#include "trace_prompt_audio.h"
+struct prompt_job { uint32_t epoch; uint8_t id; bool preview; };
+K_MSGQ_DEFINE(prompt_jobs, sizeof(struct prompt_job), 8, 4);
+static atomic_t pending_prompts;
+static struct k_spinlock prompt_lock;
+static struct trace_prompt_policy prompt_policy = {.battery=-1};
+static uint8_t prompt_status[20] = {1};
+static uint32_t prompt_sequence;
+static bool enqueue_prompt(unsigned id, bool preview);
+static void prompt_report(uint8_t id, uint8_t phase, bool preview, int result);
 #ifdef CONFIG_TRACE_SPEAKER_SELF_TEST
 #include "trace_speaker_phrase.h"
 static bool diagnostic;
@@ -94,6 +106,20 @@ static void playback_thread(void *a, void *b, void *c)
 {
     for (;;) {
         k_sem_take(&play_ready, K_FOREVER);
+        struct prompt_job job;
+        while (!k_msgq_get(&prompt_jobs, &job, K_NO_WAIT)) {
+            atomic_and(&pending_prompts, ~BIT(job.id));
+            k_spinlock_key_t key=k_spin_lock(&prompt_lock);
+            bool valid=prompt_policy_valid(&prompt_policy,job.id,job.epoch,job.preview);
+            k_spin_unlock(&prompt_lock,key);
+            if (!valid || atomic_get(&powered_off)) continue;
+            const struct prompt_clip *clip=&prompt_clips[job.id];
+            LOG_INF("TRACE prompt START id=%u preview=%u uptime=%lld: %s", job.id,job.preview,k_uptime_get(),clip->name);
+            prompt_report(job.id,1,job.preview,0);
+            int result=play_pcm(clip->pcm,clip->bytes);
+            prompt_report(job.id,result ? 3 : 2,job.preview,result);
+            LOG_INF("TRACE prompt END id=%u result=%d uptime=%lld",job.id,result,k_uptime_get());
+        }
         k_mutex_lock(&audio_lock, K_FOREVER);
 #ifdef CONFIG_TRACE_SPEAKER_SELF_TEST
         if (diagnostic) {
@@ -107,11 +133,13 @@ static void playback_thread(void *a, void *b, void *c)
                 err = play_pcm(trace_phrase, sizeof(trace_phrase));
                 LOG_INF("Speaker diagnostic phrase END result=%d", err);
             }
+            queued = false; expected = received = 0;
         } else
 #endif
-        if (queued) play_pcm(mono, expected);
-        queued = false;
-        expected = received = 0;
+        if (queued) {
+            play_pcm(mono, expected);
+            queued = false; expected = received = 0;
+        }
         k_mutex_unlock(&audio_lock);
     }
 }
@@ -203,9 +231,97 @@ int play_boot_sound(void)
     return 0;
 }
 
-/* Legacy optional haptic service is intentionally not registered. TRACE uses
- * its acknowledged controls service and independent nonblocking motor worker. */
-void register_speaker_service(void) {}
+
+#ifdef CONFIG_OMI_ENABLE_SPEAKER
+static struct bt_uuid_128 prompts_uuid=BT_UUID_INIT_128(BT_UUID_128_ENCODE(0xA71C0020,0x6B8D,0x4E75,0xA1B2,0x7D0E6F545243));
+static struct bt_uuid_128 prompts_command_uuid=BT_UUID_INIT_128(BT_UUID_128_ENCODE(0xA71C0021,0x6B8D,0x4E75,0xA1B2,0x7D0E6F545243));
+static struct bt_uuid_128 prompts_events_uuid=BT_UUID_INIT_128(BT_UUID_128_ENCODE(0xA71C0022,0x6B8D,0x4E75,0xA1B2,0x7D0E6F545243));
+static ssize_t prompts_read(struct bt_conn *c,const struct bt_gatt_attr *a,void *b,uint16_t n,uint16_t o) {
+    uint8_t packet[20]; k_spinlock_key_t key=k_spin_lock(&prompt_lock);
+    memcpy(packet,prompt_status,sizeof(packet)); k_spin_unlock(&prompt_lock,key);
+    return bt_gatt_attr_read(c,a,b,n,o,packet,sizeof(packet));
+}
+static void prompts_ccc(const struct bt_gatt_attr *a,uint16_t value) {}
+static ssize_t prompts_write(struct bt_conn *c,const struct bt_gatt_attr *a,const void *b,uint16_t n,uint16_t o,uint8_t flags) {
+    if(o) return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
+    if(n!=2) return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
+    if(flags & BT_GATT_WRITE_FLAG_PREPARE) return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
+    const uint8_t *v=b;
+    if(v[0]==1 && v[1]<=1) {
+        k_spinlock_key_t key=k_spin_lock(&prompt_lock);
+        unsigned id=prompt_policy_configure(&prompt_policy,v[1]);
+        int battery=prompt_policy.battery;
+        prompt_status[3]=(prompt_status[3]&~1)|(v[1]?1:0);
+        k_spin_unlock(&prompt_lock,key);
+        if(id) enqueue_prompt(id,false);
+        trace_prompt_battery(battery);
+    } else if((v[0]==2 && v[1]==6) || (v[0]==3 && v[1]>=1 && v[1]<=6)) {
+        /* Fixed-phrase preview also permits attended testing without faking
+         * connection/capture/battery state. Summary (6) is the app event. */
+        if(!enqueue_prompt(v[1],v[0]==3)) return BT_GATT_ERR(BT_ATT_ERR_INSUFFICIENT_RESOURCES);
+    } else return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
+    return n;
+}
+static struct bt_gatt_attr prompt_attrs[]={
+    BT_GATT_PRIMARY_SERVICE(&prompts_uuid),
+    BT_GATT_CHARACTERISTIC(&prompts_command_uuid.uuid,BT_GATT_CHRC_WRITE,BT_GATT_PERM_WRITE,NULL,prompts_write,NULL),
+    BT_GATT_CHARACTERISTIC(&prompts_events_uuid.uuid,BT_GATT_CHRC_READ|BT_GATT_CHRC_NOTIFY,BT_GATT_PERM_READ,prompts_read,NULL,NULL),
+    BT_GATT_CCC(prompts_ccc,BT_GATT_PERM_READ|BT_GATT_PERM_WRITE),
+};
+static struct bt_gatt_service prompts_service=BT_GATT_SERVICE(prompt_attrs);
+static bool enqueue_prompt(unsigned id,bool preview) {
+    if(!initialized || atomic_get(&powered_off) || id<1 || id>6) return false;
+    k_spinlock_key_t key=k_spin_lock(&prompt_lock);
+    struct prompt_job j={.epoch=prompt_policy.epoch,.id=id,.preview=preview};
+    bool allowed=prompt_policy_valid(&prompt_policy,id,j.epoch,preview);
+    k_spin_unlock(&prompt_lock,key);
+    if(!allowed) return false;
+    atomic_val_t bit=BIT(id);
+    if(atomic_or(&pending_prompts,bit)&bit) return true; /* coalesce pending phrase */
+    if(k_msgq_put(&prompt_jobs,&j,K_NO_WAIT)) { atomic_and(&pending_prompts,~bit); return false; }
+    k_sem_give(&play_ready); return true;
+}
+static void prompt_report(uint8_t id,uint8_t phase,bool preview,int result) {
+    uint8_t packet[20]={1,phase,id};
+    k_spinlock_key_t key=k_spin_lock(&prompt_lock);
+    packet[3]=(prompt_policy.enabled?1:0)|(preview?2:0);
+    sys_put_le32(++prompt_sequence,packet+4);
+    sys_put_le64(k_uptime_get(),packet+8);
+    sys_put_le32((uint32_t)result,packet+16);
+    memcpy(prompt_status,packet,sizeof(packet)); k_spin_unlock(&prompt_lock,key);
+    /* Low-priority playback thread, never microphone/codec/GATT/system work. */
+    (void)bt_gatt_notify(NULL,&prompt_attrs[4],packet,sizeof(packet));
+}
+#endif
+void register_speaker_service(void) {
+#ifdef CONFIG_OMI_ENABLE_SPEAKER
+    int err=bt_gatt_service_register(&prompts_service);
+    LOG_INF("TRACE spoken prompt service=%d",err);
+#endif
+}
+void trace_prompt_link(bool linked) {
+#ifdef CONFIG_OMI_ENABLE_SPEAKER
+    k_spinlock_key_t key=k_spin_lock(&prompt_lock);
+    unsigned id=prompt_policy_link(&prompt_policy,linked); k_spin_unlock(&prompt_lock,key);
+    if(id) enqueue_prompt(id,false);
+#endif
+}
+void trace_prompt_capture(bool active) {
+#ifdef CONFIG_OMI_ENABLE_SPEAKER
+    k_spinlock_key_t key=k_spin_lock(&prompt_lock);
+    unsigned id=prompt_policy_capture(&prompt_policy,active); k_spin_unlock(&prompt_lock,key);
+    if(id) enqueue_prompt(id,false);
+#endif
+}
+void trace_prompt_battery(int percent) {
+#ifdef CONFIG_OMI_ENABLE_SPEAKER
+    k_spinlock_key_t key=k_spin_lock(&prompt_lock);
+    unsigned id=prompt_policy_battery(&prompt_policy,percent); k_spin_unlock(&prompt_lock,key);
+    if(id && !enqueue_prompt(id,false)) {
+        key=k_spin_lock(&prompt_lock); prompt_policy.low_latched=false; k_spin_unlock(&prompt_lock,key);
+    }
+#endif
+}
 
 int init_haptic_pin()
 {

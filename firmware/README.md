@@ -6,7 +6,7 @@ Firmware sources and integration patches for the TRACE iPhone app and Omi DevKit
 
 | Directory | Purpose |
 | --- | --- |
-| [trace-controls-v1](trace-controls-v1/) | Current button-only firmware, advertised as `trace-controls-v4`. Includes SD recording and vibration feedback. The folder name is historical. |
+| [trace-controls-v1](trace-controls-v1/) | Current button-only firmware, advertised as `trace-controls-v5`. Includes SD recording, vibration feedback and spoken event prompts. The folder name is historical. |
 | [trace-sd-v1](trace-sd-v1/) | SD recording base, advertised as `trace-sd-v3`. Includes the project-local SD synchronization correction. |
 | [trace-devkit2-test](trace-devkit2-test/) | Earlier BLE audio, standby, battery, LED, and backpressure patches/configurations. Historical building blocks; use the consolidated SD base for the current build. |
 
@@ -94,3 +94,16 @@ builds have no startup sound. The separate `trace-speaker-d5` configuration play
 one brief tone and phrase after boot for an attended hardware check; see the
 [controls speaker notes](trace-controls-v1/README.md#speaker-correction-and-diagnostic).
 Speaker presence/output still requires an acoustic check on the actual device.
+
+
+## Spoken prompts revision
+
+`trace-controls-v5`, paired with TRACE app build 36, adds Connected, Disconnected,
+Recording started, Paused, Low battery, and Conversation summary completed.
+The app's DevKit controls settings include a single spoken-prompts switch.
+Fixed clips play locally on a separate worker; recording continues throughout.
+They may be audible in the recorded conversation: playback windows are logged,
+but there is no microphone muting or echo cancellation. The low-battery warning
+uses a capped voltage estimate, not calibrated remaining runtime. See the
+[trigger rules and BLE protocol](trace-controls-v1/README.md#spoken-event-prompts-v5--trace-build-36)
+and [build 36 validation](../docs/TRACE36_SPOKEN_PROMPTS.md).
