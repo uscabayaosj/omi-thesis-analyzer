@@ -52,7 +52,7 @@ final class CaptureDiagnostics {
             "sequence": event.sequence, "deviceUptimeMilliseconds": event.deviceUptimeMilliseconds,
             "result": event.result, "preview": event.preview, "capturePaused": paused,
             "captureSession": sessionID.uuidString, "writtenFramesAtReceipt": written,
-            "note": "Speaker playback window; originals remain continuous and may contain this prompt"
+            "note": "Device audio alert window; originals remain continuous and may contain the alert"
         ])
     }
 

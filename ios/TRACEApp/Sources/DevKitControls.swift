@@ -138,13 +138,21 @@ struct DevKitControlsView: View {
                 Toggle("Quiet vibration feedback", isOn: $preferences.feedback).disabled(!preferences.enabled)
             } header: { Text("DevKit controls") }
             footer: { Text("Requires TRACE controls firmware and an active Bluetooth connection.") }
-            Section("Spoken prompts") {
-                Toggle("DevKit spoken prompts", isOn: $speech.enabled)
+            Section("Tone alerts") {
+                Toggle("DevKit tone alerts", isOn: $speech.enabled)
                 Text(capture.spokenPromptsStatus).font(.footnote).foregroundStyle(.secondary)
-                Text("Connected, disconnected, recording started, paused, low battery, and conversation summary completed. Uses the selected 90% signal level. Summary prompts require the app and are queued for up to five minutes when disconnected.")
+                Text("Short tones at the selected 100% digital signal level. Requires controls-v6 firmware; older firmware may still speak. Summary alerts require the app and wait up to five minutes when disconnected.")
                     .font(.footnote).foregroundStyle(.secondary)
-                Text("The microphone keeps recording during speech. Prompts may be audible in saved audio and transcripts; playback windows are logged locally.")
+                Text("The microphone keeps recording during tones. Brief beeps may be audible in saved audio; playback windows are logged locally.")
                     .font(.footnote).foregroundStyle(.secondary)
+            }
+            Section("Tone patterns") {
+                LabeledContent("Connected", value: "Two rising notes")
+                LabeledContent("Disconnected", value: "Two falling notes")
+                LabeledContent("Recording started", value: "Two high beeps")
+                LabeledContent("Paused", value: "One low beep")
+                LabeledContent("Low battery", value: "Three low beeps")
+                LabeledContent("Summary completed", value: "Three rising notes")
             }
             Section("Button actions") {
                 Label("One button press: bookmark", systemImage: "bookmark")

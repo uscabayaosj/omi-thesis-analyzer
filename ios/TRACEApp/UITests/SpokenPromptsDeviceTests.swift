@@ -28,7 +28,7 @@ import XCTest
         XCTAssertTrue(app.tabBars.buttons["Capture"].firstMatch.waitForExistence(timeout: 15))
         app.tabBars.buttons["Capture"].firstMatch.tap()
         let promptStatus = app.descendants(matching: .any).matching(identifier: "trace.prompts.status").firstMatch
-        let connected = NSPredicate { _,_ in promptStatus.exists && promptStatus.label == "Spoken prompts connected" }
+        let connected = NSPredicate { _,_ in promptStatus.exists && promptStatus.label == "DevKit audio alerts connected" }
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: connected, object: nil)], timeout: 40), .completed)
         tap(app, "trace.prompts.disconnect")
         Thread.sleep(forTimeInterval: 2)

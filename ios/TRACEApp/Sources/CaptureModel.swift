@@ -117,7 +117,7 @@ final class CaptureModel {
     @ObservationIgnored private var serverSessionIDs = Set(UserDefaults.standard.stringArray(forKey: "trace.native.capture.serverSessions") ?? [])
     @ObservationIgnored private var serverSessionStatusTask: Task<Void, Never>?
     @ObservationIgnored private var announcedTranscriptIDs = Set<String>()
-    var spokenPromptsStatus = "Waiting for DevKit spoken prompts"
+    var spokenPromptsStatus = "Waiting for DevKit audio alerts"
     @ObservationIgnored private var summaryPrompts = (UserDefaults.standard.data(forKey: "trace.prompts.summaries").flatMap { try? JSONDecoder().decode(SummaryPromptQueue.self, from: $0) }) ?? SummaryPromptQueue()
     @ObservationIgnored private var summaryPromptInFlight = false
     func summaryCompleted(conversationID: String?, status: String?) {

@@ -61,7 +61,7 @@ final class PendantTransport: NSObject, @preconcurrency CBCentralManagerDelegate
     private func resetPrompts() {
         let callbacks = promptWrites; promptWrites.removeAll()
         promptCommand = nil; promptEvents = nil; promptSequence = nil; promptConfigured = false
-        onPromptStatus?("DevKit spoken prompts disconnected")
+        onPromptStatus?("DevKit audio alerts disconnected")
         for callback in callbacks { callback?(false) }
     }
     func synchronizePrompts() {
@@ -71,7 +71,7 @@ final class PendantTransport: NSObject, @preconcurrency CBCentralManagerDelegate
         promptWrites.append { [weak self] success in
             guard let self else { return }
             self.promptConfigured = success
-            self.onPromptStatus?(success ? "Spoken prompts connected" : "Could not configure spoken prompts")
+            self.onPromptStatus?(success ? "DevKit audio alerts connected" : "Could not configure audio alerts")
             if success { self.onPromptReady?() }
         }
         peripheral.writeValue(Data([1, SpokenPromptPreferences.shared.enabled ? 1 : 0]), for: command, type: .withResponse)
@@ -283,7 +283,7 @@ final class PendantTransport: NSObject, @preconcurrency CBCentralManagerDelegate
             return
         }
         let services = peripheral.services ?? []
-        if !services.contains(where: { $0.uuid == CBUUID(string: SpokenPromptProtocol.service) }) { onPromptStatus?("Spoken prompts require TRACE controls v5 firmware") }
+        if !services.contains(where: { $0.uuid == CBUUID(string: SpokenPromptProtocol.service) }) { onPromptStatus?("Audio alerts require controls-v5 or later; tones require controls-v6") }
         if !services.contains(where: { $0.uuid == CBUUID(string: DevKitControlProtocol.service) }) { onControlsStatus?("Button controls require TRACE controls firmware") }
         guard services.contains(where: { $0.uuid == CBUUID(string: OmiBLEProtocol.serviceUUID) }) else {
             UserDefaults.standard.removeObject(forKey: pairedPeripheralKey)
@@ -439,7 +439,7 @@ final class PendantTransport: NSObject, @preconcurrency CBCentralManagerDelegate
     func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
         if characteristic.uuid == CBUUID(string: SpokenPromptProtocol.events) {
             if error == nil, characteristic.isNotifying { synchronizePrompts() }
-            else { onPromptStatus?("Spoken prompt subscription failed") }
+            else { onPromptStatus?("Audio alert subscription failed") }
             return
         }
         if characteristic.uuid == CBUUID(string: DevKitControlProtocol.events) {
