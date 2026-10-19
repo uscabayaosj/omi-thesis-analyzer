@@ -41,13 +41,13 @@ seconds without an accepted packet. Busy/invalid writes are rejected through ATT
 there is no playback-completion notification protocol. Each clip is at most
 250 ms; this is not a general continuous voice-streaming protocol.
 
-All PCM is clamped to +/-650 (about 2% of full-scale amplitude). This limits the
-digital signal, not acoustic loudness or speaker gain. This conservative limit
-should remain until the actual speaker is checked.
+All PCM is clamped to +/-29490 (about 90% of full-scale amplitude). This limits
+the digital signal, not acoustic loudness or amplifier gain. The attended
+listening results below record how this level was selected.
 
 For the explicitly attended speaker check, append `speaker-diagnostic.conf` to
 `EXTRA_CONF_FILE` after `trace-controls.conf`, separated by a semicolon. The
-result advertises `trace-speaker-d2`. About 15 seconds after transport startup it
+result advertises `trace-speaker-d5`. About 15 seconds after transport startup it
 plays a 240 ms quiet 400 Hz tone, waits 800 ms, then plays the locally synthesized
 phrase “TRACE speaker test.” once per boot. Diagnostic audio is stored in flash
 and excluded from the normal build. A listener must confirm audible output;
@@ -74,11 +74,31 @@ listener reported **no sound**. Those logs do not establish working audio output
 
 The inherited left-justified format does not match the MAX98357A specified for
 the reference Adafruit Audio BFF. The second diagnostic (`trace-speaker-d2`)
-uses standard I2S at the same low amplitude. This format correction still needs
-a listening check on the actual device. Production DevKit board revisions may
+uses standard I2S at the same low amplitude. The attended second diagnostic booted and completed both playbacks; the human
+listener confirmed hearing both the tone and an understandable phrase on one
+DevKit. This verifies acoustic output on that unit at the tested level.
+Simultaneous recording/playback and continuous Bluetooth voice streaming were
+not qualified in this check. Production DevKit board revisions may
 differ from the published reference assembly; neither a working I2S peripheral
 nor generic product documentation proves a speaker is installed or connected.
 
 Hardware references:
 - [Adafruit Audio BFF pins](https://learn.adafruit.com/adafruit-audio-bff/pinouts)
 - [MAX98357A vs MAX98357B audio formats](https://www.analog.com/en/products/max98357a.html)
+
+The human listener found the successful d2 phrase too quiet. Diagnostic d3 keeps
+standard I2S and raises the phrase peak from 650 to 2600 and tone peak from 500
+to 2000, without changing timing, the waveform, amplifier hardware gain, or host
+volume controls. The listener found this level still too quiet.
+
+The d3 playbacks completed successfully, but the listener still found the volume
+too low. Diagnostic d4 raises the phrase peak to 8192 (25% of signed full scale)
+and the tone to 6300, about +10 dB from d3, pending a listening-level check.
+
+At d4 the listener could not hear the tone and described the phrase as barely
+audible, then explicitly requested 90%. Diagnostic d5 raises the same waveform
+to a phrase peak of 29490 (90% of signed full scale), with the tone scaled by the
+same factor to 22679. The short timing, I2S format and hardware gain are unchanged.
+The attended d5 diagnostic completed both playbacks with zero driver errors.
+The listener confirmed "Clear and loud enough." The normal image retains this
+selected signal limit and disables the automatic tone/phrase sequence.

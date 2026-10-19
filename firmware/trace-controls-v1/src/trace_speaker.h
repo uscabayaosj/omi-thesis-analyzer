@@ -7,7 +7,7 @@ int speaker_init(void);
  * that many signed 16-bit LE mono bytes in even packets. Four-byte data
  * packets are data while a transfer is in progress. 5 s timeout resets it.
  * Returns accepted bytes or negative errno; queued/busy is rejected.
- * Complete clips play asynchronously, with peak limited to 650/32767. */
+ * Complete clips play asynchronously, with peak limited to 29490/32767. */
 int speak(uint16_t len, const void *buf);
 int play_boot_sound(void);
 int init_haptic_pin(void);

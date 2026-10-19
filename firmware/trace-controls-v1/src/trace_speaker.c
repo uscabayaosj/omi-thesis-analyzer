@@ -60,7 +60,7 @@ static int play_pcm(const uint8_t *pcm, size_t bytes)
             /* Clamp all incoming audio to the diagnostic's conservative peak.
              * This is a digital amplitude limit, not a calibrated sound level. */
             int16_t sample = (int16_t)sys_get_le16(pcm + sent + i * 2);
-            sample = CLAMP(sample, -650, 650);
+            sample = CLAMP(sample, -29490, 29490);
             stereo[i * 2] = sample;
             stereo[i * 2 + 1] = sample;
         }
@@ -149,7 +149,7 @@ int speaker_init(void)
     };
     err = i2s_configure(audio_speaker, I2S_DIR_TX, &config);
     initialized = !err;
-    LOG_INF("Speaker init result=%d; low amplitude limit=650", err);
+    LOG_INF("Speaker init result=%d; amplitude limit=29490", err);
     return err;
 #else
     return -ENOTSUP;

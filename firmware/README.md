@@ -90,7 +90,7 @@ README does not update an already-flashed DevKit.
 `trace-controls-v4` replaces the legacy speaker driver with bounded asynchronous
 playback, optional initialization, checked ingress and correct I2S buffer ownership.
 It retains the button controls, SD path and green USB-power indicator. Normal
-builds have no startup sound. The separate `trace-speaker-d2` configuration plays
-one quiet tone and phrase after boot for an attended hardware check; see the
+builds have no startup sound. The separate `trace-speaker-d5` configuration plays
+one brief tone and phrase after boot for an attended hardware check; see the
 [controls speaker notes](trace-controls-v1/README.md#speaker-correction-and-diagnostic).
 Speaker presence/output still requires an acoustic check on the actual device.
